@@ -1,0 +1,33 @@
+name: roe_advisor
+description: >
+  Sample "ROE Advisor" extension for Lattice C2.
+  AI-powered rules of engagement decision support with streaming responses.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  le_sdk:
+    path: ../../packages/le_sdk
+  lattice_common:
+    path: ../../packages/lattice_common
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: fonts/Roboto-Regular.ttf
+
+lattice_edge_extension:
+  type: web
+  entry: web/index.html
+  icon: shield
+  display_mode: panel
+  description: Rules of engagement decision support

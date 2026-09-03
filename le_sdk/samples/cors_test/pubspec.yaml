@@ -1,0 +1,37 @@
+name: cors_test
+description: >
+  Test extension that fetches an external URL to verify CORS proxy behavior.
+  Fetch succeeds when proxy is configured, fails with CORS error without it.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  le_sdk:
+    path: ../../packages/le_sdk
+  lattice_common:
+    path: ../../packages/lattice_common
+  web: ^1.1.0
+
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: fonts/Roboto-Regular.ttf
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: 6.0.0
+
+lattice_edge_extension:
+  type: web
+  entry: web/index.html
+  icon: http
+  display_mode: panel
+  description: CORS proxy test — fetches external URL

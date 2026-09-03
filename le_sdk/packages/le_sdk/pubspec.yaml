@@ -1,0 +1,18 @@
+name: le_sdk
+description: SDK for building Lattice Edge extensions
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.4.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  web: ^1.1.0
+  lattice_common:
+    path: ../lattice_common
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

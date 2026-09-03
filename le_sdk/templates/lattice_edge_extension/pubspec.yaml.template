@@ -1,0 +1,28 @@
+name: __ID__
+description: __DESCRIPTION__
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.4.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  le_sdk:
+    path: __SDK_PATH__
+
+flutter:
+  assets:
+    - assets/logo.png
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: fonts/Roboto-Regular.ttf
+
+lattice_edge_extension:
+  id: __ID__
+  name: __NAME__
+  description: __DESCRIPTION__
+  icon: extension
+  display_mode: panel

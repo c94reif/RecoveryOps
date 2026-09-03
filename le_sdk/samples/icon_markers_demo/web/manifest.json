@@ -1,0 +1,8 @@
+{
+  "name": "Icon Markers Demo",
+  "short_name": "IconMarkers",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0A0A0A",
+  "theme_color": "#FF6B35"
+}

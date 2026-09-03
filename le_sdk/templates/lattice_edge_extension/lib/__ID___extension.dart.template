@@ -1,0 +1,50 @@
+import 'package:flutter/material.dart';
+import 'package:le_sdk/le_sdk.dart';
+
+class __CLASS__Extension extends LatticeEdgeExtension {
+  @override
+  String get id => '__ID__';
+
+  @override
+  String get name => '__NAME__';
+
+  @override
+  String get description => '__DESCRIPTION__';
+
+  @override
+  ExtensionDisplayMode get defaultDisplayMode => ExtensionDisplayMode.panel;
+
+  @override
+  Widget build(ExtensionContext extensionContext) =>
+      __CLASS__ExtensionUI(extensionContext: extensionContext);
+}
+
+class __CLASS__ExtensionUI extends StatefulWidget {
+  final ExtensionContext extensionContext;
+  const __CLASS__ExtensionUI({super.key, required this.extensionContext});
+
+  @override
+  State<__CLASS__ExtensionUI> createState() => ___CLASS__ExtensionUIState();
+}
+
+class ___CLASS__ExtensionUIState extends State<__CLASS__ExtensionUI> {
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const ClampingScrollPhysics(),
+      padding: const EdgeInsets.all(16),
+      children: [
+        // TODO: Build your extension UI here
+        const Text(
+          '__NAME__',
+          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Edit lib/__ID___extension.dart to get started.',
+          style: TextStyle(color: Color(0xFF888888), fontSize: 13),
+        ),
+      ],
+    );
+  }
+}

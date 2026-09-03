@@ -1,0 +1,41 @@
+name: lace_report
+description: >
+  Sample "LACE Report" plugin for Lattice C2.
+  Includes a Dart/native implementation (lib/) and a web implementation
+  (web/) demonstrating the LatticePlugin JS bridge.
+  LACE: Liquids, Ammunition, Casualties, Equipment status report.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  le_sdk:
+    path: ../../packages/le_sdk
+  lattice_common:
+    path: ../../packages/lattice_common
+
+dev_dependencies:
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"
+
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: fonts/Roboto-Regular.ttf
+
+lattice_edge_extension:
+  type: web
+  entry: web/index.html
+  icon: analytics
+  display_mode: panel
+  description: Submit logistics status reports (Liquids, Ammunition, Casualties, Equipment)

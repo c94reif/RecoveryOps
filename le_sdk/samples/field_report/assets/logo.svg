@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2D3A1F"/>
+      <stop offset="100%" style="stop-color:#1A2410"/>
+    </linearGradient>
+    <linearGradient id="clip" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B7D3C"/>
+      <stop offset="100%" style="stop-color:#6B5D2C"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#E8E0C8"/>
+      <stop offset="100%" style="stop-color:#D4C9A8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="80" fill="url(#bg)"/>
+
+  <!-- Outer border - military stencil style -->
+  <rect x="16" y="16" width="480" height="480" rx="68" fill="none" stroke="#4A5A2A" stroke-width="4" stroke-dasharray="12,6"/>
+
+  <!-- Clipboard body -->
+  <rect x="128" y="120" width="256" height="320" rx="12" fill="url(#clip)" stroke="#5A4D1C" stroke-width="3"/>
+
+  <!-- Clipboard clip top -->
+  <rect x="192" y="100" width="128" height="48" rx="8" fill="#6B5D2C" stroke="#5A4D1C" stroke-width="2"/>
+  <rect x="216" y="108" width="80" height="16" rx="8" fill="#3A3A2A"/>
+
+  <!-- Paper -->
+  <rect x="148" y="152" width="216" height="272" rx="4" fill="url(#paper)"/>
+
+  <!-- Classification header bar -->
+  <rect x="148" y="152" width="216" height="36" rx="4" fill="#8B2500"/>
+  <text x="256" y="176" font-family="monospace" font-size="16" font-weight="bold" fill="#FFD700" text-anchor="middle" letter-spacing="4">FIELD REPORT</text>
+
+  <!-- Report lines -->
+  <rect x="168" y="204" width="160" height="3" rx="1" fill="#8B8060"/>
+  <rect x="168" y="220" width="176" height="3" rx="1" fill="#8B8060"/>
+  <rect x="168" y="236" width="140" height="3" rx="1" fill="#8B8060"/>
+
+  <!-- Separator -->
+  <line x1="168" y1="256" x2="344" y2="256" stroke="#8B8060" stroke-width="1" stroke-dasharray="4,3"/>
+
+  <!-- Grid/form lines -->
+  <rect x="168" y="272" width="80" height="3" rx="1" fill="#6B6040"/>
+  <rect x="268" y="272" width="76" height="3" rx="1" fill="#6B6040"/>
+  <rect x="168" y="292" width="80" height="3" rx="1" fill="#6B6040"/>
+  <rect x="268" y="292" width="76" height="3" rx="1" fill="#6B6040"/>
+  <rect x="168" y="312" width="80" height="3" rx="1" fill="#6B6040"/>
+  <rect x="268" y="312" width="76" height="3" rx="1" fill="#6B6040"/>
+
+  <!-- Location marker icon -->
+  <circle cx="208" cy="370" r="16" fill="none" stroke="#4A5A2A" stroke-width="3"/>
+  <circle cx="208" cy="370" r="6" fill="#4A5A2A"/>
+  <line x1="208" y1="386" x2="208" y2="400" stroke="#4A5A2A" stroke-width="3"/>
+
+  <!-- Checkmark -->
+  <polyline points="268,362 288,382 320,350" fill="none" stroke="#4A7A2A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Military star watermark -->
+  <polygon points="256,60 264,80 286,80 268,92 276,112 256,100 236,112 244,92 226,80 248,80" fill="#4A5A2A" opacity="0.6"/>
+</svg>

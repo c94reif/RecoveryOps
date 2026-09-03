@@ -1,0 +1,12 @@
+[
+  {
+    "Algorithm": "SHA256",
+    "Hash": "C3EC503BD34C0557F209A38C4145C33CFF5D5D43A3E1680CA01E5949842B4A1A",
+    "FileName": "app-debug.apk"
+  },
+  {
+    "Algorithm": "SHA256",
+    "Hash": "D9E74912395E9514DD3037AB844019361F16F2DCE425BA6A6E8A0E03E96B6EEB",
+    "FileName": "app-release.apk"
+  }
+]

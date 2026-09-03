@@ -1,0 +1,28 @@
+name: entity_task_manager
+description: >
+  Sample extension demonstrating EntityService and TaskService APIs.
+  Create, browse, and manage entities and tasks via the Lattice SDK.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  le_sdk:
+    path: ../../packages/le_sdk
+  lattice_common:
+    path: ../../packages/lattice_common
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
+
+lattice_edge_extension:
+  type: native
+  icon: hub
+  display_mode: panel
+  description: Create and manage entities and tasks

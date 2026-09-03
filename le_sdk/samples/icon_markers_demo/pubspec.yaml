@@ -1,0 +1,33 @@
+name: icon_markers_demo
+description: >
+  Sample extension demonstrating all 18 icon marker types with 4 disposition
+  colors. Places markers in a grid near the current map center.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  le_sdk:
+    path: ../../packages/le_sdk
+  lattice_common:
+    path: ../../packages/lattice_common
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.svg
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: fonts/Roboto-Regular.ttf
+
+lattice_edge_extension:
+  type: web
+  entry: web/index.html
+  icon: map
+  display_mode: panel
+  description: Demo of all 18 icon marker types with disposition colors

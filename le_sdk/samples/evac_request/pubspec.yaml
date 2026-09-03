@@ -1,0 +1,42 @@
+name: evac_request
+description: >
+  Sample "Call for Evac" plugin for Lattice C2.
+  Includes a Dart/native implementation (lib/) and a web implementation
+  (web/) demonstrating the LatticePlugin JS bridge.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  lattice_common:
+    path: ../../packages/lattice_common
+  le_sdk:
+    path: ../../packages/le_sdk
+
+dev_dependencies:
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: fonts/Roboto-Regular.ttf
+
+lattice_edge_extension:
+  type: web
+  entry: web/index.html
+  icon: medical
+  display_mode: panel
+  description: Submit MEDEVAC / evacuation requests with location and priority

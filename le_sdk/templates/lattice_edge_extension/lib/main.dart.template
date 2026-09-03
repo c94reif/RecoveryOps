@@ -1,0 +1,23 @@
+import 'package:flutter/material.dart';
+import 'package:le_sdk/le_sdk.dart';
+
+import '__ID___extension.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final extensionContext = await ExtensionContext.connect();
+
+  runApp(MaterialApp(
+    debugShowCheckedModeBanner: false,
+    theme: ThemeData.dark().copyWith(
+      scaffoldBackgroundColor: const Color(0xFF0A0A0A),
+    ),
+    home: Scaffold(
+      appBar: AppBar(
+        title: const Text('__NAME__ — Preview'),
+        backgroundColor: const Color(0xFF0A0A0A),
+      ),
+      body: __CLASS__Extension().build(extensionContext),
+    ),
+  ));
+}

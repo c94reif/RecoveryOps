@@ -1,0 +1,43 @@
+name: casevac_report
+description: >
+  Sample "CASEVAC 9-Line" plugin for Lattice C2.
+  Includes a Dart/native implementation (lib/) and a web implementation
+  (web/) demonstrating the LatticePlugin JS bridge.
+  9-Line MEDEVAC/CASEVAC request format for casualty evacuation.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  lattice_common:
+    path: ../../packages/lattice_common
+  le_sdk:
+    path: ../../packages/le_sdk
+
+dev_dependencies:
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: fonts/Roboto-Regular.ttf
+
+lattice_edge_extension:
+  type: web
+  entry: web/index.html
+  icon: medical
+  display_mode: panel
+  description: Submit 9-Line CASEVAC/MEDEVAC requests with full tactical detail

@@ -1,0 +1,11 @@
+name: lattice_common
+description: Shared types for Lattice Edge
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter

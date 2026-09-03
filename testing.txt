@@ -1,0 +1,14 @@
+# Lattice Mesh Configuration (for Anduril integration)
+#LATTICE_MESH_ENV_TOKEN="" # Lattice environment bearer token
+#LATTICE_MESH_SANDBOX_BEARER_TOKEN="" # Lattice sandbox authorization token
+#LATTICE_RESOURCE_ENDPOINT="" # Lattice resource endpoint (e.g. lattice-XXXXX.env.sandboxes.developer.anduril.com)
+LATTICE_RESOURCE_ENDPOINT="lattice-fdv50z.env.sandboxes.developer.anduril.com"
+
+
+password: Arizona_friendly_split_tucker_229302
+
+
+user@internal.local
+
+christopher.a.reif.mil@army.mil
+Germanyus1941!

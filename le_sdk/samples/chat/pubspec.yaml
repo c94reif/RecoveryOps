@@ -1,0 +1,40 @@
+name: chat
+description: >
+  Sample "Chat" plugin for Lattice C2.
+  Peer-to-peer LAN chat with text, emoji, and voice notes.
+  Includes a Dart/native implementation (lib/) and a web stub (web/).
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_inappwebview: ^6.1.5
+  lattice_common:
+    path: ../../packages/lattice_common
+  le_sdk:
+    path: ../../packages/le_sdk
+  sqflite: ^2.3.0
+  path_provider: ^2.1.0
+  path: ^1.8.0
+  uuid: ^4.2.1
+  record: 7.0.0
+  audioplayers: ^6.0.0
+  permission_handler: 12.0.3
+
+flutter:
+  assets:
+    - assets/logo.png
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: fonts/Roboto-Regular.ttf
+
+lattice_plugin:
+  type: web
+  entry: web/index.html
+  icon: chat
+  display_mode: panel

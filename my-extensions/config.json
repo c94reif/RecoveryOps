@@ -1,0 +1,8 @@
+{
+  "lattice_connections": [
+    {
+      "url": "https://lattice-s56c5y.env.sandboxes.developer.anduril.com/",
+      "token": "eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3ODY1NDUyNDksImlzcyI6ImFuZHVyaWwiLCJqdGkiOiI5MzcxNmVmNy05NDgzLTQ0ZDYtYmNhYy05OWUxYmIyYWZhOTAiLCJuYmYiOjE3Nzc5MDUyMzksInN1YiI6InVzZXIvMDhmNWRlY2YtMzJmMy00NTEyLTk4MzMtOTJiMjg5NDNlYzNjIiwidG9rZW5fc291cmNlIjoxfQ.qErtCOPcbTwVYPRsF70tfu3wjSwTvPDSqyBRMspEJfQ"
+    }
+  ]
+}
