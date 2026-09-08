@@ -1,0 +1,69 @@
+#!/bin/sh
+
+
+branch=$(git rev-parse --abbrev-ref HEAD)
+
+
+[ "$branch" = "HEAD" ] && exit 0
+
+
+if [ "$branch" = "main" ]; then
+  echo ""
+  echo "🚫 Don't commit directly to main — create a branch first:"
+  echo "   git checkout -b feature/my-change"
+  echo ""
+  exit 1
+fi
+
+
+if ! echo "$branch" | grep -qE '^(feature|bug|refactor|chore)/[a-z0-9._-]+$'; then
+  echo ""
+  echo "🚫 Invalid branch name: '$branch'"
+  echo ""
+  echo "Branch names must follow the pattern:"
+  echo "   feature/<short-description>"
+  echo "   bug/<short-description>"
+  echo ""
+  echo "Examples: spaces are not allowed, need - between words"
+  echo "   feature/nfc-tag-scanning"
+  echo "   bug/ios-nfc-session-crash"
+  echo "   refactor/strategy-pattern"
+ echo ""
+  echo "Rename your current branch with:"
+  echo "   git branch -m feature/my-change"
+  echo ""
+  exit 1
+fi
+
+
+echo "Format checking"
+dart format --set-exit-if-changed lib test || {
+  echo ""
+  echo "🚫 Formatting issues found (fixed in working tree)."
+  echo "   Review the changes, then: git add -u && git commit again"
+  exit 1
+}
+
+echo "analyzer running"
+flutter analyze || {
+  echo ""
+  echo "🚫 Analyzer found issues. Fix them before committing."
+  exit 1
+}
+
+echo "file length check running (400 executable lines, imports & comments excluded)"
+dart run tool/check_file_length.dart || {
+  echo ""
+  echo "🚫 One or more components exceed the 400 executable-line limit."
+  exit 1
+}
+
+echo "app version sync check running (About screen mirrors pubspec.yaml)"
+dart run tool/sync_version.dart --check || {
+  echo ""
+  echo "🚫 App version is out of sync with pubspec.yaml."
+  echo "   Run: dart run tool/sync_version.dart  then stage lib/app/app_version.g.dart"
+  exit 1
+}
+
+echo "✅ Pre-commit checks passed"

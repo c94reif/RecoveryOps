@@ -1,17 +1,18 @@
-# ivy_pulse
+# Ivy Pulse
 
-A new Flutter project.
+## General Info:
+Companion application for **Convoy Ops**
+> Developers:
+> - Christopher Reif
+    >   - Phone Number: (580)919-0457
+>   - Email:
+      >     - Military: christopher.a.reif.mil@army.mil
+>     - Personal: reifc@protonmail.com
+> - Jesus Ambroio
+>   - Phone Number: (224)253-2169
+>   - Email:
+>     - Military: jesus.ambroio.mil@army.mil
+>     - Personal: jesus.ambrocio@outlook.com
+ ---
 
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+testing
