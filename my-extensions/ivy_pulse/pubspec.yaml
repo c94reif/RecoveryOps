@@ -1,0 +1,28 @@
+name: ivy_pulse
+description: A Lattice Edge extension
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.4.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  le_sdk:
+    path: ../../packages/le_sdk
+
+flutter:
+  assets:
+    - assets/logo.png
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: fonts/Roboto-Regular.ttf
+
+lattice_edge_extension:
+  id: ivy_pulse
+  name: Lattice Edge App to aid Soldiers in properly PMCSing
+  description: A Lattice Edge extension
+  icon: extension
+  display_mode: panel
