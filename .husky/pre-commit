@@ -1,7 +1,6 @@
 #!/bin/sh
 
 
-# The pre-commit hooks are re-used from my previous projects Christopher Reif - creif3
 branch=$(git rev-parse --abbrev-ref HEAD)
 
 

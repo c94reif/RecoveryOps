@@ -1,7 +1,6 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-# The pre-push hooks are re-used from my previous projects Christopher Reif - creif3
 
 protected="main"
 

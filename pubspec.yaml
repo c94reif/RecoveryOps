@@ -1,0 +1,14 @@
+name: ivy_pulse
+description: A Lattice Edge extension
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.4.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  husky: ^0.1.7
