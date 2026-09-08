@@ -1,0 +1,33 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# The pre-push hooks are re-used from my previous projects Christopher Reif - creif3
+
+protected="main"
+
+while read local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/$protected" ]; then
+    echo ""
+    echo " Direct pushes to '$protected' are not allowed."
+    echo ""
+    echo "Create a feature branch and open a PR instead:"
+    echo "  git checkout -b feature/my-change"
+    echo "  git push -u origin feature/my-change"
+    echo ""
+    exit 1
+  fi
+done
+
+echo "running tests with coverage"
+flutter test --coverage || {
+  echo ""
+  echo "🚫 Tests failed. Fix them before pushing."
+  exit 1
+}
+
+echo "coverage gate running (80% minimum, generated files excluded)"
+dart run tool/check_coverage.dart || {
+  echo ""
+  echo "🚫 Coverage is below the 80% minimum. Add tests before pushing."
+  exit 1
+}
