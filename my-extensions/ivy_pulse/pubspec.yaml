@@ -10,7 +10,11 @@ dependencies:
   flutter:
     sdk: flutter
   le_sdk:
-    path: ../../packages/le_sdk
+    path: ../../le_sdk/packages/le_sdk
+
+
+dev_dependencies:
+  husky: ^0.1.7
 
 flutter:
   assets:
