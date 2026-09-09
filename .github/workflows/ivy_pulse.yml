@@ -12,7 +12,7 @@ on:
 
 env:
   FLUTTER_VERSION: "3.44.1"
-  WORKING_DIR: my-extensions/ivy_pulse
+  WORKING_DIR_IVY_PULSE: my-extensions/ivy_pulse
 
 permissions:
   contents: read
@@ -35,21 +35,21 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: flutter pub get ${{ env.WORKING_DIR }}
+        working-directory: ${{ env.WORKING_DIR_IVY_PULSE }}
+        run: flutter pub get
 
       - name: Verify formatting
-        run: dart format --output=none --set-exit-if-changed  ${{ env.WORKING_DIR }}
+        working-directory: ${{ env.WORKING_DIR_IVY_PULSE }}
+        run: dart format --output=none --set-exit-if-changed
 
-      - name: Static analysis (fail on any issue, not just errors)
-        run: flutter analyze ${{ env.WORKING_DIR }} --no-fatal-infos --no-fatal-warnings
+      - name: Static analysis (fail on errors)
+        working-directory: ${{ env.WORKING_DIR_IVY_PULSE }}
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
   test:
     name:  Unit & Widget Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: analyze
-    defaults:
-      run:
-        working-directory: ${{ env.WORKING_DIR }}
     steps:
       - uses: actions/checkout@v4
 
@@ -60,7 +60,8 @@ jobs:
           cache: true
 
       - name: Run tests
-        run: flutter test --coverage 2>&1 | tee ${{ runner.temp }}/test.log
+        working-directory: ${{ env.WORKING_DIR_IVY_PULSE }}
+        run: flutter test . --coverage 2>&1 | tee ${{ runner.temp }}/test.log
         continue-on-error: false
         id: tests
 
@@ -99,7 +100,7 @@ jobs:
         uses: google/osv-scanner-action/osv-scanner-action@v2.5.1
         with:
           scan-args: |-
-            --lockfile=${{ env.WORKING_DIR }}/pubspec.lock
+            --lockfile=${{ env.WORKING_DIR_IVY_PULSE }}/pubspec.lock
             --recursive
   secret-scan:
     name: Secret Scan (Gitleaks)
@@ -153,9 +154,6 @@ jobs:
     name: Build Android
     runs-on: ubuntu-latest
     needs: test
-    defaults:
-      run:
-        working-directory: ${{ env.WORKING_DIR }}
     steps:
       - uses: actions/checkout@v4
 
@@ -171,9 +169,11 @@ jobs:
           cache: true
 
       - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIR_IVY_PULSE }}
         run: flutter pub get
 
       - name: Build APK
+        working-directory: ${{ env.WORKING_DIR_IVY_PULSE }}
         run: flutter build apk --debug 2>&1 | tee ${{ runner.temp }}/android-build.log
         continue-on-error: true
         id: build
