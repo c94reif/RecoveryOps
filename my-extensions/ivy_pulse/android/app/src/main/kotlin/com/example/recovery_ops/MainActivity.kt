@@ -1,4 +1,4 @@
-package com.u4id.ivy_pulse
+package com.example.recovery_ops
 
 import io.flutter.embedding.android.FlutterActivity
 
