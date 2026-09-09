@@ -40,7 +40,7 @@ jobs:
 
       - name: Verify formatting
         working-directory: ${{ env.WORKING_DIR_IVY_PULSE }}
-        run: dart format --output=none --set-exit-if-changed
+        run: dart format . --output=none --set-exit-if-changed
 
       - name: Static analysis (fail on errors)
         working-directory: ${{ env.WORKING_DIR_IVY_PULSE }}
