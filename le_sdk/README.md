@@ -1,4 +1,4 @@
-# Lattice Edge Extension SDK
+****# Lattice Edge Extension SDK
 
 Build extensions for the Lattice Edge command-and-control application. Extensions are self-contained Flutter widgets that appear as panels or overlays alongside the main map view and can access host capabilities: map location picking, speech-to-text input, persistent storage, and peer-to-peer messaging.
 

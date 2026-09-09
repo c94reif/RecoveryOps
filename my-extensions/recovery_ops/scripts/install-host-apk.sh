@@ -104,7 +104,10 @@ print_success "Found adb: $ADB"
 # Verify devices connected
 ################################################################################
 
-mapfile -t DEVICES < <("$ADB" devices | grep 'device$' | awk '{print $1}')
+DEVICES=()
+while IFS= read -r line; do
+    DEVICES+=("$line")
+done < <("$ADB" devices | grep 'device$' | awk '{print $1}')
 
 if [ ${#DEVICES[@]} -eq 0 ]; then
   print_error "No Android device/emulator connected."
