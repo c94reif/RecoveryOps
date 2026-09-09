@@ -194,9 +194,6 @@ jobs:
     name: Build Windows
     runs-on: windows-latest
     needs: test
-    defaults:
-      run:
-        working-directory: ${{ env.WORKING_DIR }}
     steps:
       - uses: actions/checkout@v4
 
@@ -207,12 +204,15 @@ jobs:
           cache: true
 
       - name: Enable Windows platform
+        working-directory: ${{ env.WORKING_DIR_IVY_PULSE }}
         run: flutter create --platforms=windows .
 
       - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIR_IVY_PULSE }}
         run: flutter pub get
 
       - name: Build Windows
+        working-directory: ${{ env.WORKING_DIR_IVY_PULSE }}
         run: flutter build windows --debug 2>&1 | tee ${{ runner.temp }}/windows-build.log
         continue-on-error: true
         id: build
