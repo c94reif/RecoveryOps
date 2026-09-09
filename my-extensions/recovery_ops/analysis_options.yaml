@@ -11,15 +11,11 @@ analyzer:
   exclude:
     - build/**
     - android/**
-<<<<<<< Updated upstream
     - web/**
-=======
     - ios/**
-    - web/**
     - windows/**
     - macos/**
     - linux/**
->>>>>>> Stashed changes
 include: package:flutter_lints/flutter.yaml
 
 linter:

@@ -37,7 +37,8 @@ class _IvyPulseExtensionUIState extends State<IvyPulseExtensionUI> {
         // TODO: Build your extension UI here
         const Text(
           'Lattice Edge App to aid Soldiers in properly PMCSing',
-          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+          style: TextStyle(
+              color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         const Text(

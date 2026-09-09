@@ -1,8 +1,8 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:recovery_ops/data/datasources/local/database.dart';
-import 'package:recovery_ops/data/dao/profile/profileDao.dart';
-import 'package:recovery_ops/data/dao/reports/reportsDao.dart';
+import 'package:recovery_ops/data/dao/profile/profile_dao.dart';
+import 'package:recovery_ops/data/dao/reports/reports_dao.dart';
 
 void main() {
   late AppDatabase db;
@@ -26,7 +26,8 @@ void main() {
     });
 
     test('saveProfile inserts a new profile', () async {
-      await profileDao.saveProfile(name: 'John Doe', callSign: 'Ghost', unit: 'Alpha 1');
+      await profileDao.saveProfile(
+          name: 'John Doe', callSign: 'Ghost', unit: 'Alpha 1');
 
       final profile = await profileDao.getProfile();
       expect(profile, isNotNull);
@@ -36,8 +37,10 @@ void main() {
     });
 
     test('saveProfile updates an existing profile', () async {
-      await profileDao.saveProfile(name: 'John Doe', callSign: 'Ghost', unit: 'Alpha 1');
-      await profileDao.saveProfile(name: 'Jane Doe', callSign: 'Wraith', unit: 'Bravo 2');
+      await profileDao.saveProfile(
+          name: 'John Doe', callSign: 'Ghost', unit: 'Alpha 1');
+      await profileDao.saveProfile(
+          name: 'Jane Doe', callSign: 'Wraith', unit: 'Bravo 2');
 
       final profile = await profileDao.getProfile();
       expect(profile, isNotNull);
@@ -63,7 +66,8 @@ void main() {
     });
 
     test('handles unicode characters in profile fields', () async {
-      await profileDao.saveProfile(name: 'Jöhn Dœ', callSign: '幽灵', unit: 'Álpha');
+      await profileDao.saveProfile(
+          name: 'Jöhn Dœ', callSign: '幽灵', unit: 'Álpha');
       final profile = await profileDao.getProfile();
       expect(profile!.name, 'Jöhn Dœ');
       expect(profile.callSign, '幽灵');
@@ -78,7 +82,6 @@ void main() {
       expect(profile.unit, '');
     });
   });
-
 
   group('ReportsDao', () {
     Future<void> insertSample({
@@ -112,9 +115,12 @@ void main() {
     });
 
     test('reports are ordered by timestamp descending', () async {
-      await insertSample(bumperNumber: 'OLD', timestamp: DateTime.utc(2026, 1, 1));
-      await insertSample(bumperNumber: 'NEW', timestamp: DateTime.utc(2026, 6, 1));
-      await insertSample(bumperNumber: 'MID', timestamp: DateTime.utc(2026, 3, 1));
+      await insertSample(
+          bumperNumber: 'OLD', timestamp: DateTime.utc(2026, 1, 1));
+      await insertSample(
+          bumperNumber: 'NEW', timestamp: DateTime.utc(2026, 6, 1));
+      await insertSample(
+          bumperNumber: 'MID', timestamp: DateTime.utc(2026, 3, 1));
 
       final reports = await reportsDao.getAllReports();
       expect(reports[0].bumperNumber, 'NEW');
@@ -123,8 +129,10 @@ void main() {
     });
 
     test('markAsRead only affects target row', () async {
-      await insertSample(bumperNumber: 'A', timestamp: DateTime.utc(2026, 1, 1));
-      await insertSample(bumperNumber: 'B', timestamp: DateTime.utc(2026, 2, 1));
+      await insertSample(
+          bumperNumber: 'A', timestamp: DateTime.utc(2026, 1, 1));
+      await insertSample(
+          bumperNumber: 'B', timestamp: DateTime.utc(2026, 2, 1));
 
       final before = await reportsDao.getAllReports();
       await reportsDao.markAsRead(before.last.id);
@@ -135,8 +143,10 @@ void main() {
     });
 
     test('markAllAsRead sets all rows to read', () async {
-      await insertSample(bumperNumber: 'A', timestamp: DateTime.utc(2026, 1, 1));
-      await insertSample(bumperNumber: 'B', timestamp: DateTime.utc(2026, 2, 1));
+      await insertSample(
+          bumperNumber: 'A', timestamp: DateTime.utc(2026, 1, 1));
+      await insertSample(
+          bumperNumber: 'B', timestamp: DateTime.utc(2026, 2, 1));
 
       await reportsDao.markAllAsRead();
 
@@ -145,8 +155,12 @@ void main() {
     });
 
     test('markAllAsRead does not affect already-read rows', () async {
-      await insertSample(bumperNumber: 'A', isRead: true, timestamp: DateTime.utc(2026, 1, 1));
-      await insertSample(bumperNumber: 'B', isRead: false, timestamp: DateTime.utc(2026, 2, 1));
+      await insertSample(
+          bumperNumber: 'A', isRead: true, timestamp: DateTime.utc(2026, 1, 1));
+      await insertSample(
+          bumperNumber: 'B',
+          isRead: false,
+          timestamp: DateTime.utc(2026, 2, 1));
 
       await reportsDao.markAllAsRead();
 
@@ -154,7 +168,6 @@ void main() {
       expect(after.every((r) => r.isRead), isTrue);
     });
   });
-
 
   group('schema', () {
     test('both profiles and reports tables exist', () async {

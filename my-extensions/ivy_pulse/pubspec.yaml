@@ -15,6 +15,7 @@ dependencies:
 
 dev_dependencies:
   husky: ^0.1.7
+  flutter_lints: ^6.0.0
 
 flutter:
   assets:

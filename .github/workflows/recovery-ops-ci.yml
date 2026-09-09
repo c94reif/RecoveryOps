@@ -15,6 +15,9 @@ on:
 env:
   FLUTTER_VERSION: "3.41.7"
   WORKING_DIR: my-extensions/recovery_ops
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:

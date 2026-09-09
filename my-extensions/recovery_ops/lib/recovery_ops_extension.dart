@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:le_sdk/le_sdk.dart';
 import 'package:recovery_ops/core/di/injection.dart';
-import 'package:recovery_ops/core/theme/appTheme.dart';
-import 'package:recovery_ops/domain/services/queuePromptStrategy.dart';
-import 'package:recovery_ops/domain/services/queueWorkerStrategy.dart';
-import 'package:recovery_ops/presentation/common/widgets/queuePromptHost.dart';
-import 'package:recovery_ops/presentation/home/homePage.dart';
+import 'package:recovery_ops/core/theme/app_theme.dart';
+import 'package:recovery_ops/domain/services/queue_prompt_strategy.dart';
+import 'package:recovery_ops/domain/services/queue_worker_strategy.dart';
+import 'package:recovery_ops/presentation/common/widgets/queue_prompt_host.dart';
+import 'package:recovery_ops/presentation/home/home_page.dart';
 
 class RecoveryOpsExtension extends LatticeEdgeExtension {
   bool initialized = false;
@@ -60,7 +60,8 @@ class RecoveryOpsExtensionUIState extends State<RecoveryOpsExtensionUI> {
   void initState() {
     super.initState();
     widget.extensionContext.messaging.markAllAsRead();
-    messageSub = widget.extensionContext.messaging.onMessageReceived.listen((_) {
+    messageSub =
+        widget.extensionContext.messaging.onMessageReceived.listen((_) {
       widget.extensionContext.messaging.markAllAsRead();
     });
   }

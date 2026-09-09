@@ -17,15 +17,29 @@ while read local_ref local_sha remote_ref remote_sha; do
   fi
 done
 
-echo "running tests with coverage"
-flutter test --coverage || {
+echo "running tests with coverage Ivy Pulse"
+flutter test my-extensions/ --coverage || {
+  echo ""
+  echo "🚫 Tests failed. Fix them before pushing."
+  exit 1
+}
+
+echo "running tests with coverage Recovery Ops"
+flutter test my-extensions/recovery_ops --coverage || {
   echo ""
   echo "🚫 Tests failed. Fix them before pushing."
   exit 1
 }
 
 echo "coverage gate running (80% minimum, generated files excluded)"
-dart run tool/check_coverage.dart || {
+dart run my-extensions/ivy_pulse tool/check_coverage.dart || {
+  echo ""
+  echo "🚫 Coverage is below the 80% minimum. Add tests before pushing."
+  exit 1
+}
+
+echo "coverage gate running (80% minimum, generated files excluded)"
+dart run my-extensions/recovery_ops tool/check_coverage.dart || {
   echo ""
   echo "🚫 Coverage is below the 80% minimum. Add tests before pushing."
   exit 1

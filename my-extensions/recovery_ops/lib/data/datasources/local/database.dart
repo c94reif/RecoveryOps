@@ -1,11 +1,11 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
-import 'package:recovery_ops/data/datasources/local/tables/profileTable.dart';
-import 'package:recovery_ops/data/datasources/local/tables/queuedRequestsTable.dart';
-import 'package:recovery_ops/data/datasources/local/tables/reportsTable.dart';
-import 'package:recovery_ops/data/dao/profile/profileDao.dart';
-import 'package:recovery_ops/data/dao/queue/queuedRequestsDao.dart';
-import 'package:recovery_ops/data/dao/reports/reportsDao.dart';
+import 'package:recovery_ops/data/datasources/local/tables/profile_table.dart';
+import 'package:recovery_ops/data/datasources/local/tables/queued_requests_table.dart';
+import 'package:recovery_ops/data/datasources/local/tables/reports_table.dart';
+import 'package:recovery_ops/data/dao/profile/profile_dao.dart';
+import 'package:recovery_ops/data/dao/queue/queued_requests_dao.dart';
+import 'package:recovery_ops/data/dao/reports/reports_dao.dart';
 
 part 'database.g.dart';
 

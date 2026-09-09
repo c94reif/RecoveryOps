@@ -10,7 +10,7 @@ Companion application for **Convoy Ops**
  ---
 ## Features / Bugs:
 >TODO's:
-> - [x] Refactor reportsViewModel.dart
+> - [x] Refactor reports_view_model.dart
 > - [ ] Need to introduce Isolates. 
 > - [ ] Need to refactor the profile page, profile view model, create database migration, and some other stuff to remove the callsign the profile page 
 > - [ ] Need to go back and refactor the polling for either geometry and or the remote nav and the 
