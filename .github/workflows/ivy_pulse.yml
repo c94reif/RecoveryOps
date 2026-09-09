@@ -96,7 +96,7 @@ jobs:
 
       # Google's open-source OSV-Scanner has native pub/pubspec.lock support.
       - name: Run OSV-Scanner
-        uses: google/osv-scanner-action/osv-scanner-action@v2
+        uses: google/osv-scanner-action/osv-scanner-action@v2.5.1
         with:
           scan-args: |-
             --lockfile=pubspec.lock
