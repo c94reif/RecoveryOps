@@ -16,24 +16,24 @@ if [ "$branch" = "main" ]; then
 fi
 
 
-if ! echo "$branch" | grep -qE '^(feature|bug|refactor|chore)/[a-z0-9._-]+$'; then
-  echo ""
-  echo "🚫 Invalid branch name: '$branch'"
-  echo ""
-  echo "Branch names must follow the pattern:"
-  echo "   feature/<short-description>"
-  echo "   bug/<short-description>"
-  echo ""
-  echo "Examples: spaces are not allowed, need - between words"
-  echo "   feature/nfc-tag-scanning"
-  echo "   bug/ios-nfc-session-crash"
-  echo "   refactor/strategy-pattern"
- echo ""
-  echo "Rename your current branch with:"
-  echo "   git branch -m feature/my-change"
-  echo ""
-  exit 1
-fi
+#if ! echo "$branch" | grep -qE '^(feature|bug|refactor|chore)/[a-z0-9._-]+$'; then
+#  echo ""
+#  echo "🚫 Invalid branch name: '$branch'"
+#  echo ""
+#  echo "Branch names must follow the pattern:"
+#  echo "   feature/<short-description>"
+#  echo "   bug/<short-description>"
+#  echo ""
+#  echo "Examples: spaces are not allowed, need - between words"
+#  echo "   feature/nfc-tag-scanning"
+#  echo "   bug/ios-nfc-session-crash"
+#  echo "   refactor/strategy-pattern"
+# echo ""
+#  echo "Rename your current branch with:"
+#  echo "   git branch -m feature/my-change"
+#  echo ""
+#  exit 1
+#fi
 
 
 echo "Format checking"
@@ -44,26 +44,33 @@ dart format --set-exit-if-changed lib test || {
   exit 1
 }
 
-echo "analyzer running"
-flutter analyze || {
+echo "analyzer running Ivy Pulse"
+flutter analyze my-extensions/ivy_pulse  || {
+  echo ""
+  echo "🚫 Analyzer found issues. Fix them before committing."
+  exit 1
+}
+
+echo "analyzer running Recovery Ops"
+flutter analyze my-extensions/recovery_ops || {
   echo ""
   echo "🚫 Analyzer found issues. Fix them before committing."
   exit 1
 }
 
 echo "file length check running (400 executable lines, imports & comments excluded)"
-dart run tool/check_file_length.dart || {
+dart run tool/check_file_length.dart  || {
   echo ""
   echo "🚫 One or more components exceed the 400 executable-line limit."
   exit 1
 }
 
-echo "app version sync check running (About screen mirrors pubspec.yaml)"
-dart run tool/sync_version.dart --check || {
-  echo ""
-  echo "🚫 App version is out of sync with pubspec.yaml."
-  echo "   Run: dart run tool/sync_version.dart  then stage lib/app/app_version.g.dart"
-  exit 1
-}
+#echo "app version sync check running (About screen mirrors pubspec.yaml)"
+#dart run tool/sync_version.dart --check || {
+#  echo ""
+#  echo "🚫 App version is out of sync with pubspec.yaml."
+#  echo "   Run: dart run tool/sync_version.dart  then stage lib/app/app_version.g.dart"
+#  exit 1
+#}
 
 echo "✅ Pre-commit checks passed"

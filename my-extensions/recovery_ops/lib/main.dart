@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:le_sdk/le_sdk.dart';
-import 'package:recovery_ops/core/theme/appTheme.dart';
+import 'package:recovery_ops/core/theme/app_theme.dart';
 
 import 'recovery_ops_extension.dart';
 

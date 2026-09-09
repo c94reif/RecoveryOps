@@ -14,7 +14,8 @@ void main() async {
     ),
     home: Scaffold(
       appBar: AppBar(
-        title: const Text('Lattice Edge App to aid Soldiers in properly PMCSing — Preview'),
+        title: const Text(
+            'Lattice Edge App to aid Soldiers in properly PMCSing — Preview'),
         backgroundColor: const Color(0xFF0A0A0A),
       ),
       body: IvyPulseExtension().build(extensionContext),
