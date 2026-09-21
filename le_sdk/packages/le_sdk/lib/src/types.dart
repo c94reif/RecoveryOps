@@ -1,16 +1,58 @@
 /// Display mode for an extension's content.
 enum ExtensionDisplayMode { panel, overlay }
 
+/// An extension's preferred screen orientation while it is active.
+///
+/// The host locks the device to the declared orientation for as long as the
+/// extension is open, and restores the operator's own portrait/landscape
+/// setting the moment it closes. `any` (the default) means the extension has
+/// no preference — the host's existing auto-rotate/manual setting applies
+/// unchanged.
+enum ExtensionOrientation { any, portrait, landscape }
+
 /// Built-in icon types for map markers.
 enum MarkerIcon {
-  air, ground, sea, helicopter, uav, fighter, bomber, tank,
-  missile, submarine, satellite, sensor, radar, person,
-  vehicle, building, signal, unknown;
+  air,
+  ground,
+  sea,
+  helicopter,
+  uav,
+  fighter,
+  bomber,
+  tank,
+  missile,
+  submarine,
+  satellite,
+  sensor,
+  radar,
+  person,
+  vehicle,
+  building,
+  signal,
+  unknown;
 }
 
 /// Military disposition for icon marker coloring.
 enum MarkerDisposition {
-  hostile, friendly, neutral, unknown;
+  hostile,
+  friendly,
+  neutral,
+  unknown;
+}
+
+/// Preset width for the extension panel; use with [UiService.setPanelSize] / [UiService.getPanelSize].
+enum PanelSize {
+  /// Compact width — narrower than the standard drawer, for glanceable panels.
+  xsmall,
+
+  /// Standard drawer width.
+  small,
+
+  /// 70% of the screen width.
+  medium,
+
+  /// Full available content area (screen width minus the navigation rail).
+  large;
 }
 
 /// A geographic coordinate.
@@ -127,5 +169,42 @@ class ScreenPoint {
   factory ScreenPoint.fromJson(Map<String, dynamic> j) => ScreenPoint(
         (j['x'] as num).toDouble(),
         (j['y'] as num).toDouble(),
+      );
+}
+
+/// A rectangle in logical screen-pixel coordinates (same space as
+/// [ScreenPoint] / OpenLayers `getPixelFromCoordinate`). Passed to
+/// `MapService.captureMap` to capture only a region of the map viewport.
+class CaptureRect {
+  final double x;
+  final double y;
+  final double width;
+  final double height;
+  const CaptureRect(this.x, this.y, this.width, this.height);
+
+  /// Axis-aligned bounding box of [points]; null if empty or degenerate
+  /// (zero area).
+  static CaptureRect? boundingBox(List<ScreenPoint> points) {
+    if (points.isEmpty) return null;
+    var minX = points.first.x, maxX = points.first.x;
+    var minY = points.first.y, maxY = points.first.y;
+    for (final p in points) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    final w = maxX - minX, h = maxY - minY;
+    if (w <= 0 || h <= 0) return null;
+    return CaptureRect(minX, minY, w, h);
+  }
+
+  Map<String, dynamic> toJson() =>
+      {'x': x, 'y': y, 'width': width, 'height': height};
+  factory CaptureRect.fromJson(Map<String, dynamic> j) => CaptureRect(
+        (j['x'] as num).toDouble(),
+        (j['y'] as num).toDouble(),
+        (j['width'] as num).toDouble(),
+        (j['height'] as num).toDouble(),
       );
 }

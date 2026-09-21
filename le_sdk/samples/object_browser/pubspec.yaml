@@ -1,0 +1,27 @@
+name: object_browser
+description: Sample extension demonstrating the Lattice Objects API (upload, download, list, delete)
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.7.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  le_sdk:
+    path: ../../packages/le_sdk
+  lattice_common:
+    path: ../../packages/lattice_common
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+lattice_edge_extension:
+  type: web
+  icon: cloud_upload
+  display_mode: panel
+  description: Browse, upload, and manage objects in the Lattice CDN

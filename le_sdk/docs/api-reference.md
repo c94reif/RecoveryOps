@@ -14,6 +14,9 @@ This document is the complete API reference for the Lattice Edge Extension SDK. 
 - [MessagingService](#messagingservice-contextmessaging)
 - [EntityService](#entityservice-contextentities)
 - [TaskService](#taskservice-contexttasks)
+- [UiService](#uiservice-contextui)
+- [NetworkService](#networkservice-contextnetwork)
+- [MeshItemStoreService](#meshitemstoreservice-contextmeshitemstore)
 - [Types](#types)
 - [Error Contract](#error-contract)
 - [Storage Notes](#storage-notes)
@@ -254,7 +257,14 @@ await context.map.clearMarkers();
 ### `addPolyline()`
 
 ```dart
-Future<void> addPolyline(String id, List<LatLng> points, {String? color})
+Future<void> addPolyline(
+  String id,
+  List<LatLng> points, {
+  String? color,
+  double? width,
+  List<double>? dashPattern,
+  double? opacity,
+})
 ```
 
 **Description:** Draws a polyline on the map connecting the given points in order. If a polyline with the same `id` already exists, it is replaced.
@@ -266,6 +276,9 @@ Future<void> addPolyline(String id, List<LatLng> points, {String? color})
 | `id` | `String` | Yes | Unique identifier for this polyline (for update/removal). |
 | `points` | `List<LatLng>` | Yes | Ordered list of coordinates defining the line. |
 | `color` | `String?` | No | Hex color string (e.g. `'#FF6B35'`). Defaults to host theme. |
+| `width` | `double?` | No | Stroke width in logical pixels. Defaults to the host's standard line width. |
+| `dashPattern` | `List<double>?` | No | Dash array in pixels (e.g. `[10, 6]`); omit for a solid line. |
+| `opacity` | `double?` | No | Line opacity `0..1`. Use a low value to render a faded route. |
 
 **Returns:** `Future<void>`
 
@@ -276,6 +289,8 @@ await context.map.addPolyline(
   'patrol-route',
   [LatLng(33.749, -84.388), LatLng(33.752, -84.391), LatLng(33.755, -84.385)],
   color: '#FF6B35',
+  width: 3,
+  dashPattern: [10, 6], // dashed
 );
 ```
 
@@ -1078,6 +1093,286 @@ Stream<TaskData> listenAsAgent()
 
 ---
 
+## UiService (`context.ui`)
+
+Host UI control and introspection. This section documents the panel-resize API; see the SDK source for the full set of navigation/introspection methods.
+
+### `setPanelSize()`
+
+```dart
+Future<void> setPanelSize(PanelSize size)
+```
+
+**Description:** Resize the extension panel ("plugin drawer") to one of four preset widths:
+
+| `PanelSize` | Width |
+|-------------|-------|
+| `xsmall` | A compact width, narrower than the default drawer (capped so it is never wider than `small`). |
+| `small` | The default plugin-drawer width (unchanged from the standard size). |
+| `medium` | 70% of the screen width. |
+| `large` | The full content area — screen width minus the navigation rail, so the rail's close/switch actions stay reachable. |
+
+> The host has a user-configurable **default** panel size (Settings → Advanced → *Default Plugin Size*). The shared drawer returns to that default whenever the user leaves a plugin. If you want your plugin to re-open at the size the user last chose, persist it with [`StorageService`](#storageservice-contextstorage) and call `setPanelSize` again on startup — see the `panel_resize_demo` sample.
+
+The panel animates to the new width and then performs **a one-shot reload of the extension** so every control is rebuilt at the new size.
+
+> ⚠️ Because the extension reloads, any unsaved in-memory UI state (text fields, scroll position) is lost. Persist anything you need with [`StorageService`](#storageservice-contextstorage) before calling this.
+
+**Cycle safety:** the call is idempotent — requesting the size the panel is already at does nothing (no resize, no reload), so an extension that re-requests its size during startup will not oscillate. A request that arrives while a previous resize is still settling is dropped.
+
+**Example:**
+
+```dart
+// Persist state first — the extension will reload.
+await context.storage.write('draft', jsonEncode(formState));
+await context.ui.setPanelSize(PanelSize.large);
+```
+
+### `getPanelSize()`
+
+```dart
+Future<PanelSize> getPanelSize()
+```
+
+**Description:** Returns the panel's current preset size. If the user has manually dragged the panel to a custom width, this returns the *closest* preset rather than an exact match.
+
+**Returns:** `Future<PanelSize>`
+
+---
+
+## NetworkService (`context.network`)
+
+Host-brokered raw UDP. A WebExtension cannot open raw / multicast / unicast sockets directly (browser sandbox), so `context.network` proxies socket work to the native host. Useful for receiving telemetry, joining a tactical multicast group, or sending datagrams to a peer the host can route to.
+
+Subscriptions are owned by your extension. Always `close()` a subscription you opened — the host releases the bound port + multicast lock when you do. The host will also tear them down when your extension is unloaded.
+
+See the `udp_monitor` sample for a complete worked example.
+
+### `subscribeMulticast()`
+
+```dart
+Future<UdpSubscription> subscribeMulticast(String group, int port)
+```
+
+**Description:** Bind a socket on the host and join the IPv4 multicast `group` (e.g. `"239.2.3.1"`) on `port`. Resolves once the socket is bound and the IGMP join has been issued; rejects on bind failure (port already in use, OS denial).
+
+**Returns:** `Future<UdpSubscription>` — owns the bound socket. Listen on its `datagrams` stream and call `close()` to release the resource.
+
+**Example:**
+
+```dart
+final sub = await context.network.subscribeMulticast('239.2.3.1', 6969);
+sub.datagrams.listen((d) {
+  print('${d.sourceAddress}:${d.sourcePort} → ${d.bytes.length} bytes');
+});
+// Later:
+await sub.close();
+```
+
+### `subscribeUnicast()`
+
+```dart
+Future<UdpSubscription> subscribeUnicast(int port)
+```
+
+**Description:** Bind `0.0.0.0:port` for unicast receive. Same lifecycle as multicast subscribe — listen on `datagrams`, call `close()` when done.
+
+**Returns:** `Future<UdpSubscription>`
+
+### `sendMulticast()`
+
+```dart
+Future<SendResult> sendMulticast(String group, int port, Uint8List bytes)
+```
+
+**Description:** Fire-and-forget multicast send from an ephemeral source socket. Use this when you only need to broadcast and don't care about replies; for request/response, hold a `UdpSubscription` and call `subscription.send()` so replies arrive on the same socket.
+
+**Returns:** `Future<SendResult>` — `success: true` on a successful write, `success: false` with an `error` string otherwise.
+
+### `sendUnicast()`
+
+```dart
+Future<SendResult> sendUnicast(String destinationIp, int port, Uint8List bytes)
+```
+
+**Description:** Fire-and-forget unicast send from an ephemeral source socket.
+
+**Returns:** `Future<SendResult>`
+
+### `UdpSubscription`
+
+Returned by `subscribeMulticast` / `subscribeUnicast`.
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `datagrams` | `Stream<UdpDatagram>` | Broadcast stream — multiple listeners share one host socket. **Does not honor pause-based backpressure.** If a listener is slow, datagrams are dropped on the floor at the host. |
+| `send(bytes, {destinationIp, port})` | `Future<SendResult>` | Send raw bytes from this subscription's bound socket. With `destinationIp + port`, sends to that target; without, sends back to the multicast group / port the subscription was bound to. |
+| `close()` | `Future<void>` | Leave the group, close the socket, release the multicast lock. Idempotent — safe to call multiple times. |
+
+---
+
+## MeshItemStoreService (`context.meshItemStore`)
+
+Aggregated access to Anduril's `mesh-item-store` service, grouped under a single accessor on `ExtensionContext`. Both views share the same upstream service, the same auth (via the active Lattice connection), and the same data-type addressing — grouping them under one accessor keeps `ExtensionContext` flat and makes the `mesh-item-store` boundary obvious at the API surface.
+
+| Sub-accessor | Type | Purpose |
+|---|---|---|
+| `context.meshItemStore.items` | [`MeshItemService`](#items-contextmeshitemstoreitems) | Schema-validated item CRUD |
+| `context.meshItemStore.streams` | [`MeshStreamService`](#streams-contextmeshitemstorestreams) | Pub/sub on typed streams |
+
+Items and streams are addressed by a four-segment [`MeshDataTypePath`](#meshdatatypepath) (`namespace/domain/dataType/version`); a single item's full address is a [`MeshItemPath`](#meshitempath) (type + server-assigned `id`). Bulk operations report partial success via [`MeshBatchResult`](#meshbatchresult).
+
+See the `mesh_item_browser` sample for a complete worked example.
+
+### Items (`context.meshItemStore.items`)
+
+Read/write access to schema-validated items. All calls authenticate as the current AE operator; schema administration (creating / deleting data types) is intentionally **not** exposed because those operations require elevated privilege upstream. Plugins assume the types they target already exist and know each type's JSON schema.
+
+#### `listDataTypes()`
+
+```dart
+Future<List<MeshDataType>> listDataTypes()
+```
+
+**Description:** Returns all data types registered on the mesh-item-store. Each `MeshDataType` carries the raw JSON-Schema bytes — the SDK does **not** parse the schema; plugins decode it themselves.
+
+#### `getDataType()`
+
+```dart
+Future<MeshDataType?> getDataType(MeshDataTypePath path)
+```
+
+**Description:** Fetch a single data type, or `null` if not registered.
+
+#### `createItem()`
+
+```dart
+Future<MeshItem> createItem(
+  MeshDataTypePath type,
+  Map<String, Object?> data, {
+  Duration? ttl,
+})
+```
+
+**Description:** Create a single item under `type`. The host validates `data` against the data type's JSON schema and rejects on mismatch. `ttl`, if provided, sets `expiry_time`; otherwise the item lives until explicitly deleted.
+
+**Returns:** the persisted [`MeshItem`](#meshitem) including the assigned id and timestamps.
+
+#### `createItems()`
+
+```dart
+Future<MeshBatchResult<MeshItem>> createItems(
+  MeshDataTypePath type,
+  List<Map<String, Object?>> data, {
+  Duration? ttl,
+})
+```
+
+**Description:** Bulk-create. Per-item success/failure is surfaced via [`MeshBatchResult`](#meshbatchresult) — schema-invalid entries fail individually without aborting the rest.
+
+#### `getItem()`
+
+```dart
+Future<MeshItem?> getItem(MeshItemPath path)
+```
+
+**Description:** Fetch a single item or `null` if not found.
+
+#### `listItems()`
+
+```dart
+Future<List<MeshItem>> listItems(
+  MeshDataTypePath type, {
+  Map<String, Object?>? filter,
+})
+```
+
+**Description:** List all items under `type`. The optional `filter` is forwarded verbatim to the upstream `util.FilterItemMap`. The dialect is **narrow** — there are no `$gt`/`$in`/`$or` operators, no array matching, no regex:
+
+- `created_at` — keep items with `createdAt` **at or after** this `"YYYY-MM-DD HH:MM:SS"` value.
+- `expiry_time` — keep items with `expiryTime` **at or before** this value.
+- Any other top-level key with a scalar value — exact equality (compared via Go's `fmt.Sprintf("%v", ...)`).
+- Any other top-level key with a `Map` value — recursive application of the same rules on the nested map.
+
+#### `updateItem()`
+
+```dart
+Future<MeshItem> updateItem(
+  MeshItemPath path,
+  Map<String, Object?> data, {
+  Duration? ttl,
+})
+```
+
+**Description:** Replace the item at `path`. The new `data` is re-validated against the schema. Pass `ttl` to refresh / set `expiry_time`.
+
+#### `deleteItem()`
+
+```dart
+Future<void> deleteItem(MeshItemPath path)
+```
+
+**Description:** Delete a single item. No-op if it has already expired.
+
+### Streams (`context.meshItemStore.streams`)
+
+Pub/sub access to mesh-item-store streams. Streams share the same four-segment data-type addressing as items, but each stream type identifies an *ephemeral channel* rather than a stored collection.
+
+> Subscriptions are **live from now** — there is no replay, no cursor, no historical backfill. Cancel the returned `StreamSubscription` to tear down the host-side SSE channel.
+
+#### `listStreamDataTypes()`
+
+```dart
+Future<List<MeshDataType>> listStreamDataTypes()
+```
+
+**Description:** Returns all stream data types registered on the mesh-item-store.
+
+#### `getStreamDataType()`
+
+```dart
+Future<MeshDataType?> getStreamDataType(MeshDataTypePath path)
+```
+
+**Description:** Fetch a single stream data type, or `null` if not registered.
+
+#### `publish()`
+
+```dart
+Future<MeshBatchResult<DateTime>> publish(
+  MeshDataTypePath type,
+  List<Map<String, Object?>> messages,
+)
+```
+
+**Description:** Publish a batch of messages to `type`. Per-message success/failure is reported via [`MeshBatchResult`](#meshbatchresult); the value of a successful entry is the host-side publish timestamp.
+
+#### `subscribe()`
+
+```dart
+Stream<MeshStreamMessage> subscribe(MeshDataTypePath type)
+```
+
+**Description:** Live-subscribe to a stream. Emits as messages arrive on the upstream Flux subscription. No replay — anything published before this call is gone.
+
+**Example:**
+
+```dart
+final sub = context.meshItemStore.streams.subscribe(MeshDataTypePath(
+  namespace: 'sustainment',
+  domain: 'taktyrmis2',
+  dataType: 'unit',
+  version: 'v1',
+)).listen((msg) {
+  print('${msg.path.dataType} @ ${msg.receivedAt}: ${msg.data}');
+});
+
+// Cancel to release the SSE channel:
+await sub.cancel();
+```
+
+---
+
 ## Types
 
 ### `LatLng`
@@ -1125,6 +1420,23 @@ enum ExtensionDisplayMode { panel, overlay }
 |-------|-------------|
 | `panel` | Extension appears as a side panel alongside the map. |
 | `overlay` | Extension appears as a floating overlay tab. |
+
+---
+
+### `PanelSize`
+
+Preset width for the extension panel. Used with [`setPanelSize()`](#setpanelsize) / [`getPanelSize()`](#getpanelsize).
+
+```dart
+enum PanelSize { xsmall, small, medium, large }
+```
+
+| Value | Description |
+|-------|-------------|
+| `xsmall` | Compact width, narrower than the default (capped at `small`). |
+| `small` | Default plugin-drawer width. |
+| `medium` | 70% of the screen width. |
+| `large` | Full content area (screen width minus the navigation rail). |
 
 ---
 
@@ -1453,6 +1765,128 @@ class TaskEvent {
 
 ---
 
+### `UdpDatagram`
+
+A received UDP datagram.
+
+```dart
+class UdpDatagram {
+  final String sourceAddress;    // Source IP (e.g. "192.168.1.42")
+  final int sourcePort;
+  final Uint8List bytes;         // Raw payload
+  final DateTime receivedAt;
+}
+```
+
+---
+
+### `SendResult`
+
+Result of a UDP send.
+
+```dart
+class SendResult {
+  final bool success;
+  final String? error;     // Populated only on failure
+}
+```
+
+---
+
+### `MeshDataTypePath`
+
+Four-segment path identifying a mesh-item-store data type. Mirrors the upstream service's `namespace/domain/dataType/version` addressing.
+
+```dart
+class MeshDataTypePath {
+  final String namespace;
+  final String domain;
+  final String dataType;
+  final String version;     // 'v1', 'v2', ...
+}
+```
+
+---
+
+### `MeshItemPath`
+
+Path to a single mesh item — a `MeshDataTypePath` plus the server-assigned id.
+
+```dart
+class MeshItemPath {
+  final MeshDataTypePath type;
+  final String id;
+}
+```
+
+---
+
+### `MeshDataType`
+
+A registered data type. The `schema` is the **raw JSON-Schema bytes**; the SDK does not parse it. Plugins are expected to know the schema for the types they consume.
+
+```dart
+class MeshDataType {
+  final MeshDataTypePath path;
+  final Uint8List schema;        // Raw JSON-Schema bytes (base64 on the wire)
+  final bool isDeprecated;
+  final DateTime createdAt;
+}
+```
+
+---
+
+### `MeshItem`
+
+A schema-valid item stored at `path`.
+
+```dart
+class MeshItem {
+  final MeshItemPath path;
+  final Map<String, Object?> data;
+  final DateTime createdAt;
+  final DateTime? expiryTime;    // Null = no TTL
+}
+```
+
+---
+
+### `MeshStreamMessage`
+
+A live message received from a mesh-item-store stream.
+
+```dart
+class MeshStreamMessage {
+  final MeshDataTypePath path;
+  final Map<String, Object?> data;
+  final DateTime receivedAt;
+}
+```
+
+---
+
+### `MeshBatchResult`
+
+Result of a bulk operation. Reports per-input success / failure with the same partial-success semantics as the upstream `BatchItemResult` / `StreamPublishResult`.
+
+```dart
+class MeshBatchResult<T> {
+  final List<MeshBatchEntry<T>> results;
+  final int total;
+  final int succeeded;
+  final int failed;
+}
+
+class MeshBatchEntry<T> {
+  final int index;       // Position in the input list
+  final bool success;
+  final T? value;        // Populated on success
+  final String? error;   // Populated on failure
+}
+```
+
+---
+
 ## Error Contract
 
 - **User cancellation** returns `null` (location pick dismissed, speech cancelled, recipient picker cancelled). Never throws.
@@ -1491,4 +1925,105 @@ final payload = jsonEncode({
   'location': {'lat': 33.749, 'lng': -84.388},
   'timestamp': DateTime.now().millisecondsSinceEpoch,
 });
+```
+
+## ObjectService (`context.objects`)
+
+Access the Lattice Object Store CDN for binary file storage. Use when entity payloads exceed the entity API size limits.
+
+Object path constraints: `A-Z`, `a-z`, `0-9`, `.`, `_`, `-` only. No spaces, slashes, or special characters.
+
+### `upload()`
+
+Upload binary data to the Object Store.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `path` | `String` | Yes | Unique object path |
+| `bytes` | `Uint8List` | Yes | Binary content to store |
+| `contentType` | `String?` | No | MIME type (e.g. `image/png`) |
+| `ttl` | `Duration?` | No | Time-to-live; auto-deletes after expiry |
+
+**Returns:** `ObjectUploadResult` with `path` and `checksum`
+
+**Example:**
+```dart
+final result = await context.objects.upload(
+  'my-report.json',
+  Uint8List.fromList(utf8.encode(jsonEncode(data))),
+  ttl: Duration(hours: 24),
+);
+print('Uploaded: ${result.path}, checksum: ${result.checksum}');
+```
+
+### `download()`
+
+Download an object by path. Returns `null` if the object doesn't exist.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `path` | `String` | Yes | Object path to download |
+
+**Returns:** `Uint8List?` — raw bytes, or `null` if not found
+
+**Example:**
+```dart
+final bytes = await context.objects.download('my-report.json');
+if (bytes != null) {
+  final content = utf8.decode(bytes);
+}
+```
+
+### `list()`
+
+List all objects, optionally filtered by prefix. Auto-pages through all results.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `prefix` | `String?` | No | Filter objects by path prefix |
+
+**Returns:** `List<ObjectMetadata>`
+
+**Example:**
+```dart
+final objects = await context.objects.list(prefix: 'myapp-');
+for (final obj in objects) {
+  print('${obj.path} (${obj.sizeBytes} bytes)');
+}
+```
+
+### `delete()`
+
+Permanently delete an object. Cannot be undone.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `path` | `String` | Yes | Object path to delete |
+
+**Example:**
+```dart
+await context.objects.delete('my-report.json');
+```
+
+### `getMetadata()`
+
+Get metadata without downloading content. Returns `null` if the object doesn't exist.
+
+**Parameters:**
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `path` | `String` | Yes | Object path |
+
+**Returns:** `ObjectMetadata?` with `path`, `sizeBytes`, `lastUpdatedAt`, `expiryTime?`, `checksum?`
+
+**Example:**
+```dart
+final meta = await context.objects.getMetadata('my-report.json');
+if (meta != null) {
+  print('Size: ${meta.sizeBytes}, expires: ${meta.expiryTime}');
+}
 ```

@@ -6,10 +6,19 @@ CLAUDE.local.md
 #APK's, their getting too big for git 
 le_sdk/host-apk/old/lattice-edge-debug.apk
 le_sdk/host-apk/lattice-edge-release.apk
+le_sdk/host-apk/lattice-edge-release.apk
 *.apk
 
+# Android/Flutter build artifacts — never commit binaries
+*.apk
+*.apks
+*.aab
+*.apk.idsig
+*.aar
+*.dex
+build/
 
-# Git worktrees
+#Git worktrees
 .worktrees/
 
 ### Android ###

@@ -4,8 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:lattice_common/lattice_common.dart';
-import 'package:le_sdk/le_sdk.dart'
-    as sdk;
+import 'package:le_sdk/le_sdk.dart' as sdk;
 import 'package:uuid/uuid.dart';
 
 import '../models/message.dart';
@@ -13,6 +12,7 @@ import '../models/peer.dart';
 import '../services/audio_service.dart';
 import '../storage/chat_database.dart';
 import '../widgets/message_bubble.dart';
+import '../widgets/voice_preview.dart';
 import '../widgets/voice_recorder.dart';
 
 /// Conversation screen for direct, broadcast, or group chat.
@@ -43,6 +43,33 @@ class ConversationScreen extends StatefulWidget {
   /// the entire chat panel (not just the thread).
   final VoidCallback? onClose;
 
+  /// Optional: callback to open the host app's standard field editor overlay
+  /// instead of a plain AlertDialog for text entry (e.g. rename group).
+  final void Function({
+    required String header,
+    String hint,
+    String initialValue,
+    required ValueChanged<String> onConfirm,
+    VoidCallback? onCancel,
+  })? onOpenFieldEditor;
+
+  /// Optional host-supplied renderer for text-message bodies. When non-null,
+  /// the host replaces the default plain [Text] render inside each message
+  /// bubble — used to make embedded content (e.g. MGRS strings) tappable.
+  final Widget Function(String body, bool isOutgoing)? textBodyBuilder;
+
+  /// Optional host-supplied builder for entire message items. When non-null
+  /// and returning a widget for a given message, that widget replaces the
+  /// entire bubble+timestamp row — used for rich cards (e.g. shared entities)
+  /// that should not be wrapped in a standard chat bubble.
+  final Widget? Function(Message message, bool isOutgoing)? messageItemBuilder;
+
+  /// Optional host-supplied toast presenter for transient warnings (e.g.
+  /// "Microphone unavailable"). When non-null, the host renders it through the
+  /// app's styled toast system; when null, the screen falls back to a plain
+  /// [SnackBar] so the standalone sample still surfaces the message.
+  final void Function(String message)? onShowToast;
+
   const ConversationScreen({
     super.key,
     required this.conversationId,
@@ -61,6 +88,10 @@ class ConversationScreen extends StatefulWidget {
     this.onLeaveGroup,
     this.getSelfCallsign = _defaultCallsign,
     this.onClose,
+    this.onOpenFieldEditor,
+    this.textBodyBuilder,
+    this.messageItemBuilder,
+    this.onShowToast,
   });
 
   static String _defaultCallsign() => 'You';
@@ -69,14 +100,24 @@ class ConversationScreen extends StatefulWidget {
   State<ConversationScreen> createState() => _ConversationScreenState();
 }
 
-class _ConversationScreenState extends State<ConversationScreen> {
+class _ConversationScreenState extends State<ConversationScreen>
+    with WidgetsBindingObserver {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   final _uuid = const Uuid();
 
+  /// True while the soft keyboard is showing. Read from the raw platform
+  /// view inset in [didChangeMetrics] rather than MediaQuery — an ancestor
+  /// Scaffold in the host app consumes MediaQuery's inset before it reaches
+  /// this panel, and TextField focus can persist after the keyboard is
+  /// dismissed (e.g. system back button), so neither is a reliable signal.
+  bool _keyboardVisible = false;
+
   List<Message> _messages = [];
   bool _isRecording = false;
   String? _recordingPath;
+  bool _isPreviewing = false;
+  String? _previewPath;
   bool _showGroupRoster = false;
 
   bool get _isBroadcast => widget.conversationId == 'broadcast';
@@ -103,10 +144,28 @@ class _ConversationScreenState extends State<ConversationScreen> {
     widget.contactsAccessor.onMessageReceived.listen(_onIncomingMessage);
     // Listen for group roster changes
     widget.groupsNotifier?.addListener(_onGroupsChanged);
+    // Auto-send voice note when max duration reached
+    widget.audio.onAutoStop = _onRecordingAutoStop;
+    // Observe keyboard show/hide to collapse & restore the header.
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeMetrics() {
+    // The soft keyboard is up when the platform bottom view inset is > 0.
+    // Uses the raw window inset (not MediaQuery) so it isn't swallowed by an
+    // ancestor Scaffold, and toggles correctly when the keyboard is
+    // dismissed by any means (done button, tap-away, or system back).
+    final visible = View.of(context).viewInsets.bottom > 0;
+    if (visible != _keyboardVisible && mounted) {
+      setState(() => _keyboardVisible = visible);
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.audio.onAutoStop = null;
     widget.groupsNotifier?.removeListener(_onGroupsChanged);
     _textController.dispose();
     _scrollController.dispose();
@@ -206,10 +265,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   Future<void> _toggleRecording() async {
     if (_isRecording) {
-      // Stop recording and send
+      // Stop recording and enter preview mode
       final path = await widget.audio.stopRecording();
-      setState(() => _isRecording = false);
-      if (path != null) await _sendVoiceNote(path);
+      setState(() {
+        _isRecording = false;
+        if (path != null) {
+          _isPreviewing = true;
+          _previewPath = path;
+        }
+      });
     } else {
       // Check permission
       final hasPermission = await widget.audio.hasPermission();
@@ -218,12 +282,73 @@ class _ConversationScreenState extends State<ConversationScreen> {
         if (!granted) return;
       }
 
+      // Check the mic up front so we can show a specific reason if recording
+      // can't proceed (no mic vs. audio tooling missing) rather than a generic
+      // failure after the fact.
+      final availability = await widget.audio.checkMicAvailability();
+      if (availability != MicAvailability.available) {
+        if (mounted) {
+          _notifyUser(switch (availability) {
+            MicAvailability.noMicrophone => 'No microphone connected',
+            MicAvailability.toolingUnavailable => 'Recording unavailable',
+            MicAvailability.available => 'Microphone unavailable',
+          });
+        }
+        return;
+      }
+
       final msgId = _uuid.v4();
       _recordingPath = await widget.audio.startRecording(msgId);
       if (_recordingPath != null) {
         setState(() => _isRecording = true);
+      } else if (mounted) {
+        // Reached only if start() failed after the availability check passed
+        // (e.g. the encoder process died). Fall back to a generic message.
+        _notifyUser('Microphone unavailable');
       }
     }
+  }
+
+  /// Surface a transient message: prefer the host's styled toast, fall back to
+  /// a plain SnackBar so the standalone sample still shows it. Caller must
+  /// confirm `mounted` first (uses [context]).
+  void _notifyUser(String message) {
+    if (widget.onShowToast != null) {
+      widget.onShowToast!(message);
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  void _onRecordingAutoStop(String path) {
+    if (!mounted) return;
+    setState(() {
+      _isRecording = false;
+      _isPreviewing = true;
+      _previewPath = path;
+    });
+  }
+
+  void _sendPreview() {
+    if (_previewPath == null) return;
+    final path = _previewPath!;
+    setState(() {
+      _isPreviewing = false;
+      _previewPath = null;
+    });
+    _sendVoiceNote(path);
+  }
+
+  void _deletePreview() {
+    if (_previewPath == null) return;
+    final file = File(_previewPath!);
+    if (file.existsSync()) file.deleteSync();
+    setState(() {
+      _isPreviewing = false;
+      _previewPath = null;
+    });
   }
 
   Future<void> _sendVoiceNote(String filePath) async {
@@ -266,14 +391,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   /// Send via the centralized MessagingService.
+  ///
+  /// For group messages, piggybacks group metadata (name + members) onto the
+  /// envelope so recipients who missed the `group_created` sync event can
+  /// auto-create the group record on first message receipt.
   Future<bool> _sendToTarget(String payload) async {
     try {
       if (_isBroadcast) {
         final report = await widget.contactsAccessor.broadcast(payload);
         return report.successCount > 0 || report.results.isEmpty;
       } else if (_isGroup) {
-        final report = await widget.contactsAccessor.sendToGroup(
-            widget.conversationId, payload);
+        final enriched = _enrichWithGroupMetadata(payload);
+        final report = await widget.contactsAccessor
+            .sendToGroup(widget.conversationId, enriched);
         return report.successCount > 0;
       } else {
         final report =
@@ -283,6 +413,21 @@ class _ConversationScreenState extends State<ConversationScreen> {
     } catch (e) {
       debugPrint('ConversationScreen: send failed: $e');
       return false;
+    }
+  }
+
+  /// Injects `groupName` and `groupMembers` into the JSON envelope so that
+  /// recipients can recover group state if they missed the creation event.
+  String _enrichWithGroupMetadata(String payload) {
+    final group = _currentGroup;
+    if (group == null) return payload;
+    try {
+      final map = jsonDecode(payload) as Map<String, dynamic>;
+      map['groupName'] = group.name;
+      map['groupMembers'] = group.memberDeviceIds;
+      return jsonEncode(map);
+    } catch (_) {
+      return payload;
     }
   }
 
@@ -395,7 +540,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.person_add, size: 20, color: colors.textMuted),
+                            Icon(Icons.person_add,
+                                size: 20, color: colors.textMuted),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -426,26 +572,25 @@ class _ConversationScreenState extends State<ConversationScreen> {
             ),
           ),
           actions: [
-            Expanded(
-              child: SizedBox(
-                height: 36,
-                child: TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(null),
-                  style: TextButton.styleFrom(
-                    backgroundColor: colors.surface,
-                    foregroundColor: colors.textSecondary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      side: BorderSide(color: colors.borderActive),
-                    ),
+            SizedBox(
+              width: double.infinity,
+              height: 36,
+              child: TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(null),
+                style: TextButton.styleFrom(
+                  backgroundColor: colors.surface,
+                  foregroundColor: colors.textSecondary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    side: BorderSide(color: colors.borderActive),
                   ),
-                  child: Text('Cancel',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: colors.textSecondary,
-                      )),
                 ),
+                child: Text('Cancel',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: colors.textSecondary,
+                    )),
               ),
             ),
           ],
@@ -462,6 +607,22 @@ class _ConversationScreenState extends State<ConversationScreen> {
     final group = _currentGroup;
     if (group == null) return;
 
+    if (widget.onOpenFieldEditor != null) {
+      widget.onOpenFieldEditor!(
+        header: 'Rename Group',
+        hint: 'Group name',
+        initialValue: group.name,
+        onConfirm: (newName) async {
+          if (newName.isNotEmpty && newName != group.name) {
+            await widget.onRenameGroup?.call(group.id, newName);
+            await _loadMessages();
+          }
+        },
+      );
+      return;
+    }
+
+    // Fallback: plain AlertDialog for standalone/preview mode.
     final controller = TextEditingController(text: group.name);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -525,8 +686,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                     Navigator.of(ctx).pop(true);
                   });
                 },
-                child:
-                    Text('Rename', style: TextStyle(color: colors.accent)),
+                child: Text('Rename', style: TextStyle(color: colors.accent)),
               ),
             ],
           ),
@@ -543,8 +703,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     }
   }
 
-  Future<void> _confirmRemoveMember(
-      String deviceId, String callsign) async {
+  Future<void> _confirmRemoveMember(String deviceId, String callsign) async {
     final group = _currentGroup;
     if (group == null) return;
 
@@ -565,13 +724,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text('Cancel',
-                  style: TextStyle(color: colors.textSecondary)),
+              child:
+                  Text('Cancel', style: TextStyle(color: colors.textSecondary)),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child:
-                  Text('Remove', style: TextStyle(color: colors.error)),
+              child: Text('Remove', style: TextStyle(color: colors.error)),
             ),
           ],
         );
@@ -604,8 +762,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text('Cancel',
-                  style: TextStyle(color: colors.textSecondary)),
+              child:
+                  Text('Cancel', style: TextStyle(color: colors.textSecondary)),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
@@ -624,8 +782,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
   // --- Build methods ---
 
   Widget _buildGroupRoster(List<Peer> peers) {
+    final group = _currentGroup;
+    if (group == null) return const SizedBox.shrink();
     final colors = context.lattice.colors;
-    final group = _currentGroup!;
 
     // Resolve callsign for each member device id
     Peer? _peerForId(String deviceId) {
@@ -635,6 +794,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
         return null;
       }
     }
+
+    final members = group.memberDeviceIds;
 
     return Container(
       decoration: BoxDecoration(
@@ -646,101 +807,113 @@ class _ConversationScreenState extends State<ConversationScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Member list
-          ...group.memberDeviceIds.map((deviceId) {
-            final isSelf = deviceId == widget.localDeviceId;
-            final peer = isSelf ? null : _peerForId(deviceId);
-            final callsign = isSelf
-                ? widget.getSelfCallsign()
-                : (peer?.callsign ?? deviceId);
-            final isOnline = isSelf ? true : (peer?.isOnline ?? false);
+          // Scrollable member list — fills the available body space so the
+          // panel covers the area down to the action row. The action buttons
+          // below stay pinned at the bottom regardless of group size.
+          Expanded(
+            child: ListView.builder(
+              physics: const ClampingScrollPhysics(),
+              itemCount: members.length,
+              itemBuilder: (context, index) {
+                final deviceId = members[index];
+                final isSelf = deviceId == widget.localDeviceId;
+                final peer = isSelf ? null : _peerForId(deviceId);
+                final callsign = isSelf
+                    ? widget.getSelfCallsign()
+                    : (peer?.callsign ?? deviceId);
+                final isOnline = isSelf ? true : (peer?.isOnline ?? false);
 
-            return GestureDetector(
-              onLongPress: isSelf
-                  ? null
-                  : () => _confirmRemoveMember(deviceId, callsign),
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 48),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom:
-                        BorderSide(color: colors.border, width: 0.5),
+                return GestureDetector(
+                  onLongPress: isSelf
+                      ? null
+                      : () => _confirmRemoveMember(deviceId, callsign),
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: colors.border, width: 0.5),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        // Online/offline dot
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isOnline ? colors.success : colors.textMuted,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            isSelf ? '$callsign (you)' : callsign,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: colors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        // Leave (self) or Remove (others)
+                        if (isSelf)
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: _leaveGroup,
+                            child: SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: Icon(Icons.exit_to_app,
+                                  size: 18, color: colors.error),
+                            ),
+                          )
+                        else
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () =>
+                                _confirmRemoveMember(deviceId, callsign),
+                            child: SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: Icon(Icons.remove_circle_outline,
+                                  size: 18, color: colors.textMuted),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    // Online/offline dot
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isOnline ? colors.success : colors.textMuted,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        isSelf ? '$callsign (you)' : callsign,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: colors.textPrimary,
-                        ),
-                      ),
-                    ),
-                    // Leave (self) or Remove (others)
-                    if (isSelf)
-                      GestureDetector(
-                        onTap: _leaveGroup,
-                        child: SizedBox(
-                          width: 48,
-                          height: 48,
-                          child: Icon(Icons.exit_to_app,
-                              size: 18, color: colors.error),
-                        ),
-                      )
-                    else
-                      GestureDetector(
-                        onTap: () =>
-                            _confirmRemoveMember(deviceId, callsign),
-                        child: SizedBox(
-                          width: 48,
-                          height: 48,
-                          child: Icon(Icons.remove_circle_outline,
-                              size: 18, color: colors.textMuted),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            );
-          }),
+                );
+              },
+            ),
+          ),
 
-          // Action row: Add, Rename
+          // Action row: Add, Rename (always visible at bottom)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: Row(
               children: [
                 // Add member
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: _addMember,
                   child: SizedBox(
                     width: 48,
                     height: 48,
-                    child: Icon(Icons.person_add,
-                        size: 20, color: colors.accent),
+                    child:
+                        Icon(Icons.person_add, size: 20, color: colors.accent),
                   ),
                 ),
                 // Rename group
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: _renameGroup,
                   child: SizedBox(
                     width: 48,
                     height: 48,
-                    child: Icon(Icons.edit,
-                        size: 20, color: colors.textSecondary),
+                    child:
+                        Icon(Icons.edit, size: 20, color: colors.textSecondary),
                   ),
                 ),
               ],
@@ -754,6 +927,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = context.lattice.colors;
+    // When the keyboard is up, collapse the header to reclaim vertical space
+    // for the chat: hide the nav/avatar/status, leaving just a small text
+    // label of who you're messaging. Tracked in [didChangeMetrics].
+    final keyboardVisible = _keyboardVisible;
 
     return ValueListenableBuilder<List<Peer>>(
       valueListenable: widget.peersNotifier,
@@ -762,10 +939,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
         return Column(
           children: [
-            // Header
+            // Header — collapses to a slim name-only indicator bar when the
+            // keyboard is up: back / edit / close icons and the avatar are
+            // hidden, and the vertical padding tightens to reclaim space.
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              padding: EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: keyboardVisible ? 4 : 10,
+              ),
               decoration: BoxDecoration(
                 border: Border(
                   bottom: BorderSide(color: colors.borderActive),
@@ -773,19 +954,23 @@ class _ConversationScreenState extends State<ConversationScreen> {
               ),
               child: Row(
                 children: [
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: widget.onBack,
-                    child: SizedBox(
-                      width: 48,
-                      height: 48,
-                      child: Icon(Icons.arrow_back,
-                          size: 20, color: colors.textPrimary),
+                  // Back button — hidden when the keyboard is up.
+                  if (!keyboardVisible)
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: widget.onBack,
+                      child: SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: Icon(Icons.arrow_back,
+                            size: 20, color: colors.textPrimary),
+                      ),
                     ),
-                  ),
-                  // Avatar
-                  _buildAvatar(),
-                  const SizedBox(width: 8),
+                  // Avatar — hidden when the keyboard is up to save space.
+                  if (!keyboardVisible) ...[
+                    _buildAvatar(),
+                    const SizedBox(width: 8),
+                  ],
                   // Title
                   Expanded(
                     child: Column(
@@ -795,43 +980,50 @@ class _ConversationScreenState extends State<ConversationScreen> {
                           _isBroadcast
                               ? 'Broadcast'
                               : _isGroup
-                                  ? _currentGroup!.name
+                                  ? (_currentGroup?.name ?? '')
                                   : (widget.peer?.callsign ?? 'Unknown'),
-                          maxLines: 2,
+                          maxLines: keyboardVisible ? 1 : 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: _isGroup ? 13 : 16,
+                            // Shrink to chat-message text size (13) when the
+                            // keyboard is up to make the header even slimmer.
+                            fontSize:
+                                keyboardVisible ? 13 : (_isGroup ? 13 : 16),
                             fontWeight: FontWeight.w600,
                             color: colors.textPrimary,
                           ),
                         ),
-                        Text(
-                          _isBroadcast
-                              ? '${onlinePeers.length} users online'
-                              : _isGroup
-                                  ? '${_currentGroup!.memberDeviceIds.length} members'
-                                  : (widget.peer?.isOnline == true
-                                      ? 'Online'
-                                      : 'Offline'),
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: _isBroadcast
-                                ? colors.textSecondary
+                        // Status subtitle — hidden when the keyboard is up so
+                        // only the name of who you're messaging remains.
+                        if (!keyboardVisible)
+                          Text(
+                            _isBroadcast
+                                ? '${onlinePeers.length} users online'
                                 : _isGroup
-                                    ? colors.textSecondary
+                                    ? '${_currentGroup?.memberDeviceIds.length ?? 0} members'
                                     : (widget.peer?.isOnline == true
-                                        ? colors.success
-                                        : colors.textMuted),
+                                        ? 'Online'
+                                        : 'Offline'),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: _isBroadcast
+                                  ? colors.textSecondary
+                                  : _isGroup
+                                      ? colors.textSecondary
+                                      : (widget.peer?.isOnline == true
+                                          ? colors.success
+                                          : colors.textMuted),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
-                  // Edit icon for groups
-                  if (_isGroup)
+                  // Edit icon for groups — hidden when the keyboard is up.
+                  if (_isGroup && !keyboardVisible)
                     GestureDetector(
-                      onTap: () => setState(
-                          () => _showGroupRoster = !_showGroupRoster),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () =>
+                          setState(() => _showGroupRoster = !_showGroupRoster),
                       child: SizedBox(
                         width: 48,
                         height: 48,
@@ -839,7 +1031,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
                             size: 18, color: colors.textSecondary),
                       ),
                     ),
-                  if (widget.onClose != null)
+                  // Close (exit) icon — hidden when the keyboard is up.
+                  if (widget.onClose != null && !keyboardVisible)
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: widget.onClose,
@@ -854,158 +1047,227 @@ class _ConversationScreenState extends State<ConversationScreen> {
               ),
             ),
 
-            // Group roster panel (shown when tapped)
-            if (_isGroup && _showGroupRoster) _buildGroupRoster(peers),
+            // When the group roster (edit group) panel is open it takes over the
+            // body, filling the space the message list would otherwise occupy —
+            // so the composer is hidden (below) and no empty "Today" separator
+            // shows through.
+            if (_isGroup && _showGroupRoster)
+              Expanded(child: _buildGroupRoster(peers))
+            else
+              // Messages
+              Expanded(
+                child: ClipRect(
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    physics: const ClampingScrollPhysics(),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final msg = _messages[index];
+                      final isOutgoing =
+                          msg.fromDeviceId == widget.localDeviceId;
 
-            // Messages
-            Expanded(
-              child: ClipRect(
-                child: ListView.builder(
-                  controller: _scrollController,
-                  physics: const ClampingScrollPhysics(),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  itemCount: _messages.length,
-                  itemBuilder: (context, index) {
-                    final msg = _messages[index];
-                    final isOutgoing =
-                        msg.fromDeviceId == widget.localDeviceId;
+                      final msgDay =
+                          DateTime.fromMillisecondsSinceEpoch(msg.timestamp)
+                              .toLocal();
+                      bool showSeparator = index == 0;
+                      if (index > 0) {
+                        final prevDay = DateTime.fromMillisecondsSinceEpoch(
+                          _messages[index - 1].timestamp,
+                        ).toLocal();
+                        showSeparator = !isSameLocalDay(prevDay, msgDay);
+                      }
 
-                    // System messages rendered as centred italic text
-                    if (msg.type == MessageType.system) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Center(
-                          child: Text(
-                            msg.body ?? '',
-                            style: TextStyle(
-                              color: colors.textSecondary,
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-
-                    // Resolve sender callsign from peers list
-                    String? senderCallsign = msg.fromCallsign;
-                    if (senderCallsign == null) {
-                      try {
-                        senderCallsign = peers
-                            .firstWhere(
-                                (p) => p.deviceId == msg.fromDeviceId)
-                            .callsign;
-                      } catch (_) {}
-                    }
-
-                    return MessageBubble(
-                      message: msg,
-                      isOutgoing: isOutgoing,
-                      showSenderLabel: _isBroadcast || _isGroup,
-                      senderCallsign: senderCallsign,
-                      onRetry: msg.status == MessageStatus.failed
-                          ? () => _retryMessage(msg)
-                          : null,
-                      onPlayVoice: (path) => widget.audio.play(path),
-                      currentlyPlayingPath: widget.audio.currentlyPlaying,
-                      positionStream: widget.audio.positionStream,
-                      durationStream: widget.audio.durationStream,
-                    );
-                  },
-                ),
-              ),
-            ),
-
-            // Input area
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: colors.borderActive),
-                ),
-              ),
-              child: _isRecording
-                  ? VoiceRecorder(onStop: _toggleRecording)
-                  : Row(
-                      children: [
-                        // Text input
-                        Expanded(
-                          child: TextField(
-                            controller: _textController,
-                            style: TextStyle(
-                                color: colors.textPrimary, fontSize: 13),
-                            decoration: InputDecoration(
-                              hintText: _isBroadcast
-                                  ? 'Broadcast message...'
-                                  : 'Type a message...',
-                              hintStyle: TextStyle(
-                                  color: colors.textMuted, fontSize: 13),
-                              filled: true,
-                              fillColor: colors.surface,
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 12),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(
-                                    color: colors.borderActive),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(
-                                    color: colors.borderActive),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(
-                                    color: colors.accent),
+                      Widget item;
+                      // Let the host render custom cards (e.g. entity shares).
+                      final customItem =
+                          widget.messageItemBuilder?.call(msg, isOutgoing);
+                      if (customItem != null) {
+                        item = customItem;
+                      } else
+                      // System messages rendered as centred italic text
+                      if (msg.type == MessageType.system) {
+                        item = Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Center(
+                            child: Text(
+                              msg.body ?? '',
+                              style: TextStyle(
+                                color: colors.textSecondary,
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
                               ),
                             ),
-                            maxLines: null,
-                            minLines: 1,
-                            keyboardType: TextInputType.multiline,
-                            textInputAction: TextInputAction.newline,
                           ),
-                        ),
-                        const SizedBox(width: 8),
+                        );
+                      } else {
+                        // Resolve sender callsign from peers list
+                        String? senderCallsign = msg.fromCallsign;
+                        if (senderCallsign == null) {
+                          try {
+                            senderCallsign = peers
+                                .firstWhere(
+                                    (p) => p.deviceId == msg.fromDeviceId)
+                                .callsign;
+                          } catch (_) {}
+                        }
 
-                        // Mic button (hidden for broadcast — voice notes exceed 1400-byte limit)
-                        if (!_isBroadcast) ...[
-                          GestureDetector(
-                            onTap: _toggleRecording,
-                            child: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: colors.surface,
-                                border: Border.all(
-                                    color: colors.borderActive),
-                                borderRadius: BorderRadius.circular(8),
+                        item = MessageBubble(
+                          message: msg,
+                          isOutgoing: isOutgoing,
+                          showSenderLabel: _isBroadcast || _isGroup,
+                          senderCallsign: senderCallsign,
+                          onRetry: msg.status == MessageStatus.failed
+                              ? () => _retryMessage(msg)
+                              : null,
+                          textBodyBuilder: widget.textBodyBuilder,
+                        );
+                      }
+
+                      if (!showSeparator) return item;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Center(
+                              child: Text(
+                                formatChatDateSeparator(msgDay),
+                                style: TextStyle(
+                                  color: colors.textSecondary,
+                                  fontSize: 12,
+                                ),
                               ),
-                              child: Icon(Icons.mic,
-                                  size: 20, color: colors.textSecondary),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          item,
                         ],
+                      );
+                    },
+                  ),
+                ),
+              ),
 
-                        // Send button
-                        GestureDetector(
-                          onTap: _sendText,
-                          child: Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: colors.accent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(Icons.send,
-                                size: 20, color: colors.textPrimary),
-                          ),
-                        ),
-                      ],
+            // Input area — hidden while the group roster (edit group) panel is
+            // open so the composer/voice recorder doesn't compete with the
+            // roster for vertical space (was causing a ~21px Column overflow).
+            if (!(_isGroup && _showGroupRoster)) ...[
+              if (_currentGroup?.localUserLeft == true)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: colors.borderActive),
                     ),
-            ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'You are no longer in this group',
+                      style: TextStyle(fontSize: 12, color: colors.textMuted),
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: colors.borderActive),
+                    ),
+                  ),
+                  child: _isRecording
+                      ? VoiceRecorder(onStop: _toggleRecording)
+                      : _isPreviewing && _previewPath != null
+                          ? VoicePreview(
+                              audioPath: _previewPath!,
+                              onSend: _sendPreview,
+                              onDelete: _deletePreview,
+                            )
+                          : Row(
+                              children: [
+                                // Text input
+                                Expanded(
+                                  child: TextField(
+                                    controller: _textController,
+                                    style: TextStyle(
+                                        color: colors.textPrimary,
+                                        fontSize: 13),
+                                    decoration: InputDecoration(
+                                      hintText: _isBroadcast
+                                          ? 'Broadcast message...'
+                                          : 'Type a message...',
+                                      hintStyle: TextStyle(
+                                          color: colors.textMuted,
+                                          fontSize: 13),
+                                      filled: true,
+                                      fillColor: colors.surface,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 12),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(
+                                            color: colors.borderActive),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(
+                                            color: colors.borderActive),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide:
+                                            BorderSide(color: colors.accent),
+                                      ),
+                                    ),
+                                    maxLines: 2,
+                                    minLines: 1,
+                                    keyboardType: TextInputType.multiline,
+                                    textInputAction: TextInputAction.newline,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+
+                                // Mic button (hidden for broadcast — voice notes exceed 1400-byte limit)
+                                if (!_isBroadcast) ...[
+                                  GestureDetector(
+                                    onTap: _toggleRecording,
+                                    child: Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: colors.surface,
+                                        border: Border.all(
+                                            color: colors.borderActive),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(Icons.mic,
+                                          size: 20,
+                                          color: colors.textSecondary),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+
+                                // Send button
+                                GestureDetector(
+                                  onTap: _sendText,
+                                  child: Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: colors.accent,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(Icons.send,
+                                        size: 20, color: colors.textPrimary),
+                                  ),
+                                ),
+                              ],
+                            ),
+                ),
+            ],
           ],
         );
       },
@@ -1055,7 +1317,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
       height: 32,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: isOnline ? colors.success.withValues(alpha: 0.15) : colors.surfaceElevated,
+        color: isOnline
+            ? colors.success.withValues(alpha: 0.15)
+            : colors.surfaceElevated,
         border: Border.all(
           color: isOnline ? colors.success : colors.textMuted,
           width: 2,

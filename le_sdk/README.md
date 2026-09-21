@@ -1,4 +1,4 @@
-****# Lattice Edge Extension SDK
+# Lattice Edge Extension SDK
 
 Build extensions for the Lattice Edge command-and-control application. Extensions are self-contained Flutter widgets that appear as panels or overlays alongside the main map view and can access host capabilities: map location picking, speech-to-text input, persistent storage, and peer-to-peer messaging.
 
@@ -121,7 +121,7 @@ See [Shipping Your Plugin](docs/developer-guide.md#6-ship-to-anduril) in the dev
 | `docs/` | Developer guide, API reference, style guide |
 | `packages/` | The `le_sdk` Dart package (your main dependency) |
 | `templates/` | Scaffold templates used by `create-extension` scripts |
-| `samples/` | 10 sample extensions — from simple reports to entity/task management |
+| `samples/` | 13 sample extensions — from simple reports to entity/task management |
 | `scripts/` | Extension scaffolding and deploy scripts (bash + PowerShell) |
 | `my-extensions/` | Your extensions go here (created by scaffold scripts) |
 | `host-apk/` | Place the Lattice Edge APK here for on-device testing |
@@ -137,8 +137,10 @@ See [Shipping Your Plugin](docs/developer-guide.md#6-ship-to-anduril) in the dev
 | `lace_report` | Medium | Logistics status tracking (Liquids, Ammo, Casualties, Equipment) |
 | `entity_task_manager` | High | EntityService and TaskService APIs — create, browse, manage entities and tasks |
 | `equipment_readiness` | High | Logistics reporting with unit/site selection, equipment catalog, peer messaging |
-| `route_planner` | Medium | Map APIs: pickLocation, addMarker, addPolyline, flyTo, getMarkers |
 | `icon_markers_demo` | Low | All 18 icon marker types with 4 disposition colors |
+| `panel_resize_demo` | Low | Dynamic panel sizing — `ui.setPanelSize`/`getPanelSize`, reflowing controls, proportional image |
+| `mesh_item_browser` | High | Mesh-item-store APIs — discover data types, CRUD items, live-tail streams, publish messages |
+| `udp_monitor` | Medium | Host-brokered UDP via `network` — join multicast group, stream incoming datagrams, send back |
 | `cors_test` | Low | CORS proxy verification — fetches external URL to test proxy setup |
 
 ## Documentation

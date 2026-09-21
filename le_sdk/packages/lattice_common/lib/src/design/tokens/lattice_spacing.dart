@@ -18,12 +18,16 @@ class LatticeSpacing {
   static const double xl = 20.0;
   static const double xxl = 24.0;
   static const double touchTarget = 56.0;
+  static const double touchTargetSmall = 48.0;
   static const double touchTargetCompact = 44.0;
   static const double borderRadius = 8.0;
   static const double borderRadiusSmall = 4.0;
   static const double borderRadiusLarge = 12.0;
   static const double popoverWidth = 380.0;
   static const double popoverMarkerGap = 20.0;
+  static const double menuMinWidth = 200.0;
+  static const double menuItemHeight = 56.0;
+  static const double menuItemIconGap = 10.0;
 
   // Composed padding constants
   static const EdgeInsetsDirectional inputPadding =

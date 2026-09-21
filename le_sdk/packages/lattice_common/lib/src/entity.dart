@@ -154,6 +154,14 @@ class Entity {
     this.createdTime,
     this.isLive,
     this.routeDetails,
+    this.ring,
+    this.altFloorMeters,
+    this.altCeilMeters,
+    this.startTime,
+    this.geoDetailsBytes,
+    this.linePositions,
+    this.sidc,
+    this.prototypeExtensionsBytes,
   });
 
   final String id;
@@ -176,6 +184,67 @@ class Entity {
   final DateTime? createdTime;
   final bool? isLive;
   final Map<String, dynamic>? routeDetails;
+
+  /// Polygon ring as [lat, lon] pairs. Only used when [shapeType] is
+  /// [ShapeType.polygon]. Must have at least 3 elements.
+  final List<List<double>>? ring;
+
+  /// Altitude floor above ground level, in metres. Applied per-vertex on the
+  /// polygon ring when building the proto entity.
+  final double? altFloorMeters;
+
+  /// Altitude ceiling above ground level, in metres. The extrusion height
+  /// (`heightM`) per vertex is computed as `(altCeilMeters - altFloorMeters)`.
+  final double? altCeilMeters;
+
+  /// Optional effective start time for the entity. Maps to `entity.createdTime`
+  /// on the proto when present.
+  final DateTime? startTime;
+
+  /// Optional serialized `GeoDetails` proto, carried opaquely by the platform.
+  /// A plugin that owns its geometry builds the full `GeoDetails` message in its
+  /// own layer and sets the bytes here; the host attaches them to the published
+  /// entity (and echoes them back on read) WITHOUT decoding — it has no
+  /// knowledge of any specific geo type or subtype. Null for entities that
+  /// carry no geo detail.
+  final List<int>? geoDetailsBytes;
+
+  /// Line vertices as [lat, lon] pairs, in order. Only used when [shapeType] is
+  /// [ShapeType.line]. Must have at least 2 elements. Unlike [ring], this is NOT
+  /// auto-closed — a line is an open path, not a loop. The host builds a
+  /// `geoShape.line` (GeoLine) from these and uses their centroid as the
+  /// entity's `location`.
+  final List<List<double>>? linePositions;
+
+  /// Optional 2525 SIDC. When set, the host stamps `symbology.milStd2525C.sidc`
+  /// on the published entity so it renders with doctrinal styling (e.g. a line
+  /// control measure like MSR/ASR). Null for entities with no symbology.
+  ///
+  /// Format: a 20-character MIL-STD-2525D symbol identification code (the same
+  /// string the milSymbol renderer consumes). Layout is
+  /// `VVSSSSSSSSSSDDDDdddd`:
+  ///   - `VV`   version (`10` = 2525D)
+  ///   - `S`    standard identity + symbol set + status + HQ/task-force + echelon
+  ///   - `D`    the 6-digit entity/mission code
+  ///   - `dddd` modifiers (usually `0000`)
+  /// A `-` is treated as `0` by the renderer.
+  ///
+  /// Examples (line control measures, symbol set `25`):
+  ///   - `10032500003303000000` — Main Supply Route (MSR)
+  ///   - `10032500003304000000` — Alternate Supply Route (ASR)
+  ///   - `10032500001403000000` — Phase Line
+  ///   - `10032500001101000000` — Boundary
+  /// Point example:
+  ///   - `10031000001211000000` — friendly infantry
+  final String? sidc;
+
+  /// Optional serialized `PrototypeExtensions` proto, carried opaquely by the
+  /// platform (same contract as [geoDetailsBytes]). A plugin builds the message
+  /// in its own layer — e.g. a `tactical-graphic` extension carrying
+  /// `{sidc, category, label}` so the host and LCA desktop classify and label
+  /// the entity as a tactical graphic. The host merges these onto the published
+  /// entity WITHOUT decoding. Null when the entity carries no extensions.
+  final List<int>? prototypeExtensionsBytes;
 
   String get resolvedColor => color ?? disposition.defaultColor;
   String get resolvedSymbol => symbol ?? disposition.defaultSymbol;
@@ -201,6 +270,14 @@ class Entity {
     DateTime? createdTime,
     bool? isLive,
     Map<String, dynamic>? routeDetails,
+    List<List<double>>? ring,
+    double? altFloorMeters,
+    double? altCeilMeters,
+    DateTime? startTime,
+    List<int>? geoDetailsBytes,
+    List<List<double>>? linePositions,
+    String? sidc,
+    List<int>? prototypeExtensionsBytes,
   }) {
     return Entity(
       id: id ?? this.id,
@@ -223,6 +300,15 @@ class Entity {
       createdTime: createdTime ?? this.createdTime,
       isLive: isLive ?? this.isLive,
       routeDetails: routeDetails ?? this.routeDetails,
+      ring: ring ?? this.ring,
+      altFloorMeters: altFloorMeters ?? this.altFloorMeters,
+      altCeilMeters: altCeilMeters ?? this.altCeilMeters,
+      startTime: startTime ?? this.startTime,
+      geoDetailsBytes: geoDetailsBytes ?? this.geoDetailsBytes,
+      linePositions: linePositions ?? this.linePositions,
+      sidc: sidc ?? this.sidc,
+      prototypeExtensionsBytes:
+          prototypeExtensionsBytes ?? this.prototypeExtensionsBytes,
     );
   }
 
@@ -266,6 +352,25 @@ class Entity {
           : null,
       isLive: json['isLive'] as bool?,
       routeDetails: json['routeDetails'] as Map<String, dynamic>?,
+      ring: (json['ring'] as List<dynamic>?)
+          ?.map((row) => (row as List<dynamic>).map((v) => (v as num).toDouble()).toList())
+          .toList(),
+      altFloorMeters: (json['altFloorMeters'] as num?)?.toDouble(),
+      altCeilMeters: (json['altCeilMeters'] as num?)?.toDouble(),
+      startTime: json['startTime'] != null
+          ? DateTime.parse(json['startTime'] as String)
+          : null,
+      geoDetailsBytes: (json['geoDetailsBytes'] as List<dynamic>?)
+          ?.map((v) => (v as num).toInt())
+          .toList(),
+      linePositions: (json['linePositions'] as List<dynamic>?)
+          ?.map((row) =>
+              (row as List<dynamic>).map((v) => (v as num).toDouble()).toList())
+          .toList(),
+      sidc: json['sidc'] as String?,
+      prototypeExtensionsBytes: (json['prototypeExtensionsBytes'] as List<dynamic>?)
+          ?.map((v) => (v as num).toInt())
+          .toList(),
     );
   }
 
@@ -291,6 +396,15 @@ class Entity {
         if (createdTime != null) 'createdTime': createdTime!.toIso8601String(),
         if (isLive != null) 'isLive': isLive,
         if (routeDetails != null) 'routeDetails': routeDetails,
+        if (ring != null) 'ring': ring,
+        if (altFloorMeters != null) 'altFloorMeters': altFloorMeters,
+        if (altCeilMeters != null) 'altCeilMeters': altCeilMeters,
+        if (startTime != null) 'startTime': startTime!.toIso8601String(),
+        if (geoDetailsBytes != null) 'geoDetailsBytes': geoDetailsBytes,
+        if (linePositions != null) 'linePositions': linePositions,
+        if (sidc != null) 'sidc': sidc,
+        if (prototypeExtensionsBytes != null)
+          'prototypeExtensionsBytes': prototypeExtensionsBytes,
       };
 
   @override

@@ -41,3 +41,6 @@ export 'src/design/organisms/lattice_input_decoration.dart';
 // Design system — formatters
 export 'src/design/formatters/military_datetime_formatter.dart';
 export 'src/design/formatters/military_datetime_parser.dart';
+
+// Formatters
+export 'src/formatters/chat_date_separator.dart';

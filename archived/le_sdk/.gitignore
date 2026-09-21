@@ -1,0 +1,16 @@
+# Flutter / Dart
+build/
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+.vscode/
+
+# Generated extensions (developer's work — they manage their own git)
+my-extensions/*/
+
+# OS files
+.DS_Store
+Thumbs.db

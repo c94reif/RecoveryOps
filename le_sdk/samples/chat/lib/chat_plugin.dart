@@ -116,8 +116,7 @@ class _ChatAppState extends State<_ChatApp> {
   // Local peer list converted from SDK peers
   final ValueNotifier<List<local.Peer>> _peersNotifier = ValueNotifier([]);
   // Group list from SDK
-  final ValueNotifier<List<ContactGroup>> _groupsNotifier =
-      ValueNotifier([]);
+  final ValueNotifier<List<ContactGroup>> _groupsNotifier = ValueNotifier([]);
 
   @override
   void initState() {
@@ -128,7 +127,8 @@ class _ChatAppState extends State<_ChatApp> {
         _init = result;
       });
       // Listen for incoming messages via the centralized contacts system
-      widget.extensionContext.messaging.onMessageReceived.listen(_handleIncomingMessage);
+      widget.extensionContext.messaging.onMessageReceived
+          .listen(_handleIncomingMessage);
       // Listen for peer changes from the host
       _peersSub =
           widget.extensionContext.messaging.onPeersChanged.listen((sdkPeers) {
@@ -174,8 +174,7 @@ class _ChatAppState extends State<_ChatApp> {
     if (init == null) return;
 
     try {
-      final json =
-          jsonDecode(incoming.payload) as Map<String, dynamic>;
+      final json = jsonDecode(incoming.payload) as Map<String, dynamic>;
 
       final msgType = (json['type'] as String?) == 'voice'
           ? MessageType.voice
@@ -185,8 +184,7 @@ class _ChatAppState extends State<_ChatApp> {
       final String conversationId;
       if (to == 'broadcast') {
         conversationId = 'broadcast';
-      } else if (to != null &&
-          _groupsNotifier.value.any((g) => g.id == to)) {
+      } else if (to != null && _groupsNotifier.value.any((g) => g.id == to)) {
         conversationId = to;
       } else if (to != null) {
         // Group may have been created after init — re-query
@@ -207,8 +205,11 @@ class _ChatAppState extends State<_ChatApp> {
         fromDeviceId: incoming.fromPeerId,
         type: msgType,
         body: msgType == MessageType.voice ? null : json['body'] as String?,
-        timestamp:
-            json['timestamp'] as int? ?? incoming.receivedAt.millisecondsSinceEpoch,
+        // Date and order by the recipient's receive time, not the sender's
+        // clock — peer clocks can be skewed (e.g. manually set), which would
+        // otherwise place incoming messages under the wrong day and out of
+        // order relative to locally-sent messages.
+        timestamp: incoming.receivedAt.millisecondsSinceEpoch,
         status: MessageStatus.sent,
         isRead: false,
         fromCallsign: incoming.fromCallsign,

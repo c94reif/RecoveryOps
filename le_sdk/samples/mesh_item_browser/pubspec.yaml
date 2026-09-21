@@ -1,0 +1,28 @@
+name: mesh_item_browser
+description: >
+  Sample extension demonstrating the MeshItemService and MeshStreamService APIs.
+  Browse data types, CRUD typed items, and subscribe to live streams.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  le_sdk:
+    path: ../../packages/le_sdk
+  lattice_common:
+    path: ../../packages/lattice_common
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
+
+lattice_edge_extension:
+  type: web
+  icon: storage
+  display_mode: panel
+  description: Browse and manage mesh-item-store items and streams

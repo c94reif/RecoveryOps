@@ -1,0 +1,35 @@
+name: udp_monitor
+description: >
+  Sample "UDP Monitor" extension for Lattice C2.
+  Subscribes to a multicast group/port via the host NetworkService, renders
+  incoming datagrams (hex + ASCII), and can send a datagram back. Demonstrates
+  context.network — the host-brokered UDP socket API for WebExtensions.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  le_sdk:
+    path: ../../packages/le_sdk
+  lattice_common:
+    path: ../../packages/lattice_common
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: fonts/Roboto-Regular.ttf
+
+lattice_edge_extension:
+  type: web
+  entry: web/index.html
+  icon: lan
+  display_mode: panel
+  description: Monitor and send UDP multicast/unicast datagrams

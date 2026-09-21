@@ -1,5 +1,5 @@
 name: ivy_pulse
-description: A Lattice Edge extension
+description: PMCS for Lattice Edge
 version: 1.0.0
 publish_to: 'none'
 
@@ -9,15 +9,39 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  cupertino_icons: ^1.0.8
+  drift: ^2.32.0
+  drift_flutter: ^0.3.0
+  sqlite3: ^3.2.0
+  path_provider: ^2.1.5
+  path: ^1.9.1
+  get_it: ^9.2.1
+  latlong2: ^0.9.1
+  speech_to_text: ^7.0.0
+  uuid: ^4.5.1
+
+  # PDF417 decode for the CAC scan. Pure Dart (only intl + charset), so the
+  # one decoder serves the web build and the native compile alike.
+  zxing_lib: ^1.1.4
+
+  # `dart:js_interop` bindings for the camera capture on the web build. Only
+  # ever imported behind a `dart.library.js_interop` conditional.
+  web: ^1.1.1
+
   le_sdk:
     path: ../../le_sdk/packages/le_sdk
-
+  flutter_plugin_android_lifecycle: ^2.0.34
 
 dev_dependencies:
-  husky: ^0.1.7
+  flutter_test:
+    sdk: flutter
+  drift_dev: ^2.32.0
+  build_runner: ^2.13.0
   flutter_lints: ^6.0.0
+  fake_async: ^1.3.3
 
 flutter:
+  uses-material-design: true
   assets:
     - assets/logo.png
   fonts:
@@ -27,7 +51,7 @@ flutter:
 
 lattice_edge_extension:
   id: ivy_pulse
-  name: Lattice Edge App to aid Soldiers in properly PMCSing
-  description: A Lattice Edge extension
+  name: Ivy Pulse
+  description: Guided PMCS for tactical vehicles
   icon: extension
   display_mode: panel

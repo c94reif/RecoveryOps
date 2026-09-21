@@ -1,0 +1,37 @@
+name: panel_resize_demo
+description: >
+  Sample extension demonstrating the dynamic panel-resize API
+  (ui.setPanelSize / ui.getPanelSize). Grow / shrink / reset the plugin drawer
+  between the small, medium, and large presets and watch the layout reflow.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  le_sdk:
+    path: ../../packages/le_sdk
+  lattice_common:
+    path: ../../packages/lattice_common
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: fonts/Roboto-Regular.ttf
+
+lattice_edge_extension:
+  type: dart
+  icon: aspect_ratio
+  display_mode: panel
+  description: Grow / shrink / reset the plugin drawer and watch controls reflow

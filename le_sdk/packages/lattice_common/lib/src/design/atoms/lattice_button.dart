@@ -33,6 +33,7 @@ class LatticeButton extends StatelessWidget {
     this.isCompact = false,
     this.isFullWidth = true,
     this.semanticLabel,
+    this.horizontalPadding,
   })  : _customBg = null,
         _customFg = null;
 
@@ -49,6 +50,7 @@ class LatticeButton extends StatelessWidget {
     this.isCompact = false,
     this.isFullWidth = true,
     this.semanticLabel,
+    this.horizontalPadding,
   })  : variant = LatticeButtonVariant.primary,
         _customBg = backgroundColor,
         _customFg = foregroundColor;
@@ -61,6 +63,14 @@ class LatticeButton extends StatelessWidget {
   final bool isCompact;
   final bool isFullWidth;
   final String? semanticLabel;
+
+  /// Overrides the horizontal content padding. Defaults to 12 when [isCompact],
+  /// else 0.
+  ///
+  /// Use when several buttons share a narrow row and a long label would
+  /// otherwise ellipsize: reclaiming side padding widens the text budget without
+  /// shrinking the type. Labels are clamped to a single line either way.
+  final double? horizontalPadding;
 
   final Color? _customBg;
   final Color? _customFg;
@@ -154,6 +164,9 @@ class LatticeButton extends StatelessWidget {
               fontWeight: FontWeight.w600,
               color: fg,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
           );
 
     Widget button = SizedBox(
@@ -168,9 +181,9 @@ class LatticeButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(LatticeSpacing.borderRadius),
             side: border ?? BorderSide.none,
           ),
-          padding: isCompact
-              ? const EdgeInsets.symmetric(horizontal: 12)
-              : EdgeInsets.zero,
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding ?? (isCompact ? 12 : 0),
+          ),
         ),
         child: child,
       ),
@@ -301,12 +314,19 @@ class LatticeCompactButton extends StatelessWidget {
     required this.color,
     required this.onPressed,
     this.icon,
+    this.enabled = true,
+    this.horizontalPadding,
   });
 
   final String label;
   final Color color;
   final VoidCallback? onPressed;
   final IconData? icon;
+  final bool enabled;
+
+  /// Overrides horizontal content padding. Defaults to 12 — this wrapper is
+  /// always compact. See [LatticeButton.horizontalPadding].
+  final double? horizontalPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -318,6 +338,8 @@ class LatticeCompactButton extends StatelessWidget {
       icon: icon,
       isCompact: true,
       isFullWidth: false,
+      enabled: enabled,
+      horizontalPadding: horizontalPadding,
     );
   }
 }

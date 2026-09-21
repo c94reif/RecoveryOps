@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'ai_service.dart';
+import 'object_service.dart';
 import 'peripheral_services.dart';
 import 'services.dart';
 import 'types.dart';
@@ -41,11 +42,22 @@ abstract class ExtensionContext {
   /// Host UI control and introspection.
   UiService get ui;
 
+  /// Aggregated mesh-item-store access. Use `meshItemStore.items` for
+  /// schema-validated item CRUD and `meshItemStore.streams` for pub/sub.
+  MeshItemStoreService get meshItemStore;
+
+  /// Binary object storage via the Lattice CDN. Use for data too large
+  /// for the entity API (images, documents, sensor payloads).
+  ObjectService get objects;
+
   /// Raw hardware device access (USB serial, etc.).
   DeviceService get device;
 
   /// Peripheral sensor event buses (range finder, etc.).
   PeripheralsService get peripherals;
+
+  /// Raw UDP socket access (multicast + unicast), brokered by the native host.
+  NetworkService get network;
 
   /// Close this extension (panel or overlay tab).
   void close();
@@ -66,7 +78,8 @@ abstract class ExtensionContext {
       // Conditional import resolves to WebExtensionContext on web.
       // If the bridge isn't available (standalone preview), fall back to stub.
       try {
-        return await platform_impl.WebExtensionContext.connect(timeout: timeout);
+        return await platform_impl.WebExtensionContext.connect(
+            timeout: timeout);
       } catch (_) {
         return platform_impl.StubExtensionContext.connect(timeout: timeout);
       }
