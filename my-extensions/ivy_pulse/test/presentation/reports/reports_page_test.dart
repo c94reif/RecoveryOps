@@ -29,6 +29,11 @@ void main() {
         home: const Scaffold(body: ReportsPage()),
       );
 
+  Future<void> openTab(WidgetTester tester, ReportsTab tab) async {
+    await tester.tap(find.text(tab.label));
+    await tester.pumpAndSettle();
+  }
+
   group('report cards', () {
     testWidgets('a card names the vehicle, the crew and its fault tally',
         (tester) async {
@@ -114,6 +119,7 @@ void main() {
 
       await tester.pumpWidget(subject());
       await tester.pumpAndSettle();
+      await openTab(tester, ReportsTab.unit);
 
       await tester.tap(find.text('A-11 - Stryker'));
       await tester.pumpAndSettle();
@@ -170,84 +176,269 @@ void main() {
     });
   });
 
-  group('status grouping', () {
-    testWidgets('received reports sit under their triage header',
+  group('the three tabs', () {
+    testWidgets('it opens on your own PMCS and keeps other crews off it',
         (tester) async {
+      viewModel.myUic = 'WJ8TAA';
       viewModel.reports.addAll([
         buildReport(
           id: 1,
-          entityId: 'deadlined',
-          bumperNumber: 'B-22',
-          isOutgoing: false,
-          faults: [buildFault(severity: FaultSeverity.redX)],
+          entityId: 'mine',
+          bumperNumber: 'A-11',
+          isOutgoing: true,
         ),
         buildReport(
           id: 2,
-          entityId: 'limited',
-          bumperNumber: 'C-33',
+          entityId: 'theirs',
+          bumperNumber: 'B-22',
           isOutgoing: false,
-          faults: [buildFault(severity: FaultSeverity.circleX)],
-        ),
-        buildReport(
-          id: 3,
-          entityId: 'clean',
-          bumperNumber: 'D-44',
-          isOutgoing: false,
+          uic: 'WJ8TAA',
         ),
       ]);
 
       await tester.pumpWidget(subject());
       await tester.pumpAndSettle();
 
-      expect(find.text('NOT MISSION CAPABLE'), findsOneWidget);
-      expect(find.text('LIMITED — CIRCLE X'), findsOneWidget);
-      expect(find.text('MISSION CAPABLE'), findsOneWidget);
-      expect(find.text('B-22 - Stryker'), findsOneWidget);
-      expect(find.text('C-33 - Stryker'), findsOneWidget);
-      expect(find.text('D-44 - Stryker'), findsOneWidget);
+      expect(find.text('A-11 - Stryker'), findsOneWidget);
+      expect(find.text('B-22 - Stryker'), findsNothing);
     });
 
-    testWidgets('a bucket with nothing in it gets no header', (tester) async {
+    testWidgets('a vehicle walked twice gets one header and both PMCS',
+        (tester) async {
+      viewModel.reports.addAll([
+        buildReport(
+          id: 1,
+          entityId: 'first',
+          bumperNumber: 'A-11',
+          isOutgoing: true,
+          timestamp: DateTime.utc(2026, 3, 24, 6),
+        ),
+        buildReport(
+          id: 2,
+          entityId: 'second',
+          bumperNumber: 'A-11',
+          isOutgoing: true,
+          timestamp: DateTime.utc(2026, 3, 24, 9),
+        ),
+      ]);
+
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+
+      expect(find.text('A-11'), findsOneWidget);
+      expect(find.text('2 PMCS'), findsOneWidget);
+      expect(find.text('A-11 - Stryker'), findsNWidgets(2));
+    });
+
+    testWidgets('bumper numbers are listed in order so a vehicle can be '
+        'run down', (tester) async {
+      viewModel.reports.addAll([
+        buildReport(
+          id: 1,
+          entityId: 'c',
+          bumperNumber: 'C-33',
+          isOutgoing: true,
+        ),
+        buildReport(
+          id: 2,
+          entityId: 'a',
+          bumperNumber: 'A-11',
+          isOutgoing: true,
+        ),
+        buildReport(
+          id: 3,
+          entityId: 'b',
+          bumperNumber: 'B-22',
+          isOutgoing: true,
+        ),
+      ]);
+
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+
+      final headers = tester
+          .widgetList<Text>(find.byType(Text))
+          .map((t) => t.data)
+          .where((text) => text == 'A-11' || text == 'B-22' || text == 'C-33')
+          .toList();
+      expect(headers, ['A-11', 'B-22', 'C-33']);
+    });
+
+    testWidgets('my unit holds the crews signed for under the same UIC',
+        (tester) async {
+      viewModel.myUic = 'WJ8TAA';
+      viewModel.reports.addAll([
+        buildReport(
+          id: 1,
+          entityId: 'mine',
+          bumperNumber: 'A-11',
+          isOutgoing: true,
+        ),
+        buildReport(
+          id: 2,
+          entityId: 'peer',
+          bumperNumber: 'B-22',
+          isOutgoing: false,
+          uic: 'WJ8TAA',
+        ),
+      ]);
+
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+      await openTab(tester, ReportsTab.unit);
+
+      expect(find.text('B-22 - Stryker'), findsOneWidget);
+      expect(find.text('A-11 - Stryker'), findsNothing);
+      expect(find.text('OTHER UNITS'), findsNothing);
+    });
+
+    testWidgets('a PMCS from another unit is set apart, not dropped',
+        (tester) async {
+      viewModel.myUic = 'WJ8TAA';
+      viewModel.reports.addAll([
+        buildReport(
+          id: 1,
+          entityId: 'peer',
+          bumperNumber: 'B-22',
+          isOutgoing: false,
+          uic: 'WJ8TAA',
+        ),
+        buildReport(
+          id: 2,
+          entityId: 'attached',
+          bumperNumber: 'Z-99',
+          isOutgoing: false,
+          uic: 'WAB4C0',
+        ),
+      ]);
+
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+      await openTab(tester, ReportsTab.unit);
+
+      expect(find.text('B-22 - Stryker'), findsOneWidget);
+      expect(find.text('OTHER UNITS'), findsOneWidget);
+      expect(find.text('Z-99 - Stryker'), findsOneWidget);
+    });
+
+    testWidgets('with no UIC of our own nothing is filtered away',
+        (tester) async {
+      viewModel.myUic = '';
       viewModel.reports.add(buildReport(
         id: 1,
-        entityId: 'deadlined',
+        entityId: 'peer',
+        bumperNumber: 'B-22',
         isOutgoing: false,
-        faults: [buildFault(severity: FaultSeverity.redX)],
+        uic: 'WAB4C0',
       ));
 
       await tester.pumpWidget(subject());
       await tester.pumpAndSettle();
+      await openTab(tester, ReportsTab.unit);
 
-      expect(find.text('NOT MISSION CAPABLE'), findsOneWidget);
-      expect(find.text('LIMITED — CIRCLE X'), findsNothing);
-      expect(find.text('MISSION CAPABLE'), findsNothing);
+      expect(find.text('B-22 - Stryker'), findsOneWidget);
+      expect(find.text('OTHER UNITS'), findsNothing);
     });
 
-    testWidgets('a header badges how many reports in it are unread',
+    testWidgets('an empty tab says which one is empty', (tester) async {
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('No PMCS submitted from this device yet'),
+        findsOneWidget,
+      );
+
+      await openTab(tester, ReportsTab.unit);
+      expect(
+        find.text('No PMCS from other crews in your unit yet'),
+        findsOneWidget,
+      );
+
+      await openTab(tester, ReportsTab.queued);
+      expect(
+        find.text('Nothing waiting — every PMCS has been sent'),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('the queued tab', () {
+    testWidgets('a parked submission names the vehicle and what it waits on',
         (tester) async {
-      viewModel.reports.addAll([
-        buildReport(
+      viewModel.queued.add(buildQueuedSubmission(
+        id: 1,
+        bumperNumber: 'A-11',
+        faultCount: 2,
+        redXCount: 1,
+      ));
+
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+      await openTab(tester, ReportsTab.queued);
+
+      expect(find.text('A-11 - Stryker'), findsOneWidget);
+      expect(
+        find.textContaining('2 fault(s), 1 RED X'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('waiting on lattice'), findsOneWidget);
+    });
+
+    testWidgets('the last one parked is the one on top', (tester) async {
+      viewModel.queued.addAll([
+        buildQueuedSubmission(
           id: 1,
-          entityId: 'deadlined-a',
-          bumperNumber: 'B-22',
-          isOutgoing: false,
-          isRead: false,
-          faults: [buildFault(severity: FaultSeverity.redX)],
+          entityId: 'older',
+          bumperNumber: 'A-11',
+          createdAt: DateTime.utc(2026, 3, 24, 6),
         ),
-        buildReport(
+        buildQueuedSubmission(
           id: 2,
-          entityId: 'deadlined-b',
-          bumperNumber: 'C-33',
-          isOutgoing: false,
-          isRead: true,
-          faults: [buildFault(severity: FaultSeverity.redX)],
+          entityId: 'newest',
+          bumperNumber: 'Z-99',
+          createdAt: DateTime.utc(2026, 3, 24, 9),
         ),
       ]);
 
       await tester.pumpWidget(subject());
       await tester.pumpAndSettle();
+      await openTab(tester, ReportsTab.queued);
 
-      expect(find.widgetWithText(Badge, '1'), findsOneWidget);
+      final headers = tester
+          .widgetList<Text>(find.byType(Text))
+          .map((t) => t.data)
+          .where((text) => text == 'A-11' || text == 'Z-99')
+          .toList();
+      // Last in, first out — Z-99 parked later, so it leads despite sorting
+      // after A-11 alphabetically.
+      expect(headers, ['Z-99', 'A-11']);
+    });
+
+    testWidgets('one vehicle parked twice keeps both under its header',
+        (tester) async {
+      viewModel.queued.addAll([
+        buildQueuedSubmission(
+          id: 1,
+          entityId: 'first',
+          bumperNumber: 'A-11',
+          createdAt: DateTime.utc(2026, 3, 24, 6),
+        ),
+        buildQueuedSubmission(
+          id: 2,
+          entityId: 'second',
+          bumperNumber: 'A-11',
+          createdAt: DateTime.utc(2026, 3, 24, 9),
+        ),
+      ]);
+
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+      await openTab(tester, ReportsTab.queued);
+
+      expect(find.text('A-11'), findsOneWidget);
+      expect(find.text('2 PMCS'), findsOneWidget);
+      expect(find.text('A-11 - Stryker'), findsNWidgets(2));
     });
   });
 
@@ -311,6 +502,7 @@ void main() {
 
       await tester.pumpWidget(subject());
       await tester.pumpAndSettle();
+      await openTab(tester, ReportsTab.unit);
 
       await tester.tap(find.byIcon(Icons.delete_outline));
       await tester.pumpAndSettle();

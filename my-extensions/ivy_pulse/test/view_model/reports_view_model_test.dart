@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
 import 'package:ivy_pulse/domain/entities/fault_severity.dart';
+import 'package:ivy_pulse/domain/entities/profile.dart';
 import 'package:ivy_pulse/domain/usecases/map/show_report_on_map.dart';
 import 'package:ivy_pulse/domain/usecases/publishing/publish_pmcs_deletion.dart';
 import 'package:ivy_pulse/domain/usecases/reporting/parse_incoming_deletion.dart';
@@ -93,6 +94,8 @@ void main() {
   late FakeMapService mapService;
   late ReportsViewModel viewModel;
   late bool disposed;
+  late FakeProfileRepository profileRepository;
+  late FakeQueuedSubmissionsRepository queuedRepository;
 
   /// One turn of the event loop — long enough for the constructor's database
   /// load and every un-awaited follow-up to settle.
@@ -109,6 +112,8 @@ void main() {
       ShowReportOnMap(mapService),
       PublishPmcsDeletion(entityPort: entityPort, meshPort: meshPort),
       queueWorker,
+      profileRepository: profileRepository,
+      queuedRepository: queuedRepository,
     );
     await settle();
   }
@@ -116,6 +121,8 @@ void main() {
   setUp(() {
     messaging = FakeMessagingService();
     repository = FakeReportsRepository();
+    profileRepository = FakeProfileRepository();
+    queuedRepository = FakeQueuedSubmissionsRepository();
     codec = FakeReportCodec();
     remoteSource = FakeRemoteReportSource();
     entityPort = FakePmcsEntityPort();
@@ -454,6 +461,172 @@ void main() {
 
       expect(grouped.values.expand((g) => g), isEmpty);
       expect(viewModel.yourReports.map((r) => r.entityId), ['mine-1']);
+    });
+  });
+
+  group('splitting reports across the tabs', () {
+    test('the UIC on the profile is what a report is matched against',
+        () async {
+      profileRepository.profile = const Profile(uic: 'WJ8TAA');
+      repository.reports.addAll([
+        buildReport(id: 1, entityId: 'mine', isOutgoing: true),
+        buildReport(
+          id: 2,
+          entityId: 'peer',
+          isOutgoing: false,
+          uic: 'WJ8TAA',
+        ),
+        buildReport(
+          id: 3,
+          entityId: 'attached',
+          isOutgoing: false,
+          uic: 'WAB4C0',
+        ),
+      ]);
+      await start();
+
+      expect(viewModel.myUic, 'WJ8TAA');
+      expect(viewModel.yourReports.map((r) => r.entityId), ['mine']);
+      expect(viewModel.unitReports.map((r) => r.entityId), ['peer']);
+      expect(viewModel.otherUnitReports.map((r) => r.entityId), ['attached']);
+    });
+
+    test('a UIC typed in lower case still matches its own unit', () async {
+      profileRepository.profile = const Profile(uic: 'WJ8TAA');
+      repository.reports.add(buildReport(
+        id: 1,
+        entityId: 'peer',
+        isOutgoing: false,
+        uic: 'wj8taa',
+      ));
+      await start();
+
+      expect(viewModel.unitReports.map((r) => r.entityId), ['peer']);
+      expect(viewModel.otherUnitReports, isEmpty);
+    });
+
+    test('with no profile stored every crew counts as ours rather than none',
+        () async {
+      repository.reports.add(buildReport(
+        id: 1,
+        entityId: 'peer',
+        isOutgoing: false,
+        uic: 'WAB4C0',
+      ));
+      await start();
+
+      expect(viewModel.myUic, '');
+      expect(viewModel.unitReports.map((r) => r.entityId), ['peer']);
+      expect(viewModel.otherUnitReports, isEmpty);
+    });
+  });
+
+  group('grouping by bumper number', () {
+    test('a vehicle walked twice comes back as one entry, newest first',
+        () async {
+      repository.reports.addAll([
+        buildReport(
+          id: 1,
+          entityId: 'older',
+          bumperNumber: 'A-11',
+          isOutgoing: true,
+          timestamp: DateTime.utc(2026, 3, 24, 6),
+        ),
+        buildReport(
+          id: 2,
+          entityId: 'newer',
+          bumperNumber: 'A-11',
+          isOutgoing: true,
+          timestamp: DateTime.utc(2026, 3, 24, 9),
+        ),
+      ]);
+      await start();
+
+      final groups = viewModel.groupByBumperNumber(viewModel.yourReports);
+
+      expect(groups.keys, ['A-11']);
+      expect(groups['A-11']!.map((r) => r.entityId), ['newer', 'older']);
+    });
+
+    test('vehicles come out in bumper-number order', () async {
+      repository.reports.addAll([
+        buildReport(
+          id: 1,
+          entityId: 'c',
+          bumperNumber: 'C-33',
+          isOutgoing: true,
+        ),
+        buildReport(
+          id: 2,
+          entityId: 'a',
+          bumperNumber: 'a-11',
+          isOutgoing: true,
+        ),
+      ]);
+      await start();
+
+      final groups = viewModel.groupByBumperNumber(viewModel.yourReports);
+
+      expect(groups.keys.toList(), ['A-11', 'C-33']);
+    });
+  });
+
+  group('the queued tab', () {
+    test('parked submissions come back last in first out', () async {
+      queuedRepository.submissions.addAll([
+        buildQueuedSubmission(
+          id: 1,
+          entityId: 'older',
+          bumperNumber: 'A-11',
+          createdAt: DateTime.utc(2026, 3, 24, 6),
+        ),
+        buildQueuedSubmission(
+          id: 2,
+          entityId: 'newest',
+          bumperNumber: 'Z-99',
+          createdAt: DateTime.utc(2026, 3, 24, 9),
+        ),
+      ]);
+      await start();
+
+      expect(viewModel.queued.map((q) => q.entityId), ['newest', 'older']);
+      // The vehicle parked most recently leads, alphabetical order or not.
+      expect(viewModel.queuedByBumperNumber.keys.toList(), ['Z-99', 'A-11']);
+    });
+
+    test('a vehicle parked twice keeps both under one entry, newest first',
+        () async {
+      queuedRepository.submissions.addAll([
+        buildQueuedSubmission(
+          id: 1,
+          entityId: 'first',
+          bumperNumber: 'A-11',
+          createdAt: DateTime.utc(2026, 3, 24, 6),
+        ),
+        buildQueuedSubmission(
+          id: 2,
+          entityId: 'second',
+          bumperNumber: 'A-11',
+          createdAt: DateTime.utc(2026, 3, 24, 9),
+        ),
+      ]);
+      await start();
+
+      final groups = viewModel.queuedByBumperNumber;
+
+      expect(groups.keys.toList(), ['A-11']);
+      expect(groups['A-11']!.map((q) => q.entityId), ['second', 'first']);
+    });
+
+    test('a refresh picks up a submission parked since the tab was opened',
+        () async {
+      await start();
+      expect(viewModel.queued, isEmpty);
+
+      queuedRepository.submissions.add(buildQueuedSubmission(id: 1));
+      await viewModel.refreshQueued();
+
+      expect(viewModel.queued, hasLength(1));
     });
   });
 

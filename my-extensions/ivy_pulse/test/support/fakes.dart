@@ -12,7 +12,7 @@ import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_session.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_signature.dart';
 import 'package:ivy_pulse/domain/entities/profile.dart';
-import 'package:ivy_pulse/domain/entities/queued_submission.dart';
+// QueuedSubmission comes via the reports_view_model export below.
 import 'package:ivy_pulse/domain/entities/transport_kind.dart';
 import 'package:ivy_pulse/domain/entities/vehicle_type.dart';
 import 'package:ivy_pulse/domain/repositories/faults_repo.dart';
@@ -503,6 +503,7 @@ PmcsReport buildReport({
   PmcsSignature? signature,
   bool isOutgoing = true,
   bool isRead = true,
+  DateTime? timestamp,
 }) {
   return PmcsReport(
     id: id,
@@ -517,7 +518,7 @@ PmcsReport buildReport({
     signature: signature,
     latitude: 33.0,
     longitude: -84.0,
-    timestamp: DateTime.utc(2026, 3, 24, 8),
+    timestamp: timestamp ?? DateTime.utc(2026, 3, 24, 8),
     isOutgoing: isOutgoing,
     isRead: isRead,
   );
@@ -588,6 +589,55 @@ class FakeReportsViewModel extends ChangeNotifier implements ReportsViewModel {
     if (tally.redX > 0) return ReportsViewModel.bucketNotMissionCapable;
     if (tally.circleX > 0) return ReportsViewModel.bucketLimited;
     return ReportsViewModel.bucketMissionCapable;
+  }
+
+  @override
+  String myUic = '';
+
+  @override
+  final List<QueuedSubmission> queued = [];
+
+  @override
+  bool isSameUnit(PmcsReport report) =>
+      myUic.isEmpty || report.uic.trim().toUpperCase() == myUic;
+
+  @override
+  List<PmcsReport> get unitReports => externalReports.where(isSameUnit).toList();
+
+  @override
+  List<PmcsReport> get otherUnitReports =>
+      externalReports.where((r) => !isSameUnit(r)).toList();
+
+  @override
+  Map<String, List<PmcsReport>> groupByBumperNumber(List<PmcsReport> source) {
+    final groups = <String, List<PmcsReport>>{};
+    for (final report in source) {
+      groups
+          .putIfAbsent(report.bumperNumber.trim().toUpperCase(), () => [])
+          .add(report);
+    }
+    for (final list in groups.values) {
+      list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    }
+    final keys = groups.keys.toList()..sort();
+    return {for (final key in keys) key: groups[key]!};
+  }
+
+  @override
+  Map<String, List<QueuedSubmission>> get queuedByBumperNumber {
+    final groups = <String, List<QueuedSubmission>>{};
+    for (final submission in queued) {
+      groups
+          .putIfAbsent(submission.bumperNumber.trim().toUpperCase(), () => [])
+          .add(submission);
+    }
+    for (final list in groups.values) {
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+    final keys = groups.keys.toList()
+      ..sort((a, b) =>
+          groups[b]!.first.createdAt.compareTo(groups[a]!.first.createdAt));
+    return {for (final key in keys) key: groups[key]!};
   }
 
   @override

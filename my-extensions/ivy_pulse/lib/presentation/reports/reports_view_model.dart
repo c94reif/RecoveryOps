@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
 import 'package:ivy_pulse/core/constants/app_constants.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_report.dart';
+import 'package:ivy_pulse/domain/entities/queued_submission.dart';
+import 'package:ivy_pulse/domain/repositories/profile_repo.dart';
+import 'package:ivy_pulse/domain/repositories/queued_submissions_repo.dart';
 import 'package:ivy_pulse/domain/repositories/reports_repo.dart';
 import 'package:ivy_pulse/domain/services/queue_worker_strategy.dart';
 import 'package:ivy_pulse/domain/usecases/map/show_report_on_map.dart';
@@ -15,6 +18,23 @@ import 'package:ivy_pulse/domain/usecases/reporting/sync_remote_reports.dart';
 import 'package:ivy_pulse/presentation/common/widgets/custom_snack_bar.dart';
 
 export 'package:ivy_pulse/domain/entities/pmcs_report.dart';
+export 'package:ivy_pulse/domain/entities/queued_submission.dart';
+
+/// The three views a maintainer flips between on the Reports tab.
+enum ReportsTab {
+  /// PMCS this device submitted.
+  yours('YOURS'),
+
+  /// PMCS from other crews signed for under the same UIC.
+  unit('MY UNIT'),
+
+  /// Submissions still parked because a transport was down.
+  queued('QUEUED');
+
+  const ReportsTab(this.label);
+
+  final String label;
+}
 
 class ReportsViewModel extends ChangeNotifier {
   final sdk.MessagingService messaging;
@@ -26,6 +46,8 @@ class ReportsViewModel extends ChangeNotifier {
   final ShowReportOnMap showReportOnMap;
   final PublishPmcsDeletion publishPmcsDeletion;
   final QueueWorkerStrategy queueWorker;
+  final ProfileRepository profileRepository;
+  final QueuedSubmissionsRepository queuedRepository;
   final SnackBarService snackBarService;
 
   StreamSubscription<sdk.IncomingMessage>? sub;
@@ -52,6 +74,18 @@ class ReportsViewModel extends ChangeNotifier {
 
   String? activeMarkerId;
 
+  /// The UIC this device is signed for, upper-cased once so every comparison
+  /// against a report's UIC is a plain string match.
+  ///
+  /// Empty when the profile has not been read (or could not be). Nothing is
+  /// hidden in that case — [unitReports] falls back to every report from
+  /// another crew, because a unit we cannot name is not grounds for dropping
+  /// a deadlined vehicle off the maintainer's screen.
+  String myUic = '';
+
+  /// Parked submissions, newest first — see [queuedByBumperNumber].
+  final List<QueuedSubmission> queued = [];
+
   ReportsViewModel(
     this.messaging,
     this.repository,
@@ -62,6 +96,8 @@ class ReportsViewModel extends ChangeNotifier {
     this.showReportOnMap,
     this.publishPmcsDeletion,
     this.queueWorker, {
+    required this.profileRepository,
+    required this.queuedRepository,
     SnackBarService? snackBarService,
   }) : snackBarService = snackBarService ?? SnackBarService.instance {
     sub = messaging.onMessageReceived.listen(onMessage);
@@ -72,9 +108,37 @@ class ReportsViewModel extends ChangeNotifier {
   Future<void> loadFromDb() async {
     final rows = await repository.getAllReports();
     reports.addAll(rows);
+    await loadMyUic();
     updateUnread();
     notifyListeners();
     await refreshQueuedCount();
+    await refreshQueued();
+  }
+
+  Future<void> loadMyUic() async {
+    try {
+      final profile = await profileRepository.getProfile();
+      myUic = (profile?.uic ?? '').trim().toUpperCase();
+    } catch (e) {
+      debugPrint('[IvyPulse] could not read UIC for report filtering: $e');
+    }
+  }
+
+  /// Reload the parked submissions behind the queued tab.
+  ///
+  /// The repository hands them back oldest first because that is the order
+  /// the worker drains them in; the tab shows the reverse, so the submission
+  /// an operator just watched fail is the one at the top.
+  Future<void> refreshQueued() async {
+    try {
+      final parked = await queuedRepository.getAll();
+      queued
+        ..clear()
+        ..addAll(parked.reversed);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[IvyPulse] refreshQueued error: $e');
+    }
   }
 
   void updateUnread() {
@@ -145,6 +209,9 @@ class ReportsViewModel extends ChangeNotifier {
 
     await syncLocalReportsToLattice(reports);
     await refreshQueuedCount();
+    // Pull-to-refresh is the gesture an operator makes to ask "has my queue
+    // moved?", so the parked list has to come back with it.
+    await refreshQueued();
   }
 
   Future<void> markReportAsRead(PmcsReport report) async {
@@ -209,6 +276,58 @@ class ReportsViewModel extends ChangeNotifier {
 
   List<PmcsReport> get externalReports =>
       reports.where((r) => !r.isOutgoing).toList();
+
+  /// True when a report was signed for under the same UIC as this device.
+  /// With no UIC of our own to compare against, every crew counts as ours
+  /// rather than none — see [myUic].
+  bool isSameUnit(PmcsReport report) =>
+      myUic.isEmpty || report.uic.trim().toUpperCase() == myUic;
+
+  /// Other crews in your own unit.
+  List<PmcsReport> get unitReports =>
+      externalReports.where(isSameUnit).toList();
+
+  /// Everything else that arrived over the net. Kept reachable rather than
+  /// filtered away: a RED X on an attached vehicle still deadlines it.
+  List<PmcsReport> get otherUnitReports =>
+      externalReports.where((r) => !isSameUnit(r)).toList();
+
+  /// One entry per vehicle, keyed by bumper number, each holding that
+  /// vehicle's PMCS newest first. Vehicles come out in bumper-number order so
+  /// a maintainer looking for one can run down the list.
+  Map<String, List<PmcsReport>> groupByBumperNumber(List<PmcsReport> source) {
+    final groups = <String, List<PmcsReport>>{};
+    for (final report in source) {
+      final bumper = report.bumperNumber.trim().toUpperCase();
+      groups.putIfAbsent(bumper, () => []).add(report);
+    }
+    for (final list in groups.values) {
+      list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    }
+    final keys = groups.keys.toList()..sort();
+    return {for (final key in keys) key: groups[key]!};
+  }
+
+  /// Parked submissions per vehicle, last in first out.
+  ///
+  /// The vehicle whose submission was parked most recently leads, and within
+  /// a vehicle the newest sits on top — the reverse of the order the worker
+  /// will actually drain them in, which is what an operator asking "did my
+  /// last one go?" is looking for.
+  Map<String, List<QueuedSubmission>> get queuedByBumperNumber {
+    final groups = <String, List<QueuedSubmission>>{};
+    for (final submission in queued) {
+      final bumper = submission.bumperNumber.trim().toUpperCase();
+      groups.putIfAbsent(bumper, () => []).add(submission);
+    }
+    for (final list in groups.values) {
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+    final keys = groups.keys.toList()
+      ..sort((a, b) =>
+          groups[b]!.first.createdAt.compareTo(groups[a]!.first.createdAt));
+    return {for (final key in keys) key: groups[key]!};
+  }
 
   /// The bucket a report is triaged into. RED X outranks everything else: one
   /// deadlining fault makes the vehicle Not Mission Capable regardless of what

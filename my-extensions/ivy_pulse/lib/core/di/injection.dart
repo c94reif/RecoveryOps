@@ -311,6 +311,8 @@ void configureDependencies(sdk.ExtensionContext extensionContext) {
       getIt<ShowReportOnMap>(),
       getIt<PublishPmcsDeletion>(),
       getIt<QueueWorkerStrategy>(),
+      profileRepository: getIt<ProfileRepository>(),
+      queuedRepository: getIt<QueuedSubmissionsRepository>(),
     ),
   );
   getIt<ReportsViewModel>();

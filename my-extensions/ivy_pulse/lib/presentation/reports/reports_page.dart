@@ -24,6 +24,11 @@ class ReportsPageState extends State<ReportsPage> {
   /// Entity ids of cards showing their full fault list.
   final Set<String> expandedIds = {};
 
+  /// Which of the three views is showing. Page state rather than view-model
+  /// state: it is where the maintainer is looking, not anything about the
+  /// PMCS themselves.
+  ReportsTab selectedTab = ReportsTab.yours;
+
   @override
   void initState() {
     super.initState();
@@ -267,22 +272,188 @@ class ReportsPageState extends State<ReportsPage> {
     );
   }
 
-  Widget buildGroupHeader(String bucket, List<PmcsReport> group) {
-    final unread = group.where((r) => !r.isRead).length;
+  /// Segmented switch across the three views, with the unread and queued
+  /// counts on the tabs they belong to so a maintainer sees the work without
+  /// opening each one.
+  Widget buildTabBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+      child: SizedBox(
+        width: double.infinity,
+        child: SegmentedButton<ReportsTab>(
+          showSelectedIcon: false,
+          style: SegmentedButton.styleFrom(
+            // Three segments on a panel this narrow; the default padding
+            // pushes the labels into ellipses.
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            textStyle: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          segments: [
+            for (final tab in ReportsTab.values)
+              ButtonSegment(
+                value: tab,
+                label: buildTabLabel(tab),
+              ),
+          ],
+          selected: {selectedTab},
+          onSelectionChanged: (selection) =>
+              setState(() => selectedTab = selection.first),
+        ),
+      ),
+    );
+  }
+
+  Widget buildTabLabel(ReportsTab tab) {
+    final counter = switch (tab) {
+      ReportsTab.yours => null,
+      ReportsTab.unit => viewModel.unreadCount,
+      ReportsTab.queued => viewModel.queuedCount,
+    };
+    final label = Text(tab.label, overflow: TextOverflow.ellipsis);
+    if (counter == null) return label;
+    return ValueListenableBuilder<int>(
+      valueListenable: counter,
+      builder: (_, count, child) {
+        if (count == 0) return child!;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(child: child!),
+            const SizedBox(width: 4),
+            Badge(label: Text('$count', style: const TextStyle(fontSize: 8))),
+          ],
+        );
+      },
+      child: label,
+    );
+  }
+
+  /// One vehicle's worth of PMCS, however many that is.
+  Widget buildBumperHeader(String bumperNumber, int count) {
     return Padding(
       padding: const EdgeInsets.only(top: 14, bottom: 2),
       child: Row(
         children: [
-          SectionLabel(text: bucket),
-          if (unread > 0) ...[
-            const SizedBox(width: 8),
-            Badge(
-              label: Text('$unread', style: const TextStyle(fontSize: 8)),
-            ),
-          ],
+          SectionLabel(text: bumperNumber),
+          const SizedBox(width: 8),
+          Text(
+            count == 1 ? '1 PMCS' : '$count PMCS',
+            style: const TextStyle(color: textSecondary, fontSize: 10),
+          ),
         ],
       ),
     );
+  }
+
+  List<Widget> buildGroupedReports(
+    Map<String, List<PmcsReport>> groups,
+    String emptyMessage,
+  ) {
+    if (groups.isEmpty) return [buildEmptyLine(emptyMessage)];
+    return [
+      for (final entry in groups.entries) ...[
+        buildBumperHeader(entry.key, entry.value.length),
+        for (final report in entry.value) buildReportCard(report),
+      ],
+    ];
+  }
+
+  /// A parked submission. Deliberately not a report card: this one has not
+  /// reached anybody, and the only facts we hold are what was encoded at
+  /// submit time.
+  Widget buildQueuedCard(QueuedSubmission submission) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      color: surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(6),
+        side: const BorderSide(color: circleXAmber, width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.schedule, size: 14, color: circleXAmber),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    submission.summary,
+                    style: const TextStyle(
+                      color: textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Text(
+                  relativeAge(submission.createdAt),
+                  style: const TextStyle(color: textSecondary, fontSize: 10),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${submission.faultSummary} · waiting on '
+              '${submission.transport.name}',
+              style: const TextStyle(color: textSecondary, fontSize: 11),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> buildQueuedList() {
+    final groups = viewModel.queuedByBumperNumber;
+    if (groups.isEmpty) {
+      return [buildEmptyLine('Nothing waiting — every PMCS has been sent')];
+    }
+    return [
+      for (final entry in groups.entries) ...[
+        buildBumperHeader(entry.key, entry.value.length),
+        for (final submission in entry.value) buildQueuedCard(submission),
+      ],
+    ];
+  }
+
+  List<Widget> buildTabBody() {
+    return switch (selectedTab) {
+      ReportsTab.yours => buildGroupedReports(
+          viewModel.groupByBumperNumber(viewModel.yourReports),
+          'No PMCS submitted from this device yet',
+        ),
+      ReportsTab.unit => [
+          ...buildGroupedReports(
+            viewModel.groupByBumperNumber(viewModel.unitReports),
+            'No PMCS from other crews in your unit yet',
+          ),
+          ...buildOtherUnits(),
+        ],
+      ReportsTab.queued => buildQueuedList(),
+    };
+  }
+
+  /// PMCS from outside your UIC. They do not belong to this tab, but they are
+  /// not dropped either — an attached vehicle can still be deadlined.
+  List<Widget> buildOtherUnits() {
+    final others = viewModel.groupByBumperNumber(viewModel.otherUnitReports);
+    if (others.isEmpty) return const [];
+    return [
+      const Padding(
+        padding: EdgeInsets.only(top: 22, bottom: 2),
+        child: SectionLabel(text: 'OTHER UNITS'),
+      ),
+      for (final entry in others.entries) ...[
+        buildBumperHeader(entry.key, entry.value.length),
+        for (final report in entry.value) buildReportCard(report),
+      ],
+    ];
   }
 
   @override
@@ -290,12 +461,12 @@ class ReportsPageState extends State<ReportsPage> {
     return ListenableBuilder(
       listenable: viewModel,
       builder: (context, _) {
-        final yours = viewModel.yourReports;
-        final grouped = viewModel.groupedByStatus;
-
         return Column(
           children: [
+            // The banner stays above the switch: a parked submission is worth
+            // knowing about from whichever tab you are standing on.
             buildQueueBanner(),
+            buildTabBar(),
             Expanded(
               child: RefreshIndicator(
                 color: masterChiefGreen,
@@ -307,22 +478,7 @@ class ReportsPageState extends State<ReportsPage> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 2),
-                      child: SectionLabel(text: 'YOUR PMCS'),
-                    ),
-                    if (yours.isEmpty)
-                      buildEmptyLine('No PMCS submitted from this device yet')
-                    else
-                      for (final report in yours) buildReportCard(report),
-                    for (final bucket in ReportsViewModel.statusBuckets)
-                      if (grouped[bucket]!.isNotEmpty) ...[
-                        buildGroupHeader(bucket, grouped[bucket]!),
-                        for (final report in grouped[bucket]!)
-                          buildReportCard(report),
-                      ],
-                  ],
+                  children: buildTabBody(),
                 ),
               ),
             ),
