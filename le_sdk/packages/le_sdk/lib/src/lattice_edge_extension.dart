@@ -26,6 +26,11 @@ abstract class LatticeEdgeExtension {
   /// Default display mode (panel or overlay). Users can override.
   ExtensionDisplayMode get defaultDisplayMode => ExtensionDisplayMode.panel;
 
+  /// Preferred screen orientation while this extension is active. The host
+  /// locks to it on open and restores the operator's own setting on close.
+  /// Defaults to [ExtensionOrientation.any] (no preference).
+  ExtensionOrientation get preferredOrientation => ExtensionOrientation.any;
+
   /// Build the extension's UI. Called each time the extension is activated.
   Widget build(ExtensionContext context);
 

@@ -19,20 +19,32 @@ class LatticeTextField extends StatelessWidget {
     this.hint,
     this.controller,
     this.onChanged,
+    this.onSubmitted,
     this.maxLines = 1,
+    this.maxLength,
     this.enabled = true,
     this.isRequired = false,
     this.errorText,
     this.focusNode,
     this.inputFormatters,
     this.keyboardType,
+    this.textInputAction,
   });
 
   final String? label;
   final String? hint;
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
+
+  /// Called when the user submits the field (e.g. taps the keyboard action
+  /// button). Use with [textInputAction] to surface an explicit "done"/"go".
+  final ValueChanged<String>? onSubmitted;
   final int maxLines;
+
+  /// Optional maximum number of characters. When set, the field enforces the
+  /// limit and shows a character counter below the input.
+  final int? maxLength;
+
   final bool enabled;
   final bool isRequired;
   final String? errorText;
@@ -43,6 +55,9 @@ class LatticeTextField extends StatelessWidget {
 
   /// Overrides the soft-keyboard type shown for this field.
   final TextInputType? keyboardType;
+
+  /// Overrides the soft-keyboard action button (e.g. [TextInputAction.done]).
+  final TextInputAction? textInputAction;
 
   @override
   Widget build(BuildContext context) {
@@ -80,21 +95,22 @@ class LatticeTextField extends StatelessWidget {
         TextField(
           controller: controller,
           onChanged: onChanged,
+          onSubmitted: onSubmitted,
           maxLines: maxLines,
+          maxLength: maxLength,
           enabled: enabled,
           focusNode: focusNode,
           inputFormatters: inputFormatters,
           keyboardType: keyboardType,
-          style: TextStyle(
-            color: colors.textPrimary,
-            fontSize: 13,
-          ),
+          textInputAction: textInputAction,
+          style: TextStyle(color: colors.textPrimary, fontSize: 13),
           decoration: InputDecoration(
+            // Suppress the built-in counter — it adds vertical height that can
+            // overflow tight containers (e.g. dialogs). The limit is still
+            // enforced via [maxLength].
+            counterText: '',
             hintText: hint,
-            hintStyle: TextStyle(
-              color: colors.textMuted,
-              fontSize: 13,
-            ),
+            hintStyle: TextStyle(color: colors.textMuted, fontSize: 13),
             filled: true,
             fillColor: colors.surface,
             contentPadding: const EdgeInsets.symmetric(
@@ -104,12 +120,14 @@ class LatticeTextField extends StatelessWidget {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(LatticeSpacing.borderRadius),
               borderSide: BorderSide(
-                  color: hasError ? colors.error : colors.borderActive),
+                color: hasError ? colors.error : colors.borderActive,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(LatticeSpacing.borderRadius),
               borderSide: BorderSide(
-                  color: hasError ? colors.error : colors.iconActive),
+                color: hasError ? colors.error : colors.iconActive,
+              ),
             ),
             disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(LatticeSpacing.borderRadius),
@@ -118,19 +136,14 @@ class LatticeTextField extends StatelessWidget {
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(LatticeSpacing.borderRadius),
               borderSide: BorderSide(
-                  color: hasError ? colors.error : colors.borderActive),
+                color: hasError ? colors.error : colors.borderActive,
+              ),
             ),
           ),
         ),
         if (hasError) ...[
           const SizedBox(height: 4),
-          Text(
-            errorText!,
-            style: TextStyle(
-              color: colors.error,
-              fontSize: 11,
-            ),
-          ),
+          Text(errorText!, style: TextStyle(color: colors.error, fontSize: 11)),
         ],
       ],
     );

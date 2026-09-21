@@ -8,6 +8,9 @@ build/
 .idea/
 .vscode/
 
+# Host APK (binary — don't commit)
+host-apk/*.apk
+
 # Generated extensions (developer's work — they manage their own git)
 my-extensions/*/
 

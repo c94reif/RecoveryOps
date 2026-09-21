@@ -36,14 +36,14 @@ void main() {
     });
 
     test('round-trip message with tool_calls', () {
-      final msg = ChatCompletionMessage(
+      final msg = const ChatCompletionMessage(
         role: 'assistant',
         toolCalls: [
           ToolCallData(
             index: 0,
             id: 'call_1',
             type: 'function',
-            function: const ToolCallFunction(
+            function: ToolCallFunction(
               name: 'get_weather',
               arguments: '{"location":"NYC"}',
             ),
@@ -78,11 +78,11 @@ void main() {
 
   group('ToolCallData', () {
     test('round-trip full tool call', () {
-      final tc = ToolCallData(
+      final tc = const ToolCallData(
         index: 1,
         id: 'call_x',
         type: 'function',
-        function: const ToolCallFunction(name: 'foo', arguments: '{}'),
+        function: ToolCallFunction(name: 'foo', arguments: '{}'),
       );
       final json = tc.toJson();
       final restored = ToolCallData.fromJson(json);
@@ -109,8 +109,8 @@ void main() {
 
   group('ChatCompletionRequest', () {
     test('round-trip with defaults', () {
-      final req = ChatCompletionRequest(
-        messages: [const ChatCompletionMessage(role: 'user', content: 'Hi')],
+      final req = const ChatCompletionRequest(
+        messages: [ChatCompletionMessage(role: 'user', content: 'Hi')],
       );
       final json = req.toJson();
       expect(json['stream'], isFalse);
@@ -124,17 +124,17 @@ void main() {
     });
 
     test('default stream=false', () {
-      final req = ChatCompletionRequest(messages: []);
+      final req = const ChatCompletionRequest(messages: []);
       expect(req.stream, isFalse);
     });
 
     test('default hostTools=true', () {
-      final req = ChatCompletionRequest(messages: []);
+      final req = const ChatCompletionRequest(messages: []);
       expect(req.hostTools, isTrue);
     });
 
     test('explicit stream=true round-trips', () {
-      final req = ChatCompletionRequest(messages: [], stream: true, hostTools: false);
+      final req = const ChatCompletionRequest(messages: [], stream: true, hostTools: false);
       final json = req.toJson();
       expect(json['stream'], isTrue);
       expect(json['host_tools'], isFalse);
@@ -160,12 +160,12 @@ void main() {
 
   group('ChatCompletion', () {
     test('round-trip', () {
-      final completion = ChatCompletion(
+      final completion = const ChatCompletion(
         id: 'cmpl-123',
         choices: [
           ChatChoice(
             index: 0,
-            message: const ChatCompletionMessage(role: 'assistant', content: 'Hello!'),
+            message: ChatCompletionMessage(role: 'assistant', content: 'Hello!'),
             finishReason: 'stop',
           ),
         ],
@@ -184,9 +184,9 @@ void main() {
     });
 
     test('ChatChoice without finishReason omits key', () {
-      final choice = ChatChoice(
+      final choice = const ChatChoice(
         index: 0,
-        message: const ChatCompletionMessage(role: 'assistant'),
+        message: ChatCompletionMessage(role: 'assistant'),
       );
       final json = choice.toJson();
       expect(json.containsKey('finish_reason'), isFalse);
@@ -196,7 +196,7 @@ void main() {
     });
 
     test('default object value', () {
-      final c = ChatCompletion(id: 'x', choices: []);
+      final c = const ChatCompletion(id: 'x', choices: []);
       expect(c.object, 'chat.completion');
     });
   });
@@ -207,12 +207,12 @@ void main() {
 
   group('ChatCompletionChunk', () {
     test('round-trip content chunk', () {
-      final chunk = ChatCompletionChunk(
+      final chunk = const ChatCompletionChunk(
         id: 'chunk-1',
         choices: [
           ChatChunkChoice(
             index: 0,
-            delta: const ChatCompletionDelta(content: 'Hello'),
+            delta: ChatCompletionDelta(content: 'Hello'),
           ),
         ],
       );
@@ -228,12 +228,12 @@ void main() {
     });
 
     test('finish_reason present in final chunk', () {
-      final chunk = ChatCompletionChunk(
+      final chunk = const ChatCompletionChunk(
         id: 'chunk-end',
         choices: [
           ChatChunkChoice(
             index: 0,
-            delta: const ChatCompletionDelta(),
+            delta: ChatCompletionDelta(),
             finishReason: 'stop',
           ),
         ],
@@ -247,12 +247,12 @@ void main() {
     });
 
     test('finish_reason absent from non-final chunk', () {
-      final chunk = ChatCompletionChunk(
+      final chunk = const ChatCompletionChunk(
         id: 'chunk-mid',
         choices: [
           ChatChunkChoice(
             index: 0,
-            delta: const ChatCompletionDelta(content: 'foo'),
+            delta: ChatCompletionDelta(content: 'foo'),
           ),
         ],
       );
@@ -262,7 +262,7 @@ void main() {
     });
 
     test('delta with tool_calls round-trips', () {
-      final chunk = ChatCompletionChunk(
+      final chunk = const ChatCompletionChunk(
         id: 'chunk-tc',
         choices: [
           ChatChunkChoice(
@@ -274,7 +274,7 @@ void main() {
                   index: 0,
                   id: 'call_y',
                   type: 'function',
-                  function: const ToolCallFunction(name: 'do_thing', arguments: ''),
+                  function: ToolCallFunction(name: 'do_thing', arguments: ''),
                 ),
               ],
             ),
@@ -289,7 +289,7 @@ void main() {
     });
 
     test('default object value', () {
-      final c = ChatCompletionChunk(id: 'x', choices: []);
+      final c = const ChatCompletionChunk(id: 'x', choices: []);
       expect(c.object, 'chat.completion.chunk');
     });
   });
@@ -314,8 +314,8 @@ void main() {
     });
 
     test('create returns canned response with stop finish reason', () async {
-      final request = ChatCompletionRequest(
-        messages: [const ChatCompletionMessage(role: 'user', content: 'test')],
+      final request = const ChatCompletionRequest(
+        messages: [ChatCompletionMessage(role: 'user', content: 'test')],
       );
       final completion = await ctx.ai.chat.completions.create(request);
       expect(completion.id, isNotEmpty);
@@ -326,13 +326,13 @@ void main() {
     });
 
     test('create returns a ChatCompletion', () async {
-      final request = ChatCompletionRequest(messages: []);
+      final request = const ChatCompletionRequest(messages: []);
       final result = await ctx.ai.chat.completions.create(request);
       expect(result, isA<ChatCompletion>());
     });
 
     test('createStream emits role chunk, content chunks, and stop chunk', () async {
-      final request = ChatCompletionRequest(messages: []);
+      final request = const ChatCompletionRequest(messages: []);
       final chunks = await ctx.ai.chat.completions.createStream(request).toList();
 
       expect(chunks.isNotEmpty, isTrue);
@@ -354,7 +354,7 @@ void main() {
     });
 
     test('createStream uses consistent id across all chunks', () async {
-      final request = ChatCompletionRequest(messages: []);
+      final request = const ChatCompletionRequest(messages: []);
       final chunks = await ctx.ai.chat.completions.createStream(request).toList();
       final firstId = chunks.first.id;
       for (final chunk in chunks) {
@@ -363,7 +363,7 @@ void main() {
     });
 
     test('createStream final chunk has empty delta with stop', () async {
-      final request = ChatCompletionRequest(messages: []);
+      final request = const ChatCompletionRequest(messages: []);
       final chunks = await ctx.ai.chat.completions.createStream(request).toList();
       final lastChunk = chunks.last;
       expect(lastChunk.choices.first.finishReason, 'stop');

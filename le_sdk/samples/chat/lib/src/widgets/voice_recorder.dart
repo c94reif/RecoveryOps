@@ -26,10 +26,8 @@ class _VoiceRecorderState extends State<VoiceRecorder> {
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
       setState(() => _elapsedSeconds++);
-      if (_elapsedSeconds >= widget.maxDuration.inSeconds) {
-        widget.onStop();
-      }
     });
   }
 

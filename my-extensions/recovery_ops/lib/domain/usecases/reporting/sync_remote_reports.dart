@@ -15,8 +15,8 @@ class SyncRemoteReports {
       if (remote.isEmpty) return const [];
 
       final knownIds = <String>{
-        for (final r in currentReports)
-          if (r.entityId != null && r.entityId!.isNotEmpty) r.entityId!,
+        for (final report in currentReports)
+          if (report.entityId != null && report.entityId!.isNotEmpty) report.entityId!,
       };
 
       final newReports = <RecoveryReport>[];

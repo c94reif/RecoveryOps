@@ -63,7 +63,7 @@ register_extension() {
   local url="$1"
 
   local pkg_name="$ID"
-  local description version icon section display_mode sect_desc ext_id display_name
+  local description version icon section display_mode orientation sect_desc ext_id display_name
   description="$(get_field description | tr -s '[:space:]' ' ' | sed 's/>[[:space:]]*$//')"
   version="$(get_field version)"
 
@@ -76,6 +76,7 @@ register_extension() {
 
   display_mode="$(get_section_field "$section" display_mode)"
   display_mode="${display_mode:-panel}"
+  orientation="$(get_section_field "$section" orientation)"
   sect_desc="$(get_section_field "$section" description)"
   [ -n "$sect_desc" ] && description="$sect_desc"
 
@@ -84,6 +85,12 @@ register_extension() {
   [ -n "$version" ] && display_name="$display_name (v$version)"
 
   local manifest="{\"id\":\"$ext_id\",\"name\":\"$display_name\",\"type\":\"web\",\"url\":\"$url\",\"displayMode\":\"$display_mode\""
+  # Match ExtensionManifest.toJson(): omit the orientation key for the default
+  # ("any"/unset) so both manifest producers emit the same shape. Only write it
+  # when a plugin explicitly declares portrait/landscape.
+  if [ -n "$orientation" ] && [ "$orientation" != "any" ]; then
+    manifest="$manifest,\"orientation\":\"$orientation\""
+  fi
   [ -n "$description" ] && manifest="$manifest,\"description\":\"$description\""
   [ -n "$icon" ] && manifest="$manifest,\"icon\":\"$icon\""
   if [[ "$url" == file://* ]] && [ -f "$EXT_DIR/assets/logo.png" ]; then

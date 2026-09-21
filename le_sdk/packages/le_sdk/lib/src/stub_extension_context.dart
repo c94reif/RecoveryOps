@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'ai_service.dart';
+import 'object_service.dart';
 import 'peripheral_services.dart';
 import 'services.dart';
 import 'extension_context.dart';
@@ -29,8 +30,11 @@ class StubExtensionContext implements ExtensionContext {
   late final TaskService _tasks = _StubTaskService();
   late final UiService _ui = _StubUiService();
   late final AiService _ai = _StubAiService();
+  late final MeshItemStoreService _meshItemStore = _StubMeshItemStoreService();
+  late final ObjectService _objects = _StubObjectService();
   late final DeviceService _device = _StubDeviceService();
   late final PeripheralsService _peripherals = _StubPeripheralsService();
+  late final NetworkService _network = _StubNetworkService();
 
   @override
   MapService get map => _map;
@@ -60,10 +64,19 @@ class StubExtensionContext implements ExtensionContext {
   AiService get ai => _ai;
 
   @override
+  MeshItemStoreService get meshItemStore => _meshItemStore;
+
+  @override
+  ObjectService get objects => _objects;
+
+  @override
   DeviceService get device => _device;
 
   @override
   PeripheralsService get peripherals => _peripherals;
+
+  @override
+  NetworkService get network => _network;
 
   @override
   void close() {}
@@ -93,7 +106,31 @@ class _StubMapService implements MapService {
   }
 
   @override
-  Future<String> addMarker(LatLng location, {String? label, String? color, MarkerIcon? icon, MarkerDisposition? disposition}) async {
+  Future<List<LatLng>?> drawPolygon({
+    String? previewStrokeColor,
+    String? previewFillColor,
+    String? toolbarHint,
+  }) async {
+    // drawPolygon not supported in standalone — host required for map interaction.
+    return null;
+  }
+
+  @override
+  Future<List<LatLng>?> drawPolyline({
+    String? previewColor,
+    double? previewWidth,
+    String? toolbarHint,
+  }) async {
+    // drawPolyline not supported in standalone — host required for map interaction.
+    return null;
+  }
+
+  @override
+  Future<String> addMarker(LatLng location,
+      {String? label,
+      String? color,
+      MarkerIcon? icon,
+      MarkerDisposition? disposition}) async {
     final id = 'stub_${_nextId++}';
     _markers.add(MapMarker(
       id: id,
@@ -119,7 +156,11 @@ class _StubMapService implements MapService {
   Future<void> clearMarkers() async => _markers.clear();
 
   @override
-  Future<void> addPolyline(String id, List<LatLng> points, {String? color}) async {}
+  Future<void> addPolyline(String id, List<LatLng> points,
+      {String? color,
+      double? width,
+      List<double>? dashPattern,
+      double? opacity}) async {}
 
   @override
   Future<void> removePolyline(String id) async {}
@@ -128,12 +169,43 @@ class _StubMapService implements MapService {
   Future<void> clearPolylines() async {}
 
   @override
+  Future<void> addPolygon(String id, List<LatLng> points,
+      {String? strokeColor, String? fillColor}) async {}
+
+  @override
+  Future<void> updatePolygon(String id, List<LatLng> points,
+      {String? strokeColor, String? fillColor}) async {}
+
+  @override
+  Future<void> removePolygon(String id) async {}
+
+  @override
+  Future<void> addTacticalGraphic(String id, String sidc, List<LatLng> points,
+      {Map<String, String>? modifiers}) async {}
+
+  @override
+  Future<void> updateTacticalGraphic(String id,
+      {String? sidc,
+      List<LatLng>? points,
+      Map<String, String>? modifiers}) async {}
+
+  @override
+  Future<void> removeTacticalGraphic(String id) async {}
+
+  @override
   Future<void> flyTo(LatLng location, {double? zoom}) async {}
 
   @override
   Future<ScreenPoint?> getPixelFromLocation(LatLng location) async => null;
   @override
   Future<bool> simulateMarkerTap(String entityId) async => false;
+  @override
+  Future<Uint8List?> captureMap({
+    List<LatLng>? quad,
+    List<String>? columnLabels,
+    List<String>? rowLabels,
+  }) async =>
+      null;
 }
 
 class _StubLocationService implements LocationService {
@@ -162,21 +234,21 @@ class _StubStorageService implements StorageService {
 
 class _StubEntityService implements EntityService {
   final List<Entity> _entities = [
-    Entity(
+    const Entity(
       id: 'stub-friendly-1',
       name: 'Alpha Team',
       lat: 33.6938,
       lon: -117.9166,
       disposition: Disposition.friendly,
     ),
-    Entity(
+    const Entity(
       id: 'stub-hostile-1',
       name: 'Hostile Contact',
       lat: 33.6950,
       lon: -117.9180,
       disposition: Disposition.hostile,
     ),
-    Entity(
+    const Entity(
       id: 'stub-neutral-1',
       name: 'Neutral Observer',
       lat: 33.6920,
@@ -195,16 +267,19 @@ class _StubEntityService implements EntityService {
   @override
   Future<List<Entity>> searchEntities(String query) async {
     final lower = query.toLowerCase();
-    return _entities.where((e) => e.name.toLowerCase().contains(lower)).toList();
+    return _entities
+        .where((e) => e.name.toLowerCase().contains(lower))
+        .toList();
   }
 
   @override
   Future<List<Entity>> getNearbyEntities(
-      double lat, double lon, double radiusMeters) async =>
+          double lat, double lon, double radiusMeters) async =>
       List.unmodifiable(_entities);
 
   @override
-  Future<PublishEntityResult> publishEntity(PublishEntityRequest request) async {
+  Future<PublishEntityResult> publishEntity(
+      PublishEntityRequest request) async {
     final id = 'stub-${DateTime.now().millisecondsSinceEpoch}';
     final entity = Entity(
       id: id,
@@ -222,6 +297,11 @@ class _StubEntityService implements EntityService {
     _entities.removeWhere((e) => e.id == entity.id);
     _entities.add(entity);
     return entity.id;
+  }
+
+  @override
+  Future<void> deleteEntity(String entityId) async {
+    _entities.removeWhere((e) => e.id == entityId);
   }
 
   @override
@@ -264,10 +344,16 @@ class _StubTaskService implements TaskService {
     String? specTypeUrl,
   }) async {
     return _tasks.values.where((t) {
-      if (assigneeEntityId != null && t.assigneeEntityId != assigneeEntityId) return false;
+      if (assigneeEntityId != null && t.assigneeEntityId != assigneeEntityId) {
+        return false;
+      }
       if (authorUserId != null && t.authorUserId != authorUserId) return false;
-      if (statusGroups != null && !statusGroups.contains(t.statusGroup)) return false;
-      if (specTypeUrl != null && t.specificationTypeUrl != specTypeUrl) return false;
+      if (statusGroups != null && !statusGroups.contains(t.statusGroup)) {
+        return false;
+      }
+      if (specTypeUrl != null && t.specificationTypeUrl != specTypeUrl) {
+        return false;
+      }
       return true;
     }).toList();
   }
@@ -277,13 +363,15 @@ class _StubTaskService implements TaskService {
       {String? errorMessage, int? errorCode}) async {
     final existing = _tasks[taskId];
     if (existing == null) throw Exception('Task not found: $taskId');
+    final resolvedErrorCode = errorCode ?? existing.errorCode;
     final updated = TaskData(
       taskId: existing.taskId,
       specificationTypeUrl: existing.specificationTypeUrl,
       specificationBytes: existing.specificationBytes,
       statusGroup: TaskData.statusGroupFromRawStatus(newRawStatus),
       rawStatus: newRawStatus,
-      statusLabel: TaskData.statusLabelFromRawStatus(newRawStatus),
+      statusLabel:
+          TaskData.statusLabelFromStatus(newRawStatus, resolvedErrorCode),
       description: existing.description,
       assigneeEntityId: existing.assigneeEntityId,
       authorUserId: existing.authorUserId,
@@ -292,7 +380,7 @@ class _StubTaskService implements TaskService {
       createTime: existing.createTime,
       lastUpdateTime: DateTime.now(),
       errorMessage: errorMessage ?? existing.errorMessage,
-      errorCode: errorCode ?? existing.errorCode,
+      errorCode: resolvedErrorCode,
     );
     _tasks[taskId] = updated;
     return updated;
@@ -323,7 +411,7 @@ class StubMessagingService implements MessagingService {
 
   @override
   Future<DeliveryReport> send(String peerId, String payload) async =>
-      DeliveryReport(results: []);
+      const DeliveryReport(results: []);
 
   @override
   Future<DeliveryReport> sendToMultiple(
@@ -392,6 +480,12 @@ class _StubUiService implements UiService {
   Future<String?> getActiveExtension() async => _activeExtension;
 
   @override
+  Future<Map<String, dynamic>?> getLaunchArgs() async => null;
+
+  @override
+  Future<String?> debugReadCommand() async => null;
+
+  @override
   Future<bool> isLocationPickerActive() async => false;
 
   @override
@@ -399,32 +493,43 @@ class _StubUiService implements UiService {
 
   @override
   Future<bool> isStatusBarEnabled() async => false;
-  String? _activeLeftPanel;
+  // Deprecated no-ops: the left sidebar was removed. Bodies exist only because
+  // `implements UiService` does not inherit default bodies.
   @override
-  Future<void> openLeftPanel(String panelId) async => _activeLeftPanel = panelId;
+  Future<void> openLeftPanel(String panelId) async {}
   @override
-  Future<void> closeLeftPanel() async => _activeLeftPanel = null;
+  Future<void> closeLeftPanel() async {}
   @override
-  Future<String?> getActiveLeftPanel() async => _activeLeftPanel;
+  Future<String?> getActiveLeftPanel() async => null;
   @override
   Future<void> showBanner(String message) async {}
   @override
   Future<void> hideBanner() async {}
   @override
+  Future<void> showToast(String message,
+      {String type = 'info', String priority = 'routine'}) async {}
+  @override
   Future<void> setExtensionDisplayMode(String extensionId, String mode) async {}
+  PanelSize _panelSize = PanelSize.small;
+  @override
+  Future<void> setPanelSize(PanelSize size) async => _panelSize = size;
+  @override
+  Future<PanelSize> getPanelSize() async => _panelSize;
   @override
   Future<void> resetUi() async {
     _activeView = 'map';
     _activePanel = null;
     _activeExtension = null;
-    _activeLeftPanel = null;
     _manualLocationEnabled = false;
+    _panelSize = PanelSize.small;
   }
+
   @override
   Future<void> hideKeyboard() async {}
   bool _manualLocationEnabled = false;
   @override
-  Future<void> setManualLocation(double lat, double lon) async => _manualLocationEnabled = true;
+  Future<void> setManualLocation(double lat, double lon) async =>
+      _manualLocationEnabled = true;
   @override
   Future<void> clearManualLocation() async => _manualLocationEnabled = false;
   @override
@@ -436,7 +541,8 @@ class _StubUiService implements UiService {
   @override
   Future<void> longPressAt(double x, double y, {int holdMs = 600}) async {}
   @override
-  Future<bool> enterText(Map<String, dynamic> selector, String text) async => true;
+  Future<bool> enterText(Map<String, dynamic> selector, String text) async =>
+      true;
   @override
   Future<List<String>> getVisibleLabels() async => ['stub_label'];
   @override
@@ -464,33 +570,136 @@ class _StubAiChatCompletions implements AiChatCompletions {
 }
 
 class _StubAiCompletions implements AiCompletions {
-  static const _stubResponse = 'This is a simulated AI response. Connect to the Lattice host for real inference.';
+  static const _stubResponse =
+      'This is a simulated AI response. Connect to the Lattice host for real inference.';
 
   @override
-  Stream<ChatCompletionChunk> createStream(ChatCompletionRequest request) async* {
+  Stream<ChatCompletionChunk> createStream(
+      ChatCompletionRequest request) async* {
     final id = 'stub-${DateTime.now().millisecondsSinceEpoch}';
     yield ChatCompletionChunk(id: id, choices: [
-      ChatChunkChoice(index: 0, delta: const ChatCompletionDelta(role: 'assistant')),
+      const ChatChunkChoice(
+          index: 0, delta: ChatCompletionDelta(role: 'assistant')),
     ]);
     final words = _stubResponse.split(' ');
     for (final word in words) {
       await Future.delayed(const Duration(milliseconds: 50));
       yield ChatCompletionChunk(id: id, choices: [
-        ChatChunkChoice(index: 0, delta: ChatCompletionDelta(content: '$word ')),
+        ChatChunkChoice(
+            index: 0, delta: ChatCompletionDelta(content: '$word ')),
       ]);
     }
     yield ChatCompletionChunk(id: id, choices: [
-      ChatChunkChoice(index: 0, delta: const ChatCompletionDelta(), finishReason: 'stop'),
+      const ChatChunkChoice(
+          index: 0, delta: ChatCompletionDelta(), finishReason: 'stop'),
     ]);
   }
 
   @override
   Future<ChatCompletion> create(ChatCompletionRequest request) async {
     await Future.delayed(const Duration(milliseconds: 200));
-    return ChatCompletion(id: 'stub-${DateTime.now().millisecondsSinceEpoch}', choices: [
-      ChatChoice(index: 0, message: const ChatCompletionMessage(role: 'assistant', content: _stubResponse), finishReason: 'stop'),
-    ]);
+    return ChatCompletion(
+        id: 'stub-${DateTime.now().millisecondsSinceEpoch}',
+        choices: [
+          const ChatChoice(
+              index: 0,
+              message: ChatCompletionMessage(
+                  role: 'assistant', content: _stubResponse),
+              finishReason: 'stop'),
+        ]);
   }
+}
+
+class _StubMeshItemStoreService implements MeshItemStoreService {
+  @override
+  late final MeshItemService items = _StubMeshItemService();
+
+  @override
+  late final MeshStreamService streams = _StubMeshStreamService();
+}
+
+class _StubMeshItemService implements MeshItemService {
+  @override
+  Future<List<MeshDataType>> listDataTypes() async => [];
+
+  @override
+  Future<MeshDataType?> getDataType(MeshDataTypePath path) async => null;
+
+  @override
+  Future<MeshItem> createItem(
+    MeshDataTypePath type,
+    Map<String, Object?> data, {
+    Duration? ttl,
+  }) async =>
+      throw UnsupportedError('mesh-item-store not available in stub context');
+
+  @override
+  Future<MeshBatchResult<MeshItem>> createItems(
+    MeshDataTypePath type,
+    List<Map<String, Object?>> data, {
+    Duration? ttl,
+  }) async =>
+      throw UnsupportedError('mesh-item-store not available in stub context');
+
+  @override
+  Future<MeshItem?> getItem(MeshItemPath path) async => null;
+
+  @override
+  Future<List<MeshItem>> listItems(
+    MeshDataTypePath type, {
+    Map<String, Object?>? filter,
+  }) async =>
+      [];
+
+  @override
+  Future<MeshItem> updateItem(
+    MeshItemPath path,
+    Map<String, Object?> data, {
+    Duration? ttl,
+  }) async =>
+      throw UnsupportedError('mesh-item-store not available in stub context');
+
+  @override
+  Future<void> deleteItem(MeshItemPath path) async =>
+      throw UnsupportedError('mesh-item-store not available in stub context');
+}
+
+class _StubMeshStreamService implements MeshStreamService {
+  @override
+  Future<List<MeshDataType>> listStreamDataTypes() async => [];
+
+  @override
+  Future<MeshDataType?> getStreamDataType(MeshDataTypePath path) async => null;
+
+  @override
+  Future<MeshBatchResult<DateTime>> publish(
+    MeshDataTypePath type,
+    List<Map<String, Object?>> messages,
+  ) async =>
+      throw UnsupportedError('mesh-item-store not available in stub context');
+
+  @override
+  Stream<MeshStreamMessage> subscribe(MeshDataTypePath type) =>
+      const Stream.empty();
+}
+
+class _StubObjectService implements ObjectService {
+  @override
+  Future<ObjectUploadResult> upload(String path, Uint8List bytes,
+          {String? contentType, Duration? ttl}) async =>
+      ObjectUploadResult(path: path);
+
+  @override
+  Future<Uint8List?> download(String path) async => null;
+
+  @override
+  Future<List<ObjectMetadata>> list({String? prefix}) async => [];
+
+  @override
+  Future<void> delete(String path) async {}
+
+  @override
+  Future<ObjectMetadata?> getMetadata(String path) async => null;
 }
 
 class _StubUsbSerialService implements UsbSerialService {
@@ -552,6 +761,48 @@ class _StubPeripheralsService implements PeripheralsService {
 
   @override
   RangeFinderService get rangeFinder => _rangeFinder;
+}
+
+class _StubUdpSubscription implements UdpSubscription {
+  @override
+  Stream<UdpDatagram> get datagrams => const Stream.empty();
+
+  @override
+  Future<SendResult> send(
+    Uint8List bytes, {
+    String? destinationIp,
+    int? port,
+  }) async =>
+      const SendResult(success: false, error: 'stub');
+
+  @override
+  Future<void> close() async {}
+}
+
+class _StubNetworkService implements NetworkService {
+  @override
+  Future<UdpSubscription> subscribeMulticast(String group, int port) async =>
+      _StubUdpSubscription();
+
+  @override
+  Future<UdpSubscription> subscribeUnicast(int port) async =>
+      _StubUdpSubscription();
+
+  @override
+  Future<SendResult> sendMulticast(
+    String group,
+    int port,
+    Uint8List bytes,
+  ) async =>
+      const SendResult(success: false, error: 'stub');
+
+  @override
+  Future<SendResult> sendUnicast(
+    String destinationIp,
+    int port,
+    Uint8List bytes,
+  ) async =>
+      const SendResult(success: false, error: 'stub');
 }
 
 /// Alias so the conditional import in extension_context.dart can reference

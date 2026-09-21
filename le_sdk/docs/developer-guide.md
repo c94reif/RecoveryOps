@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Lattice Edge extensions are self-contained Flutter widgets that plug into the Lattice Edge command-and-control application. They appear as panels or overlays alongside the main map view and can access host capabilities such as map location picking, speech-to-text input, and persistent key-value storage. Extensions are **not** the same as ATAK/TAK plugins -- the TAK plugin system is a completely separate Android-native integration layer for interoperating with Android Team Awareness Kit. If you are building for TAK, this guide does not apply.
+Lattice Edge extensions are self-contained Flutter widgets that plug into the Lattice Edge command-and-control application. They appear as panels or overlays alongside the main map view and can access host capabilities such as map location picking, speech-to-text input, and persistent key-value storage. Extensions are the app's plugin mechanism.
 
 The standard development workflow uses a single Flutter/Dart codebase that serves two purposes. During development, you run `flutter build web` and load the output in the Lattice Edge host for rapid testing -- the SDK automatically bridges your Dart code to the host's JavaScript runtime. When you are ready to ship, you hand off the same Dart source as a package dependency, and Anduril compiles it natively into the host app with zero WebView overhead. You never write separate HTML or JavaScript.
 

@@ -1,3 +1,5 @@
+import 'types.dart';
+
 /// Host UI control and introspection for extensions.
 abstract class UiService {
   /// Navigate to a top-level view.
@@ -8,8 +10,12 @@ abstract class UiService {
   Future<String> getActiveView();
 
   /// Open a right panel by ID.
-  /// [panelId]: 'settings', 'latticeAi', 'entities', 'tasks',
-  ///            'notifications', 'comms', 'chat', 'browser'
+  /// [panelId]: 'notifications', 'tasks', 'chat', 'entities', 'overlays',
+  ///            'applications', 'settings', 'latticeAi'
+  ///
+  /// An unrecognised id is ignored. 'applications' is the All Applications
+  /// launcher, which replaced the former 'plugins' tab — extensions are listed
+  /// there now.
   Future<void> openPanel(String panelId);
 
   /// Close the currently open right panel.
@@ -20,6 +26,19 @@ abstract class UiService {
 
   /// Activate an extension by its ID.
   Future<void> openExtension(String extensionId);
+
+  /// Read (and clear) the launch arguments the host queued for this extension's
+  /// most recent activation, or null when there are none. The host sets these
+  /// when opening the plug-in from a contextual entry point — e.g. right-click
+  /// an extension-managed entity → "Open in plugin" passes `{'action': 'openInPlugin',
+  /// 'entityId': ...}`. Consumed on read, so a later manual open returns null.
+  Future<Map<String, dynamic>?> getLaunchArgs();
+
+  /// DEBUG-ONLY: read a JSON command the host exposes from an app-external file
+  /// (writable via `adb push`). Returns the raw JSON string, or null when no
+  /// file / unsupported. Used by E2E test harnesses to drive a plug-in without
+  /// tapping its canvas. Strip before ship.
+  Future<String?> debugReadCommand();
 
   /// Close an extension by its ID.
   Future<void> closeExtension(String extensionId);
@@ -37,13 +56,35 @@ abstract class UiService {
   Future<bool> isStatusBarEnabled();
 
   /// Open a left panel by ID.
-  /// [panelId]: 'plugins', 'appSwitcher'
+  ///
+  /// **Deprecated — the left sidebar was removed** (its navigation moved to the
+  /// right rail). Every implementation is a no-op; [getActiveLeftPanel] always
+  /// reports null. Use [openPanel] with a right-panel id instead — extensions
+  /// are listed under `'applications'`.
+  ///
+  /// Declared only so an extension built against an older SDK keeps compiling.
+  /// Callers get a deprecation warning; implementers still supply a no-op body,
+  /// because `implements UiService` does not inherit default bodies.
+  @Deprecated(
+    'The left sidebar was removed; this is a no-op. Use openPanel() instead.',
+  )
   Future<void> openLeftPanel(String panelId);
 
   /// Close the currently open left panel.
+  ///
+  /// **Deprecated — no-op.** See [openLeftPanel].
+  @Deprecated(
+    'The left sidebar was removed; this is a no-op. Use closePanel() instead.',
+  )
   Future<void> closeLeftPanel();
 
   /// Get the currently open left panel ID, or null if none.
+  ///
+  /// **Deprecated — always null.** See [openLeftPanel].
+  @Deprecated(
+    'The left sidebar was removed; this always returns null. '
+    'Use getActivePanel() instead.',
+  )
   Future<String?> getActiveLeftPanel();
 
   /// Show a floating banner overlay with a message.
@@ -51,6 +92,39 @@ abstract class UiService {
 
   /// Hide the floating banner overlay.
   Future<void> hideBanner();
+
+  /// Resize the extension panel to one of the preset [PanelSize] widths.
+  ///
+  /// - [PanelSize.small]: the default plugin-drawer width.
+  /// - [PanelSize.medium]: 70% of the screen width.
+  /// - [PanelSize.large]: the full content area (screen minus the nav rail).
+  ///
+  /// After animating, the extension reloads once — in-memory UI state is lost;
+  /// persist anything you need via [StorageService] before calling. Calling
+  /// with the current size is a no-op (no reload). A request that arrives while
+  /// a resize is still settling is ignored.
+  Future<void> setPanelSize(PanelSize size);
+
+  /// Get the panel's current preset size.
+  ///
+  /// Returns the nearest preset for the panel's current width. If the user has
+  /// manually dragged the panel to a custom width, this returns the closest
+  /// preset rather than an exact match.
+  Future<PanelSize> getPanelSize();
+
+  /// Show a transient, dismissable toast notification.
+  ///
+  /// Unlike [showBanner] (a persistent overlay), this surfaces a queued toast
+  /// that auto-dismisses. The host owns presentation; the extension only
+  /// supplies content. [type] is one of 'info' | 'success' | 'warning' |
+  /// 'error' (defaults to 'info'); [priority] is 'routine' | 'priority' |
+  /// 'immediate' (defaults to 'routine') and influences ordering / dwell time.
+  /// Unknown values fall back to the defaults host-side.
+  Future<void> showToast(
+    String message, {
+    String type,
+    String priority,
+  });
 
   /// Switch an extension's display mode ('panel' or 'overlay').
   /// Overlay mode moves the extension to a small tab, keeping it alive.

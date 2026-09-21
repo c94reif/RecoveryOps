@@ -13,6 +13,7 @@ class LatticeColorScheme {
     required this.surface,
     required this.surfaceSection,
     required this.surfaceElevated,
+    required this.menuSurface,
     required this.border,
     required this.borderActive,
     required this.textPrimary,
@@ -57,6 +58,9 @@ class LatticeColorScheme {
   final Color surfaceSection;
 
   final Color surfaceElevated;
+
+  /// Background for popup menus (more/overflow, context menus). The lightest elevation in the theme so the menu clearly stands off the panel it overlays — one step brighter than surfaceElevated in dark/highContrast, and white (matching surface) in light since white is already the lightest elevation available.
+  final Color menuSurface;
 
   final Color border;
 
@@ -134,13 +138,14 @@ class LatticeColorScheme {
     surface: Color(0xFF111111),
     surfaceSection: Color(0xFF161616),
     surfaceElevated: Color(0xFF1A1A1A),
+    menuSurface: Color(0xFF262626),
     border: Color(0xFF1D1D1D),
     borderActive: Color(0xFF2A2A2A),
     textPrimary: Color(0xFFFFFFFF),
-    textSecondary: Color(0xFF878787),
-    textMuted: Color(0xFF545454),
-    textLabel: Color(0xFF999999),
-    inactive: Color(0xFF666666),
+    textSecondary: Color(0xFFAAAAAA),
+    textMuted: Color(0xFF7A7A7A),
+    textLabel: Color(0xFFDDDDDD),
+    inactive: Color(0xFF787878),
     iconActive: Color(0xFFFFFFFF),
     accent: Color(0xFF334EFF),
     success: Color(0xFF4BAF4F),
@@ -177,13 +182,14 @@ class LatticeColorScheme {
     surface: Color(0xFFFFFFFF),
     surfaceSection: Color(0xFFF6F6F6),
     surfaceElevated: Color(0xFFEFEFEF),
+    menuSurface: Color(0xFFFFFFFF),
     border: Color(0xFFDFDFDF),
     borderActive: Color(0xFFCCCCCC),
     textPrimary: Color(0xFF1A1A1A),
-    textSecondary: Color(0xFF666666),
+    textSecondary: Color(0xFF444444),
     textMuted: Color(0xFF999999),
     textLabel: Color(0xFF545454),
-    inactive: Color(0xFFBABABA),
+    inactive: Color(0xFF707070),
     iconActive: Color(0xFF1A1A1A),
     accent: Color(0xFF5569ED),
     success: Color(0xFF388E3B),
@@ -220,13 +226,14 @@ class LatticeColorScheme {
     surface: Color(0xFF0A110A),
     surfaceSection: Color(0xFF0A160A),
     surfaceElevated: Color(0xFF0C1A0C),
+    menuSurface: Color(0xFF143014),
     border: Color(0xFF1A2D1A),
     borderActive: Color(0xFF2D492D),
     textPrimary: Color(0xFFCBFF72),
     textSecondary: Color(0xFF00B32F),
     textMuted: Color(0xFF00661F),
     textLabel: Color(0xFF00CC33),
-    inactive: Color(0xFF1A3A10),
+    inactive: Color(0xFF00902A),
     iconActive: Color(0xFFC3FF00),
     accent: Color(0xFF10A000),
     success: Color(0xFF00FF41),

@@ -6,7 +6,7 @@ void main() {
   late ExtensionContext context;
 
   setUp(() async {
-    context = await StubExtensionContext.connect(timeout: Duration(seconds: 1));
+    context = await StubExtensionContext.connect(timeout: const Duration(seconds: 1));
   });
 
   group('StubUiService', () {

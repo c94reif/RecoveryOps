@@ -12,6 +12,111 @@ enum TaskStatusGroup {
   terminal,
 }
 
+/// Raw values of the `anduril.taskmanager.v1.Status` proto enum, carried on
+/// [TaskData.rawStatus].
+///
+/// Kept as plain int constants (not a Dart `enum`) for the same reason as
+/// [TaskErrorCode]: they compare directly against the raw int that round-trips
+/// through gRPC, JSON, and the mock backend, with no conversion hop at every
+/// boundary. Critically, the status space is **open** — extensions define their
+/// own statuses well above the proto range (e.g. 100 PENDING_REVIEW, 101
+/// COORDINATED) and [TaskData.statusGroupFromRawStatus] has a `default:` arm to
+/// absorb them. An enum would have to close that space or carry an `unknown`
+/// case that every call site re-widens to an int anyway.
+///
+/// Use these instead of bare literals — `task.rawStatus == TaskStatus.wilco`
+/// reads as doctrine; `task.rawStatus == 6` does not.
+abstract final class TaskStatus {
+  /// STATUS_INVALID.
+  static const int invalid = 0;
+
+  /// CREATED — task exists but has not been dispatched.
+  static const int created = 1;
+
+  /// SCHEDULED_IN_MANAGER.
+  static const int scheduled = 2;
+
+  /// SENT — dispatched to the assignee, awaiting acknowledgement.
+  static const int sent = 3;
+
+  /// MACHINE_RECEIPT — received by the assignee's system.
+  static const int machineReceipt = 4;
+
+  /// ACK — acknowledged by the assignee.
+  static const int ack = 5;
+
+  /// WILCO — the assignee accepted the task ("will comply"). On a CFF child
+  /// fire mission this is the gun crew accepting the mission.
+  static const int wilco = 6;
+
+  /// EXECUTING — actively being worked. On a fire mission: rounds away
+  /// ("Shot Out").
+  static const int executing = 7;
+
+  /// WAITING_FOR_UPDATE — the assignee needs input to continue. On a fire
+  /// mission: rounds impacted ("Splash"), awaiting the FO's adjust-or-end call.
+  static const int waitingForUpdate = 8;
+
+  /// DONE_OK — completed successfully ("End Mission" on a fire mission).
+  static const int doneOk = 9;
+
+  /// DONE_NOT_OK — terminal failure. Disambiguated by [TaskErrorCode]: only
+  /// [TaskErrorCode.rejected] is a deliberate decline (CANTCO).
+  static const int doneNotOk = 10;
+
+  /// REPLACED — superseded by a newer definition version.
+  static const int replaced = 11;
+
+  /// CANCEL_REQUESTED.
+  static const int cancelRequested = 12;
+
+  /// COMPLETE_REQUESTED.
+  static const int completeRequested = 13;
+
+  /// VERSION_REJECTED — the server refused the submitted definition version.
+  static const int versionRejected = 14;
+
+  /// PAUSED.
+  static const int paused = 15;
+}
+
+/// Raw values of the `anduril.taskmanager.v1.ErrorCode` proto enum, carried on
+/// a task's `TaskError.code` and surfaced as [TaskData.errorCode].
+///
+/// A terminal [TaskStatus.doneNotOk] is disambiguated by this code:
+///  - [rejected] — the assignee deliberately declined the task (CANTCO).
+///  - [cancelled] — the task was cancelled by the requester.
+///  - [failed] / absent — a generic or system failure.
+///
+/// Kept as plain int constants (not an enum) so they compare directly against
+/// the raw int that round-trips through gRPC, JSON, and the mock backend.
+///
+/// These mirror the generated `ErrorCode` enum in
+/// `package:lattice_sdk_dart/anduril/taskmanager/v1/task.pub.pbenum.dart`.
+/// `lattice_common` intentionally does not depend on the heavyweight generated
+/// proto package (it depends only on `flutter`), so the values are mirrored
+/// here — exactly as the proto status ints are mirrored in
+/// [TaskData.statusGroupFromRawStatus]. App-layer code that already imports the
+/// proto package (e.g. `LatticeTaskRepository`) should use `tm.ErrorCode`
+/// directly when encoding to the wire; this mirror is for the shared types
+/// layer and UI.
+abstract final class TaskErrorCode {
+  /// ERROR_CODE_INVALID — no/unknown error code.
+  static const int invalid = 0;
+
+  /// ERROR_CODE_CANCELLED — task cancelled by the requester.
+  static const int cancelled = 1;
+
+  /// ERROR_CODE_REJECTED — assignee declined the task (CANTCO).
+  static const int rejected = 2;
+
+  /// ERROR_CODE_TIMEOUT — task timed out.
+  static const int timeout = 3;
+
+  /// ERROR_CODE_FAILED — generic failure.
+  static const int failed = 4;
+}
+
 /// Lightweight entity reference associated with a task.
 @immutable
 class TaskEntityData {
@@ -146,8 +251,7 @@ class CreateTaskParams {
   final List<TaskEntityData> initialEntities;
 
   @override
-  String toString() =>
-      'CreateTaskParams(typeUrl: $specificationTypeUrl, '
+  String toString() => 'CreateTaskParams(typeUrl: $specificationTypeUrl, '
       'description: $description, assignee: $assigneeEntityId, '
       'parent: $parentTaskId, entities: ${initialEntities.length})';
 }
@@ -179,6 +283,8 @@ class TaskData {
     this.errorMessage,
     this.errorCode,
     this.statusHistory = const [],
+    this.progressTypeUrl,
+    this.progressBytes,
   });
 
   /// Constructs a [TaskData] from individual field values, deriving
@@ -200,6 +306,8 @@ class TaskData {
     String? errorMessage,
     int? errorCode,
     List<TaskEvent> statusHistory = const [],
+    String? progressTypeUrl,
+    List<int>? progressBytes,
   }) {
     return TaskData(
       taskId: taskId,
@@ -207,7 +315,7 @@ class TaskData {
       specificationBytes: specificationBytes,
       rawStatus: rawStatus,
       statusGroup: TaskData.statusGroupFromRawStatus(rawStatus),
-      statusLabel: TaskData.statusLabelFromRawStatus(rawStatus),
+      statusLabel: TaskData.statusLabelFromStatus(rawStatus, errorCode),
       createTime: createTime,
       lastUpdateTime: lastUpdateTime,
       description: description,
@@ -220,6 +328,8 @@ class TaskData {
       errorMessage: errorMessage,
       errorCode: errorCode,
       statusHistory: statusHistory,
+      progressTypeUrl: progressTypeUrl,
+      progressBytes: progressBytes,
     );
   }
 
@@ -281,12 +391,32 @@ class TaskData {
   /// Chronological history of status transitions (most recent first).
   final List<TaskEvent> statusHistory;
 
+  /// Type URL of the task's incremental progress payload (`TaskStatus.progress`,
+  /// a `google.protobuf.Any`), or null when no progress has been reported.
+  /// Carries whatever progress message the task type defines, e.g.
+  /// `type.googleapis.com/com.example.tasks.SomeTaskProgress`.
+  final String? progressTypeUrl;
+
+  /// Raw bytes of the task's progress payload (the `Any`'s value), or null.
+  /// The assignee packs a task-type-specific progress message here via
+  /// UpdateTaskStatus; clients decode it with the message matching
+  /// [progressTypeUrl].
+  final List<int>? progressBytes;
+
   // ---------------------------------------------------------------------------
   // Convenience getters
   // ---------------------------------------------------------------------------
 
   /// Returns true when the task has reached a terminal state.
   bool get isTerminal => statusGroup == TaskStatusGroup.terminal;
+
+  /// Whether this task was deliberately declined by its assignee (CANTCO).
+  ///
+  /// True only for a terminal DONE_NOT_OK carrying [TaskErrorCode.rejected]. A
+  /// generic failure (ERROR_CODE_FAILED, no code) or a cancellation
+  /// (ERROR_CODE_CANCELLED) is not a CANTCO.
+  bool get isCantco =>
+      rawStatus == TaskStatus.doneNotOk && errorCode == TaskErrorCode.rejected;
 
   /// Returns true when the task is in a pending state.
   bool get isPending => statusGroup == TaskStatusGroup.pending;
@@ -295,54 +425,38 @@ class TaskData {
   bool get isActive => statusGroup == TaskStatusGroup.active;
 
   /// Returns true when the task has been WILCO'd (status 6).
-  bool get isWilco => rawStatus == 6;
+  bool get isWilco => rawStatus == TaskStatus.wilco;
 
   // ---------------------------------------------------------------------------
   // Static helpers
   // ---------------------------------------------------------------------------
 
-  /// Maps a raw proto status integer to a [TaskStatusGroup].
-  ///
-  /// Proto status values (anduril.taskmanager.v1):
-  ///  0 - STATUS_INVALID
-  ///  1 - CREATED
-  ///  2 - SCHEDULED_IN_MANAGER
-  ///  3 - SENT
-  ///  4 - MACHINE_RECEIPT
-  ///  5 - ACK
-  ///  6 - WILCO
-  ///  7 - EXECUTING
-  ///  8 - WAITING_FOR_UPDATE
-  ///  9 - DONE_OK
-  /// 10 - DONE_NOT_OK
-  /// 11 - REPLACED
-  /// 12 - CANCEL_REQUESTED
-  /// 13 - COMPLETE_REQUESTED
-  /// 14 - VERSION_REJECTED
-  /// 15 - PAUSED
+  /// Maps a raw proto status integer to a [TaskStatusGroup]. See [TaskStatus]
+  /// for the value names.
   static TaskStatusGroup statusGroupFromRawStatus(int rawStatus) {
     switch (rawStatus) {
-      case 1: // CREATED
-      case 2: // SCHEDULED_IN_MANAGER
-      case 3: // SENT
-      case 4: // MACHINE_RECEIPT
-      case 5: // ACK
-      case 6: // WILCO
-      case 12: // CANCEL_REQUESTED
-      case 13: // COMPLETE_REQUESTED
+      case TaskStatus.created:
+      case TaskStatus.scheduled:
+      case TaskStatus.sent:
+      case TaskStatus.machineReceipt:
+      case TaskStatus.ack:
+      case TaskStatus.wilco:
+      case TaskStatus.cancelRequested:
+      case TaskStatus.completeRequested:
         return TaskStatusGroup.pending;
 
-      case 7: // EXECUTING
-      case 8: // WAITING_FOR_UPDATE
-      case 15: // PAUSED
+      case TaskStatus.executing:
+      case TaskStatus.waitingForUpdate:
+      case TaskStatus.paused:
         return TaskStatusGroup.active;
 
-      case 9: // DONE_OK
-      case 10: // DONE_NOT_OK
-      case 11: // REPLACED
-      case 14: // VERSION_REJECTED
+      case TaskStatus.doneOk:
+      case TaskStatus.doneNotOk:
+      case TaskStatus.replaced:
+      case TaskStatus.versionRejected:
         return TaskStatusGroup.terminal;
 
+      // Extension-defined statuses (e.g. 100 PENDING_REVIEW) land here.
       default:
         return TaskStatusGroup.pending;
     }
@@ -351,39 +465,53 @@ class TaskData {
   /// Returns a human-readable label for a raw proto status integer.
   static String statusLabelFromRawStatus(int rawStatus) {
     switch (rawStatus) {
-      case 1:
+      case TaskStatus.created:
         return 'Created';
-      case 2:
+      case TaskStatus.scheduled:
         return 'Scheduled';
-      case 3:
+      case TaskStatus.sent:
         return 'Sent';
-      case 4:
+      case TaskStatus.machineReceipt:
         return 'Acknowledged (Machine)';
-      case 5:
+      case TaskStatus.ack:
         return 'Acknowledged';
-      case 6:
+      case TaskStatus.wilco:
         return 'Will Comply';
-      case 7:
+      case TaskStatus.executing:
         return 'Executing';
-      case 8:
+      case TaskStatus.waitingForUpdate:
         return 'Waiting for Update';
-      case 9:
+      case TaskStatus.doneOk:
         return 'Completed';
-      case 10:
+      case TaskStatus.doneNotOk:
         return 'Failed';
-      case 11:
+      case TaskStatus.replaced:
         return 'Replaced';
-      case 12:
+      case TaskStatus.cancelRequested:
         return 'Cancel Requested';
-      case 13:
+      case TaskStatus.completeRequested:
         return 'Complete Requested';
-      case 14:
+      case TaskStatus.versionRejected:
         return 'Rejected';
-      case 15:
+      case TaskStatus.paused:
         return 'Paused';
       default:
         return 'Unknown';
     }
+  }
+
+  /// Returns a human-readable label for a [rawStatus], refined by [errorCode].
+  ///
+  /// A terminal DONE_NOT_OK is generically "Failed", but when it carries
+  /// [TaskErrorCode.rejected] it represents a deliberate decline (CANTCO) and is
+  /// labelled "Cannot Comply"; with [TaskErrorCode.cancelled] it is "Cancelled".
+  /// All other statuses defer to [statusLabelFromRawStatus].
+  static String statusLabelFromStatus(int rawStatus, int? errorCode) {
+    if (rawStatus == TaskStatus.doneNotOk) {
+      if (errorCode == TaskErrorCode.rejected) return 'Cannot Comply';
+      if (errorCode == TaskErrorCode.cancelled) return 'Cancelled';
+    }
+    return statusLabelFromRawStatus(rawStatus);
   }
 
   // ---------------------------------------------------------------------------
@@ -392,6 +520,7 @@ class TaskData {
 
   factory TaskData.fromJson(Map<String, dynamic> json) {
     final rawStatus = json['rawStatus'] as int;
+    final errorCode = json['errorCode'] as int?;
     return TaskData(
       taskId: json['taskId'] as String,
       specificationTypeUrl: json['specificationTypeUrl'] as String,
@@ -402,13 +531,12 @@ class TaskData {
       rawStatus: rawStatus,
       statusGroup: TaskData.statusGroupFromRawStatus(rawStatus),
       statusLabel: json['statusLabel'] as String? ??
-          TaskData.statusLabelFromRawStatus(rawStatus),
+          TaskData.statusLabelFromStatus(rawStatus, errorCode),
       createTime: DateTime.parse(json['createTime'] as String),
       lastUpdateTime: DateTime.parse(json['lastUpdateTime'] as String),
       description: json['description'] as String? ?? '',
       initialEntities: (json['initialEntities'] as List<dynamic>?)
-              ?.map((e) =>
-                  TaskEntityData.fromJson(e as Map<String, dynamic>))
+              ?.map((e) => TaskEntityData.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
       assigneeEntityId: json['assigneeEntityId'] as String?,
@@ -417,11 +545,15 @@ class TaskData {
       lastUpdatedByUserId: json['lastUpdatedByUserId'] as String?,
       lastUpdatedByEntityId: json['lastUpdatedByEntityId'] as String?,
       errorMessage: json['errorMessage'] as String?,
-      errorCode: json['errorCode'] as int?,
+      errorCode: errorCode,
       statusHistory: (json['statusHistory'] as List<dynamic>?)
               ?.map((e) => TaskEvent.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
+      progressTypeUrl: json['progressTypeUrl'] as String?,
+      progressBytes: (json['progressBytes'] as List<dynamic>?)
+          ?.map((e) => e as int)
+          .toList(),
     );
   }
 
@@ -447,6 +579,8 @@ class TaskData {
         if (errorCode != null) 'errorCode': errorCode,
         if (statusHistory.isNotEmpty)
           'statusHistory': statusHistory.map((e) => e.toJson()).toList(),
+        if (progressTypeUrl != null) 'progressTypeUrl': progressTypeUrl,
+        if (progressBytes != null) 'progressBytes': progressBytes,
       };
 
   // ---------------------------------------------------------------------------

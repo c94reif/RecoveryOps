@@ -11,10 +11,12 @@ class MessageBubble extends StatelessWidget {
   final bool showSenderLabel;
   final String? senderCallsign;
   final VoidCallback? onRetry;
-  final void Function(String path)? onPlayVoice;
-  final String? currentlyPlayingPath;
-  final Stream<Duration>? positionStream;
-  final Stream<Duration>? durationStream;
+
+  /// Optional host-supplied renderer for text-message bodies. When non-null
+  /// and the message type is text, replaces the default plain [Text] render.
+  /// Receives the body string and whether the bubble is outgoing so the host
+  /// can pick the right foreground colour. Voice messages are unaffected.
+  final Widget Function(String body, bool isOutgoing)? textBodyBuilder;
 
   const MessageBubble({
     super.key,
@@ -23,10 +25,7 @@ class MessageBubble extends StatelessWidget {
     this.showSenderLabel = false,
     this.senderCallsign,
     this.onRetry,
-    this.onPlayVoice,
-    this.currentlyPlayingPath,
-    this.positionStream,
-    this.durationStream,
+    this.textBodyBuilder,
   });
 
   @override
@@ -58,12 +57,9 @@ class MessageBubble extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 260),
             child: Container(
               decoration: BoxDecoration(
-                color: isOutgoing
-                    ? colors.accent
-                    : colors.surface,
-                border: isOutgoing
-                    ? null
-                    : Border.all(color: colors.borderActive),
+                color: isOutgoing ? colors.accent : colors.surface,
+                border:
+                    isOutgoing ? null : Border.all(color: colors.borderActive),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(12),
                   topRight: const Radius.circular(12),
@@ -76,24 +72,18 @@ class MessageBubble extends StatelessWidget {
                   ? VoiceNotePlayer(
                       audioPath: message.audioPath ?? '',
                       isOutgoing: isOutgoing,
-                      isPlaying: currentlyPlayingPath == message.audioPath,
-                      onTap: () {
-                        if (message.audioPath != null) {
-                          onPlayVoice?.call(message.audioPath!);
-                        }
-                      },
-                      positionStream: positionStream,
-                      durationStream: durationStream,
                     )
-                  : Text(
-                      message.body ?? '',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isOutgoing
-                            ? colors.onAccent
-                            : colors.textPrimary,
-                      ),
-                    ),
+                  : textBodyBuilder != null
+                      ? textBodyBuilder!(message.body ?? '', isOutgoing)
+                      : Text(
+                          message.body ?? '',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isOutgoing
+                                ? colors.onAccent
+                                : colors.textPrimary,
+                          ),
+                        ),
             ),
           ),
           Padding(
@@ -108,8 +98,7 @@ class MessageBubble extends StatelessWidget {
                     color: colors.textMuted,
                   ),
                 ),
-                if (isOutgoing &&
-                    message.status == MessageStatus.failed) ...[
+                if (isOutgoing && message.status == MessageStatus.failed) ...[
                   const SizedBox(width: 4),
                   GestureDetector(
                     onTap: onRetry,

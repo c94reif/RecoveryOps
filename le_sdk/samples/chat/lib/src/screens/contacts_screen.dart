@@ -18,7 +18,8 @@ class ContactsScreen extends StatefulWidget {
   final VoidCallback onClearAllMessages;
   final ValueNotifier<List<ContactGroup>> groupsNotifier;
   final Function(ContactGroup) onOpenGroupConversation;
-  final Future<void> Function(String name, List<String> memberIds)? onCreateGroup;
+  final Future<void> Function(String name, List<String> memberIds)?
+      onCreateGroup;
   final String Function() getSelfCallsign;
   final String Function()? getSelfDeviceId;
   final VoidCallback? onClose;
@@ -67,11 +68,14 @@ class ContactsScreenState extends State<ContactsScreen> {
   final Map<String, Peer> _historicPeers = {};
   int _broadcastUnread = 0;
 
+  // Select-to-delete mode
+  bool _selectMode = false;
+  final Set<String> _selectedConversations = {};
+
   // Create Group dialog state — persisted across open/close cycles so the
   // field-editor overlay can be shown without losing member selections.
   Set<String> _cgSelected = {};
   String _cgName = '';
-  bool _cgHasCustomName = false;
 
   @override
   void initState() {
@@ -101,10 +105,12 @@ class ContactsScreenState extends State<ContactsScreen> {
 
     // Load previews for discovered peers
     for (final peer in peers) {
-      _lastMessages[peer.deviceId] =
-          await widget.db.getLastMessage(peer.deviceId);
-      _unreadCounts[peer.deviceId] =
-          await widget.db.getUnreadCount(peer.deviceId);
+      _lastMessages[peer.deviceId] = await widget.db.getLastMessage(
+        peer.deviceId,
+      );
+      _unreadCounts[peer.deviceId] = await widget.db.getUnreadCount(
+        peer.deviceId,
+      );
     }
 
     // Load broadcast
@@ -118,10 +124,12 @@ class ContactsScreenState extends State<ContactsScreen> {
     for (final dbPeer in dbPeers) {
       if (!discoveredIds.contains(dbPeer.deviceId)) {
         _historicPeers[dbPeer.deviceId] = dbPeer;
-        _lastMessages[dbPeer.deviceId] =
-            await widget.db.getLastMessage(dbPeer.deviceId);
-        _unreadCounts[dbPeer.deviceId] =
-            await widget.db.getUnreadCount(dbPeer.deviceId);
+        _lastMessages[dbPeer.deviceId] = await widget.db.getLastMessage(
+          dbPeer.deviceId,
+        );
+        _unreadCounts[dbPeer.deviceId] = await widget.db.getUnreadCount(
+          dbPeer.deviceId,
+        );
       }
     }
 
@@ -153,14 +161,12 @@ class ContactsScreenState extends State<ContactsScreen> {
     }
 
     // Load previews for active groups
-    final activeGroups = widget.groupsNotifier.value
-        .where((g) => !g.localUserLeft)
-        .toList();
+    final activeGroups =
+        widget.groupsNotifier.value.where((g) => !g.localUserLeft).toList();
     for (final group in activeGroups) {
       final msgs = await widget.db.getMessages(group.id, limit: 1);
       _lastMessages[group.id] = msgs.isNotEmpty ? msgs.first : null;
-      _unreadCounts[group.id] =
-          await widget.db.getUnreadCount(group.id);
+      _unreadCounts[group.id] = await widget.db.getUnreadCount(group.id);
     }
 
     if (mounted) setState(() {});
@@ -182,7 +188,10 @@ class ContactsScreenState extends State<ContactsScreen> {
   String _messagePreview(Message? msg) {
     if (msg == null) return '';
     if (msg.type == MessageType.voice) return 'Voice note';
-    return msg.body ?? '';
+    final body = msg.body ?? '';
+    // Entity share marker — see EntityChatCodec.marker in the host app.
+    if (body.startsWith('\x00ENT\x00')) return 'Shared an entity';
+    return body;
   }
 
   Future<bool> _confirmDelete(BuildContext context, Peer peer) async {
@@ -203,13 +212,14 @@ class ContactsScreenState extends State<ContactsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text('Cancel',
-                  style: TextStyle(color: dialogColors.textSecondary)),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: dialogColors.textSecondary),
+              ),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text('Clear',
-                  style: TextStyle(color: dialogColors.error)),
+              child: Text('Clear', style: TextStyle(color: dialogColors.error)),
             ),
           ],
         );
@@ -223,6 +233,69 @@ class ContactsScreenState extends State<ContactsScreen> {
       if (mounted) setState(() {});
     }
     return false;
+  }
+
+  Future<void> _confirmDeleteSelected() async {
+    final count = _selectedConversations.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final dialogColors = ctx.lattice.colors;
+        return AlertDialog(
+          backgroundColor: dialogColors.surfaceElevated,
+          title: Text(
+            'Clear $count ${count == 1 ? 'Conversation' : 'Conversations'}',
+            style: TextStyle(color: dialogColors.textPrimary, fontSize: 16),
+          ),
+          content: Text(
+            'Delete all messages in the selected ${count == 1 ? 'conversation' : 'conversations'}? This cannot be undone.',
+            style: TextStyle(color: dialogColors.textLabel, fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: dialogColors.textSecondary),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child:
+                  Text('Delete', style: TextStyle(color: dialogColors.error)),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed == true) {
+      final failed = <String>[];
+      for (final id in _selectedConversations.toList()) {
+        try {
+          await widget.db.deleteConversation(id);
+          _lastMessages.remove(id);
+          _unreadCounts.remove(id);
+          _historicPeers.remove(id);
+        } catch (_) {
+          failed.add(id);
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _selectMode = false;
+          _selectedConversations.clear();
+        });
+        if (failed.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to delete ${failed.length} ${failed.length == 1 ? 'conversation' : 'conversations'}',
+              ),
+            ),
+          );
+        }
+      }
+    }
   }
 
   /// Sort peers: those with unread messages first, then by last message time.
@@ -240,8 +313,10 @@ class ContactsScreenState extends State<ContactsScreen> {
     });
   }
 
-  Future<void> _showCreateGroupDialog(LatticeColorScheme colors,
-      {bool fresh = true}) async {
+  Future<void> _showCreateGroupDialog(
+    LatticeColorScheme colors, {
+    bool fresh = true,
+  }) async {
     final selfDeviceId = widget.getSelfDeviceId?.call();
     final peers = selfDeviceId != null
         ? widget.peersNotifier.value
@@ -253,7 +328,6 @@ class ContactsScreenState extends State<ContactsScreen> {
     if (fresh) {
       _cgSelected = {};
       _cgName = '';
-      _cgHasCustomName = false;
     }
 
     final nameController = TextEditingController(text: _cgName);
@@ -285,334 +359,362 @@ class ContactsScreenState extends State<ContactsScreen> {
                 });
               },
               child: AlertDialog(
-              backgroundColor: colors.background,
-              insetPadding: const EdgeInsets.symmetric(
-                  horizontal: 24, vertical: 24),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: colors.border),
-              ),
-              titlePadding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-              contentPadding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-              actionsPadding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              buttonPadding: EdgeInsets.zero,
-              title: Container(
-                decoration: BoxDecoration(
-                  color: colors.surfaceElevated,
-                  borderRadius: BorderRadius.circular(4),
+                backgroundColor: colors.background,
+                insetPadding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 24,
                 ),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 6),
-                child: Text(
-                  'CREATE GROUP',
-                  style: TextStyle(
-                    color: colors.textSecondary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.2,
-                  ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: colors.border),
                 ),
-              ),
-              content: SizedBox(
-                width: 300,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                    Row(
+                titlePadding: EdgeInsets.zero,
+                contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                actionsPadding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                buttonPadding: EdgeInsets.zero,
+                title: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: 48,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Create Group',
+                              style: TextStyle(
+                                color: colors.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Spacer(),
+                            SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: IconButton(
+                                icon: Icon(
+                                  Icons.close,
+                                  color: colors.textSecondary,
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  FocusManager.instance.primaryFocus?.unfocus();
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) {
+                                    Navigator.of(dialogContext).pop(false);
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Divider(height: 1, color: colors.border),
+                  ],
+                ),
+                content: SizedBox(
+                  width: 380,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Expanded(
-                          child: TextField(
-                            controller: nameController,
-                            focusNode: nameFocus,
-                            readOnly: widget.onOpenFieldEditor != null,
-                            autofocus: false,
-                            onTap: widget.onOpenFieldEditor != null
-                                ? () {
-                                    // Save current state before closing dialog.
-                                    _cgSelected = Set.of(_cgSelected);
-                                    _cgHasCustomName = _cgHasCustomName;
-                                    final currentName = nameController.text;
-                                    // Close dialog so field editor is visible.
-                                    Navigator.of(dialogContext).pop(null);
-                                    widget.onOpenFieldEditor!.call(
-                                      header: 'Group Name',
-                                      hint: 'Enter group name',
-                                      initialValue: currentName,
-                                      onConfirm: (value) {
-                                        _cgName = value;
-                                        _cgHasCustomName = true;
-                                        _showCreateGroupDialog(colors,
-                                            fresh: false);
-                                      },
-                                      onCancel: () {
-                                        // Re-open dialog with unchanged name.
-                                        _showCreateGroupDialog(colors,
-                                            fresh: false);
-                                      },
-                                    );
-                                  }
-                                : null,
-                            onChanged: (val) {
-                              // If user clears the field, revert to auto-naming
-                              if (val.isEmpty) {
-                                _cgHasCustomName = false;
-                                if (_cgSelected.isNotEmpty) {
-                                  nameController.text = autoName();
-                                  nameController.selection =
-                                      TextSelection.collapsed(
-                                          offset: nameController.text.length);
-                                }
-                              } else {
-                                _cgHasCustomName = true;
-                              }
-                              _cgName = nameController.text;
-                              setDialogState(() {});
-                            },
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => nameFocus.unfocus(),
-                            style: TextStyle(
-                                color: colors.textPrimary, fontSize: 13),
-                            decoration: InputDecoration(
-                              hintText: 'Group name',
-                              hintStyle: TextStyle(
-                                  color: colors.textMuted, fontSize: 13),
-                              filled: true,
-                              fillColor: colors.surface,
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 10),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: colors.borderActive),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: colors.borderActive),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: colors.iconActive),
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (isNameFocused) ...[
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            height: 38,
-                            child: TextButton(
-                              onPressed: () => nameFocus.unfocus(),
-                              style: TextButton.styleFrom(
-                                backgroundColor: colors.surface,
-                                foregroundColor: colors.iconActive,
-                                padding: const EdgeInsets.symmetric(horizontal: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(6),
-                                  side: BorderSide(color: colors.borderActive),
-                                ),
-                              ),
-                              child: Text('Done',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: colors.iconActive,
-                                  )),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: colors.surfaceElevated,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      child: Text(
-                        'SELECT MEMBERS',
-                        style: TextStyle(
-                          color: colors.textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 200),
-                      child: peers.isEmpty
-                          ? Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Text(
-                                'No peers discovered yet.\nMake sure devices are on the same network.',
-                                textAlign: TextAlign.center,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: nameController,
+                                focusNode: nameFocus,
+                                readOnly: widget.onOpenFieldEditor != null,
+                                autofocus: false,
+                                onTap: widget.onOpenFieldEditor != null
+                                    ? () {
+                                        // Save current state before closing dialog.
+                                        _cgSelected = Set.of(_cgSelected);
+                                        final currentName = nameController.text;
+                                        // Close dialog so field editor is visible.
+                                        Navigator.of(dialogContext).pop(null);
+                                        widget.onOpenFieldEditor!.call(
+                                          header: 'Group Name',
+                                          hint: 'Enter group name',
+                                          initialValue: currentName,
+                                          onConfirm: (value) {
+                                            _cgName = value;
+                                            _showCreateGroupDialog(
+                                              colors,
+                                              fresh: false,
+                                            );
+                                          },
+                                          onCancel: () {
+                                            // Re-open dialog with unchanged name.
+                                            _showCreateGroupDialog(
+                                              colors,
+                                              fresh: false,
+                                            );
+                                          },
+                                        );
+                                      }
+                                    : null,
+                                onChanged: (val) {
+                                  _cgName = val;
+                                  setDialogState(() {});
+                                },
+                                textInputAction: TextInputAction.done,
+                                onSubmitted: (_) => nameFocus.unfocus(),
                                 style: TextStyle(
-                                  color: colors.textMuted,
-                                  fontSize: 12,
+                                  color: colors.textPrimary,
+                                  fontSize: 13,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'Group name',
+                                  hintStyle: TextStyle(
+                                    color: colors.textMuted,
+                                    fontSize: 13,
+                                  ),
+                                  filled: true,
+                                  fillColor: colors.surface,
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(
+                                      color: colors.borderActive,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(
+                                      color: colors.borderActive,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(
+                                      color: colors.iconActive,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            )
-                          : ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: peers.length,
-                              itemBuilder: (ctx, i) {
-                                final peer = peers[i];
-                                final isSelected =
-                                    _cgSelected.contains(peer.deviceId);
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 6),
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      setDialogState(() {
-                                        if (isSelected) {
-                                          _cgSelected.remove(peer.deviceId);
-                                        } else {
-                                          _cgSelected.add(peer.deviceId);
-                                        }
-                                        if (!_cgHasCustomName) {
-                                          nameController.text = _cgSelected.isEmpty
-                                              ? ''
-                                              : autoName();
-                                          _cgName = nameController.text;
-                                        }
-                                      });
-                                    },
-                                    child: Container(
-                                      height: 48,
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8),
-                                      decoration: BoxDecoration(
-                                        color: colors.surface,
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                          color: isSelected
-                                              ? colors.iconActive
-                                                  .withValues(alpha: 0.5)
-                                              : colors.borderActive,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            isSelected
-                                                ? Icons.check_box
-                                                : Icons
-                                                    .check_box_outline_blank,
-                                            size: 20,
-                                            color: isSelected
-                                                ? colors.iconActive
-                                                : colors.textMuted,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              peer.callsign,
-                                              style: TextStyle(
-                                                color: colors.textPrimary,
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                          ),
-                                          Container(
-                                            width: 8,
-                                            height: 8,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: peer.isOnline
-                                                  ? colors.success
-                                                  : colors.inactive,
-                                            ),
-                                          ),
-                                        ],
+                            ),
+                            if (isNameFocused) ...[
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                height: 38,
+                                child: TextButton(
+                                  onPressed: () => nameFocus.unfocus(),
+                                  style: TextButton.styleFrom(
+                                    backgroundColor: colors.surface,
+                                    foregroundColor: colors.iconActive,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                      side: BorderSide(
+                                        color: colors.borderActive,
                                       ),
                                     ),
                                   ),
-                                );
-                              },
+                                  child: Text(
+                                    'Done',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: colors.iconActive,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (peers.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              'No peers discovered yet.\nMake sure devices are on the same network.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: colors.textMuted,
+                                fontSize: 12,
+                              ),
                             ),
+                          )
+                        else
+                          ...peers.map((peer) {
+                            final isSelected = _cgSelected.contains(
+                              peer.deviceId,
+                            );
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: GestureDetector(
+                                onTap: () {
+                                  setDialogState(() {
+                                    if (isSelected) {
+                                      _cgSelected.remove(peer.deviceId);
+                                    } else {
+                                      _cgSelected.add(peer.deviceId);
+                                    }
+                                  });
+                                },
+                                child: Container(
+                                  height: 48,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colors.surface,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? colors.iconActive.withValues(
+                                              alpha: 0.5,
+                                            )
+                                          : colors.borderActive,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        isSelected
+                                            ? Icons.check_box
+                                            : Icons.check_box_outline_blank,
+                                        size: 20,
+                                        color: isSelected
+                                            ? colors.iconActive
+                                            : colors.textMuted,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          peer.callsign,
+                                          style: TextStyle(
+                                            color: colors.textPrimary,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                      Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: peer.isOnline
+                                              ? colors.success
+                                              : colors.inactive,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-                ),
+                actions: [
+                  Builder(
+                    builder: (_) {
+                      final canCreate = _cgSelected.isNotEmpty;
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                FocusManager.instance.primaryFocus?.unfocus();
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) {
+                                  Navigator.of(dialogContext).pop(false);
+                                });
+                              },
+                              child: Container(
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: colors.surface,
+                                  border: Border.all(
+                                    color: colors.borderActive,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Cancel',
+                                    style: TextStyle(
+                                      color: colors.textSecondary,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: canCreate
+                                  ? () {
+                                      FocusManager.instance.primaryFocus
+                                          ?.unfocus();
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                        Navigator.of(
+                                          dialogContext,
+                                        ).pop(true);
+                                      });
+                                    }
+                                  : null,
+                              child: Container(
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: canCreate
+                                      ? colors.accent
+                                      : colors.textMuted,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Create',
+                                    style: TextStyle(
+                                      color: canCreate
+                                          ? colors.textPrimary
+                                          : colors.inactive,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
               ),
-              actions: [
-                Expanded(
-                  child: SizedBox(
-                    height: 36,
-                    child: TextButton(
-                      onPressed: _cgSelected.isNotEmpty &&
-                              nameController.text.trim().isNotEmpty
-                          ? () {
-                              FocusManager.instance.primaryFocus?.unfocus();
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                Navigator.of(dialogContext).pop(true);
-                              });
-                            }
-                          : null,
-                      style: TextButton.styleFrom(
-                        backgroundColor: _cgSelected.isNotEmpty &&
-                                nameController.text.trim().isNotEmpty
-                            ? colors.accent
-                            : colors.accent.withValues(alpha: 0.3),
-                        foregroundColor: colors.onAccent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                      ),
-                      child: Text('Create',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: colors.onAccent,
-                          )),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: SizedBox(
-                    height: 36,
-                    child: TextButton(
-                      onPressed: () {
-                        FocusManager.instance.primaryFocus?.unfocus();
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          Navigator.of(dialogContext).pop(false);
-                        });
-                      },
-                      style: TextButton.styleFrom(
-                        backgroundColor: colors.surface,
-                        foregroundColor: colors.textSecondary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          side: BorderSide(color: colors.borderActive),
-                        ),
-                      ),
-                      child: Text('Cancel',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: colors.textSecondary,
-                          )),
-                    ),
-                  ),
-                ),
-              ],
-            ),
             );
           },
         );
       },
     );
 
-    final name = nameController.text.trim();
+    final typedName = nameController.text.trim();
     nameController.dispose();
     nameFocus.dispose();
-    if (result == true && name.isNotEmpty && _cgSelected.isNotEmpty) {
+    if (result == true && _cgSelected.isNotEmpty) {
+      final name = typedName.isNotEmpty ? typedName : autoName();
       await widget.onCreateGroup?.call(name, _cgSelected.toList());
     }
   }
@@ -634,8 +736,7 @@ class ContactsScreenState extends State<ContactsScreen> {
         final offline = [...offlineDiscovered, ...historicList];
         _sortPeers(offline);
 
-        final hasAnyContent = online.isNotEmpty ||
-            offline.isNotEmpty;
+        final hasAnyContent = online.isNotEmpty || offline.isNotEmpty;
 
         return Column(
           children: [
@@ -644,9 +745,7 @@ class ContactsScreenState extends State<ContactsScreen> {
               height: 56,
               decoration: BoxDecoration(
                 color: colors.background,
-                border: Border(
-                  bottom: BorderSide(color: colors.border),
-                ),
+                border: Border(bottom: BorderSide(color: colors.border)),
               ),
               child: Row(
                 children: [
@@ -678,8 +777,11 @@ class ContactsScreenState extends State<ContactsScreen> {
                             width: 56,
                             height: 56,
                             child: Center(
-                              child: Icon(Icons.group_add,
-                                  size: 20, color: colors.textSecondary),
+                              child: Icon(
+                                Icons.group_add,
+                                size: 20,
+                                color: colors.textSecondary,
+                              ),
                             ),
                           ),
                         ),
@@ -689,13 +791,21 @@ class ContactsScreenState extends State<ContactsScreen> {
                     cursor: SystemMouseCursors.click,
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: widget.onClearAllMessages,
+                      onTap: () => setState(() {
+                        _selectMode = !_selectMode;
+                        _selectedConversations.clear();
+                      }),
                       child: SizedBox(
                         width: 56,
                         height: 56,
                         child: Center(
-                          child: Icon(Icons.delete_outline,
-                              size: 20, color: colors.textSecondary),
+                          child: Icon(
+                            _selectMode ? Icons.delete : Icons.delete_outline,
+                            size: 20,
+                            color: _selectMode
+                                ? colors.accent
+                                : colors.textSecondary,
+                          ),
                         ),
                       ),
                     ),
@@ -708,8 +818,11 @@ class ContactsScreenState extends State<ContactsScreen> {
                         width: 56,
                         height: 56,
                         child: Center(
-                          child: Icon(Icons.close,
-                              size: 20, color: colors.textSecondary),
+                          child: Icon(
+                            Icons.close,
+                            size: 20,
+                            color: colors.textSecondary,
+                          ),
                         ),
                       ),
                     ),
@@ -731,31 +844,37 @@ class ContactsScreenState extends State<ContactsScreen> {
 
                     // Online section
                     if (online.isNotEmpty) ...[
-                      _sectionLabel('ONLINE', online.length,
-                          color: colors.success),
+                      _sectionLabel(
+                        'ONLINE',
+                        online.length,
+                        color: colors.success,
+                      ),
                       for (final peer in online)
                         _dismissibleTile(
                           peer: peer,
-                          lastMessageTime:
-                              _lastMessages[peer.deviceId] != null
-                                  ? _formatTime(
-                                      _lastMessages[peer.deviceId]!.timestamp)
-                                  : null,
+                          lastMessageTime: _lastMessages[peer.deviceId] != null
+                              ? _formatTime(
+                                  _lastMessages[peer.deviceId]!.timestamp,
+                                )
+                              : null,
                         ),
                     ],
 
                     // Offline section
                     if (offline.isNotEmpty) ...[
-                      _sectionLabel('OFFLINE', offline.length,
-                          color: colors.inactive),
+                      _sectionLabel(
+                        'OFFLINE',
+                        offline.length,
+                        color: colors.inactive,
+                      ),
                       for (final peer in offline)
                         _dismissibleTile(
                           peer: peer,
-                          lastMessageTime:
-                              _lastMessages[peer.deviceId] != null
-                                  ? _formatTime(
-                                      _lastMessages[peer.deviceId]!.timestamp)
-                                  : null,
+                          lastMessageTime: _lastMessages[peer.deviceId] != null
+                              ? _formatTime(
+                                  _lastMessages[peer.deviceId]!.timestamp,
+                                )
+                              : null,
                         ),
                     ],
 
@@ -774,11 +893,81 @@ class ContactsScreenState extends State<ContactsScreen> {
                           ),
                         ),
                       ),
-
                   ],
                 ),
               ),
             ),
+
+            // Bottom action bar in select mode
+            if (_selectMode)
+              Container(
+                decoration: BoxDecoration(
+                  color: colors.background,
+                  border: Border(top: BorderSide(color: colors.border)),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => setState(() {
+                          _selectMode = false;
+                          _selectedConversations.clear();
+                        }),
+                        child: Container(
+                          height: 40,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: colors.borderActive),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: colors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _selectedConversations.isNotEmpty
+                            ? _confirmDeleteSelected
+                            : null,
+                        child: Opacity(
+                          opacity:
+                              _selectedConversations.isNotEmpty ? 1.0 : 0.4,
+                          child: Container(
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: colors.error,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              _selectedConversations.isEmpty
+                                  ? 'Delete'
+                                  : 'Delete (${_selectedConversations.length})',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: colors.onError,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         );
       },
@@ -790,32 +979,46 @@ class ContactsScreenState extends State<ContactsScreen> {
     final lastMsg = _lastMessages['broadcast'];
     final hasUnread = _broadcastUnread > 0;
     return GestureDetector(
-      onTap: widget.onOpenBroadcast,
+      onTap: _selectMode
+          ? () => setState(() {
+                if (_selectedConversations.contains('broadcast')) {
+                  _selectedConversations.remove('broadcast');
+                } else {
+                  _selectedConversations.add('broadcast');
+                }
+              })
+          : widget.onOpenBroadcast,
       child: Container(
         constraints: const BoxConstraints(minHeight: 48),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: hasUnread ? colors.accent.withValues(alpha: 0.05) : null,
-          border: Border(
-            bottom: BorderSide(color: colors.border, width: 1),
-          ),
+          border: Border(bottom: BorderSide(color: colors.border, width: 1)),
         ),
         child: Row(
           children: [
+            if (_selectMode) ...[
+              Icon(
+                _selectedConversations.contains('broadcast')
+                    ? Icons.check_circle
+                    : Icons.circle_outlined,
+                size: 20,
+                color: _selectedConversations.contains('broadcast')
+                    ? colors.accent
+                    : colors.textMuted,
+              ),
+              const SizedBox(width: 8),
+            ],
             Container(
               width: 36,
               height: 36,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: colors.surfaceElevated,
-                border: Border.all(
-                  color: colors.iconActive,
-                  width: 2,
-                ),
+                border: Border.all(color: colors.iconActive, width: 2),
               ),
               child: Center(
-                child: Icon(Icons.campaign, size: 16,
-                    color: colors.iconActive),
+                child: Icon(Icons.campaign, size: 16, color: colors.iconActive),
               ),
             ),
             const SizedBox(width: 10),
@@ -854,16 +1057,15 @@ class ContactsScreenState extends State<ContactsScreen> {
                 if (lastMsg != null)
                   Text(
                     _formatTime(lastMsg.timestamp),
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: colors.textMuted,
-                    ),
+                    style: TextStyle(fontSize: 10, color: colors.textMuted),
                   ),
                 if (_broadcastUnread > 0) ...[
                   const SizedBox(height: 4),
                   Container(
                     constraints: const BoxConstraints(
-                        minWidth: 18, minHeight: 18),
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     decoration: BoxDecoration(
                       color: colors.accent,
@@ -871,9 +1073,7 @@ class ContactsScreenState extends State<ContactsScreen> {
                     ),
                     child: Center(
                       child: Text(
-                        _broadcastUnread > 99
-                            ? '99+'
-                            : '$_broadcastUnread',
+                        _broadcastUnread > 99 ? '99+' : '$_broadcastUnread',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
@@ -896,27 +1096,41 @@ class ContactsScreenState extends State<ContactsScreen> {
       valueListenable: widget.groupsNotifier,
       builder: (context, groups, _) {
         final colors = context.lattice.colors;
-        final activeGroups =
-            groups.where((g) => !g.localUserLeft).toList();
-        if (activeGroups.isEmpty) return const SizedBox.shrink();
+        final activeGroups = groups.where((g) => !g.localUserLeft).toList();
+        final leftGroups = groups.where((g) => g.localUserLeft).toList();
+        if (activeGroups.isEmpty && leftGroups.isEmpty) {
+          return const SizedBox.shrink();
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionLabel('GROUPS', activeGroups.length,
-                color: colors.accent),
-            for (final group in activeGroups)
-              _groupTile(group),
+            if (activeGroups.isNotEmpty) ...[
+              _sectionLabel(
+                'GROUPS',
+                activeGroups.length,
+                color: colors.accent,
+              ),
+              for (final group in activeGroups) _groupTile(group),
+            ],
+            if (leftGroups.isNotEmpty) ...[
+              _sectionLabel(
+                'LEFT GROUPS',
+                leftGroups.length,
+                color: colors.textMuted,
+              ),
+              for (final group in leftGroups) _groupTile(group, left: true),
+            ],
           ],
         );
       },
     );
   }
 
-  Widget _groupTile(ContactGroup group) {
+  Widget _groupTile(ContactGroup group, {bool left = false}) {
     final colors = context.lattice.colors;
     final lastMsg = _lastMessages[group.id];
-    final unread = _unreadCounts[group.id] ?? 0;
+    final unread = left ? 0 : (_unreadCounts[group.id] ?? 0);
     final hasUnread = unread > 0;
 
     // Subtitle: last message body or member count
@@ -925,19 +1139,37 @@ class ContactsScreenState extends State<ContactsScreen> {
         : '${group.memberDeviceIds.length} members';
 
     return GestureDetector(
-      onTap: () => widget.onOpenGroupConversation(group),
+      onTap: _selectMode
+          ? () => setState(() {
+                if (_selectedConversations.contains(group.id)) {
+                  _selectedConversations.remove(group.id);
+                } else {
+                  _selectedConversations.add(group.id);
+                }
+              })
+          : () => widget.onOpenGroupConversation(group),
       child: Container(
         constraints: const BoxConstraints(minHeight: 48),
         height: 64,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: hasUnread ? colors.accent.withValues(alpha: 0.05) : null,
-          border: Border(
-            bottom: BorderSide(color: colors.border, width: 1),
-          ),
+          border: Border(bottom: BorderSide(color: colors.border, width: 1)),
         ),
         child: Row(
           children: [
+            if (_selectMode) ...[
+              Icon(
+                _selectedConversations.contains(group.id)
+                    ? Icons.check_circle
+                    : Icons.circle_outlined,
+                size: 20,
+                color: _selectedConversations.contains(group.id)
+                    ? colors.accent
+                    : colors.textMuted,
+              ),
+              const SizedBox(width: 8),
+            ],
             Container(
               width: 36,
               height: 36,
@@ -945,12 +1177,16 @@ class ContactsScreenState extends State<ContactsScreen> {
                 shape: BoxShape.circle,
                 color: colors.surfaceElevated,
                 border: Border.all(
-                  color: colors.iconActive,
+                  color: left ? colors.textMuted : colors.iconActive,
                   width: 2,
                 ),
               ),
               child: Center(
-                child: Icon(Icons.group, size: 16, color: colors.iconActive),
+                child: Icon(
+                  Icons.group,
+                  size: 16,
+                  color: left ? colors.textMuted : colors.iconActive,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -963,21 +1199,16 @@ class ContactsScreenState extends State<ContactsScreen> {
                     group.name,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: hasUnread
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                      color: colors.textPrimary,
+                      fontWeight: hasUnread ? FontWeight.w700 : FontWeight.w500,
+                      color: left ? colors.textMuted : colors.textPrimary,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: colors.textSecondary,
-                    ),
+                    left ? 'Left group' : subtitle,
+                    style: TextStyle(fontSize: 11, color: colors.textSecondary),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -991,16 +1222,15 @@ class ContactsScreenState extends State<ContactsScreen> {
                 if (lastMsg != null)
                   Text(
                     _formatTime(lastMsg.timestamp),
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: colors.textMuted,
-                    ),
+                    style: TextStyle(fontSize: 10, color: colors.textMuted),
                   ),
                 if (hasUnread) ...[
                   const SizedBox(height: 4),
                   Container(
                     constraints: const BoxConstraints(
-                        minWidth: 18, minHeight: 18),
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     decoration: BoxDecoration(
                       color: colors.accent,
@@ -1032,6 +1262,52 @@ class ContactsScreenState extends State<ContactsScreen> {
   }) {
     final colors = context.lattice.colors;
     final hasUnread = (_unreadCounts[peer.deviceId] ?? 0) > 0;
+    final tile = Container(
+      decoration: BoxDecoration(
+        color: hasUnread ? colors.accent.withValues(alpha: 0.05) : null,
+      ),
+      child: ContactTile(
+        peer: peer,
+        lastMessagePreview: _messagePreview(_lastMessages[peer.deviceId]),
+        lastMessageTime: lastMessageTime,
+        unreadCount: _unreadCounts[peer.deviceId] ?? 0,
+        onTap: _selectMode
+            ? () => setState(() {
+                  if (_selectedConversations.contains(peer.deviceId)) {
+                    _selectedConversations.remove(peer.deviceId);
+                  } else {
+                    _selectedConversations.add(peer.deviceId);
+                  }
+                })
+            : () => widget.onOpenConversation(peer),
+      ),
+    );
+
+    if (_selectMode) {
+      final selected = _selectedConversations.contains(peer.deviceId);
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(() {
+          if (selected) {
+            _selectedConversations.remove(peer.deviceId);
+          } else {
+            _selectedConversations.add(peer.deviceId);
+          }
+        }),
+        child: Row(
+          children: [
+            const SizedBox(width: 8),
+            Icon(
+              selected ? Icons.check_circle : Icons.circle_outlined,
+              size: 20,
+              color: selected ? colors.accent : colors.textMuted,
+            ),
+            Expanded(child: tile),
+          ],
+        ),
+      );
+    }
+
     return Dismissible(
       key: ValueKey(peer.deviceId),
       direction: DismissDirection.endToStart,
@@ -1042,19 +1318,7 @@ class ContactsScreenState extends State<ContactsScreen> {
         color: colors.error,
         child: const Icon(Icons.delete, color: Colors.white, size: 20),
       ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: hasUnread ? colors.accent.withValues(alpha: 0.05) : null,
-        ),
-        child: ContactTile(
-          peer: peer,
-          lastMessagePreview:
-              _messagePreview(_lastMessages[peer.deviceId]),
-          lastMessageTime: lastMessageTime,
-          unreadCount: _unreadCounts[peer.deviceId] ?? 0,
-          onTap: () => widget.onOpenConversation(peer),
-        ),
-      ),
+      child: tile,
     );
   }
 
@@ -1067,10 +1331,7 @@ class ContactsScreenState extends State<ContactsScreen> {
           Container(
             width: 8,
             height: 8,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color,
-            ),
+            decoration: BoxDecoration(shape: BoxShape.circle, color: color),
           ),
           const SizedBox(width: 6),
           Text(

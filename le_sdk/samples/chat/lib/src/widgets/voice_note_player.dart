@@ -1,25 +1,22 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:lattice_common/lattice_common.dart';
 
-/// Inline voice note player: play/pause button + progress bar + duration.
+/// Self-contained inline voice note player.
+///
+/// Each instance owns its own [AudioPlayer] so multiple voice notes
+/// in the same conversation play independently without interference.
 class VoiceNotePlayer extends StatefulWidget {
   final String audioPath;
   final bool isOutgoing;
-  final bool isPlaying;
-  final VoidCallback onTap;
-  final Stream<Duration>? positionStream;
-  final Stream<Duration>? durationStream;
 
   const VoiceNotePlayer({
     super.key,
     required this.audioPath,
     required this.isOutgoing,
-    required this.isPlaying,
-    required this.onTap,
-    this.positionStream,
-    this.durationStream,
   });
 
   @override
@@ -27,45 +24,93 @@ class VoiceNotePlayer extends StatefulWidget {
 }
 
 class _VoiceNotePlayerState extends State<VoiceNotePlayer> {
-  Duration _position = Duration.zero;
-  Duration _duration = const Duration(seconds: 1);
+  late final AudioPlayer _player;
   StreamSubscription? _posSub;
   StreamSubscription? _durSub;
+  StreamSubscription? _completeSub;
+
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+  bool _isPlaying = false;
+  bool _isPaused = false;
+  bool _durationLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    _subscribe();
-  }
-
-  @override
-  void didUpdateWidget(VoiceNotePlayer oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.isPlaying && !widget.isPlaying) {
-      setState(() => _position = Duration.zero);
-    }
-    if (oldWidget.positionStream != widget.positionStream) {
-      _posSub?.cancel();
-      _durSub?.cancel();
-      _subscribe();
-    }
-  }
-
-  void _subscribe() {
-    _posSub = widget.positionStream?.listen((pos) {
-      if (widget.isPlaying && mounted) setState(() => _position = pos);
+    _player = AudioPlayer();
+    _posSub = _player.onPositionChanged.listen((pos) {
+      if (mounted) setState(() => _position = pos);
     });
-    _durSub = widget.durationStream?.listen((dur) {
-      if (widget.isPlaying && dur.inMilliseconds > 0 && mounted) {
-        setState(() => _duration = dur);
+    _durSub = _player.onDurationChanged.listen((dur) {
+      if (dur.inMilliseconds > 0 && mounted) {
+        setState(() {
+          _duration = dur;
+          _durationLoaded = true;
+        });
       }
     });
+    _completeSub = _player.onPlayerComplete.listen((_) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = false;
+          _isPaused = false;
+          _position = Duration.zero;
+        });
+      }
+    });
+    _loadDuration();
+  }
+
+  Future<void> _loadDuration() async {
+    if (widget.audioPath.isEmpty) return;
+    if (!File(widget.audioPath).existsSync()) return;
+    final probe = AudioPlayer();
+    try {
+      await probe.setSource(DeviceFileSource(widget.audioPath));
+      final dur = await probe.getDuration();
+      if (dur != null && dur.inMilliseconds > 0 && mounted) {
+        setState(() {
+          _duration = dur;
+          _durationLoaded = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('[VoiceNotePlayer] Failed to load duration: $e');
+    } finally {
+      probe.dispose();
+    }
+  }
+
+  Future<void> _togglePlayback() async {
+    if (_isPlaying) {
+      setState(() {
+        _isPlaying = false;
+        _isPaused = true;
+      });
+      await _player.pause();
+    } else if (_isPaused) {
+      setState(() {
+        _isPlaying = true;
+        _isPaused = false;
+      });
+      await _player.resume();
+    } else {
+      setState(() {
+        _isPlaying = true;
+        _isPaused = false;
+        _position = Duration.zero;
+      });
+      await _player.play(DeviceFileSource(widget.audioPath));
+    }
   }
 
   @override
   void dispose() {
     _posSub?.cancel();
     _durSub?.cancel();
+    _completeSub?.cancel();
+    _player.dispose();
     super.dispose();
   }
 
@@ -78,12 +123,14 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer> {
   @override
   Widget build(BuildContext context) {
     final colors = context.lattice.colors;
+    final isActive = _isPlaying || _isPaused;
     final progress = _duration.inMilliseconds > 0
         ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
         : 0.0;
+    final displayDuration = isActive ? _position : _duration;
 
     return GestureDetector(
-      onTap: widget.onTap,
+      onTap: _togglePlayback,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -97,7 +144,7 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer> {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              widget.isPlaying ? Icons.pause : Icons.play_arrow,
+              _isPlaying ? Icons.pause : Icons.play_arrow,
               size: 18,
               color: widget.isOutgoing
                   ? colors.background
@@ -126,7 +173,9 @@ class _VoiceNotePlayerState extends State<VoiceNotePlayer> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  _formatDuration(widget.isPlaying ? _position : _duration),
+                  _durationLoaded
+                      ? _formatDuration(displayDuration)
+                      : '0:00',
                   style: TextStyle(
                     fontSize: 10,
                     color: widget.isOutgoing
