@@ -3,6 +3,7 @@ import 'package:ivy_pulse/core/di/injection.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
 import 'package:ivy_pulse/domain/entities/fault_severity.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_fault.dart';
+import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
 import 'package:ivy_pulse/presentation/common/widgets/fault_tally_bar.dart';
 import 'package:ivy_pulse/presentation/common/widgets/section_label.dart';
 import 'package:ivy_pulse/presentation/common/widgets/severity_badge.dart';
@@ -67,6 +68,8 @@ class SummaryPageState extends State<SummaryPage> {
               style: const TextStyle(color: textSecondary, fontSize: 12),
             ),
             const SizedBox(height: 12),
+            buildPhaseCoverage(),
+            const SizedBox(height: 16),
             buildStatusBanner(),
             if (!tally.isEmpty) ...[
               const SizedBox(height: 12),
@@ -90,7 +93,7 @@ class SummaryPageState extends State<SummaryPage> {
             ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: viewModel.backToPhases,
+              onPressed: viewModel.isBusy ? null : viewModel.backToPhases,
               child: const Text('BACK TO PHASES'),
             ),
           ],
@@ -142,6 +145,43 @@ class SummaryPageState extends State<SummaryPage> {
     );
   }
 
+  Widget buildPhaseCoverage() {
+    final session = viewModel.session!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionLabel(text: 'PHASE COVERAGE'),
+        const SizedBox(height: 8),
+        for (final phase in PmcsPhase.values)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                    session.isPhaseComplete(phase)
+                        ? Icons.check_circle_outline
+                        : Icons.radio_button_unchecked,
+                    size: 18,
+                    color: session.isPhaseComplete(phase)
+                        ? serviceableGreen
+                        : textSecondary),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Text(
+                        '${phase.label} · ${session.isPhaseComplete(phase) ? 'Complete' : viewModel.answeredCountFor(phase) > 0 ? 'Unfinished (${viewModel.answeredCountFor(phase)} of ${viewModel.catalog?.itemCountFor(phase) ?? 0} checks)' : 'Not started'}')),
+              ],
+            ),
+          ),
+        if (!session.allPhasesComplete) ...[
+          const SizedBox(height: 8),
+          const Text('Only completed phases are included in this report.',
+              style: TextStyle(color: circleXAmber, fontSize: 12)),
+        ],
+      ],
+    );
+  }
+
   List<Widget> buildFaultGroups() {
     if (viewModel.sessionFaults.isEmpty) {
       return [
@@ -186,74 +226,85 @@ class SummaryPageState extends State<SummaryPage> {
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: color, width: 1.2),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  fault.itemId,
-                  style: TextStyle(
-                    color: masterChiefGreen,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-                const Spacer(),
-                SeverityBadge(severity: fault.severity),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              fault.subcategory,
-              style: const TextStyle(
-                color: textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '${fault.category} · ${fault.phase.shortLabel}',
-              style: const TextStyle(color: textSecondary, fontSize: 11),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              fault.condition,
-              style: TextStyle(
-                color: color,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            if (note != null && note.isNotEmpty) ...[
-              const SizedBox(height: 6),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: viewModel.isBusy ? null : () => viewModel.reviewFault(fault),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.sticky_note_2_outlined,
-                    color: textSecondary,
-                    size: 14,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      note,
-                      style: const TextStyle(
-                        color: textPrimary,
-                        fontSize: 12,
-                        height: 1.35,
-                      ),
+                  Text(
+                    fault.itemId,
+                    style: TextStyle(
+                      color: masterChiefGreen,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
                     ),
                   ),
+                  const Spacer(),
+                  SeverityBadge(severity: fault.severity),
                 ],
               ),
+              const SizedBox(height: 6),
+              Text(
+                fault.subcategory,
+                style: const TextStyle(
+                  color: textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${fault.category} · ${fault.phase.shortLabel}',
+                style: const TextStyle(color: textSecondary, fontSize: 11),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                fault.condition,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (note != null && note.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.sticky_note_2_outlined,
+                      color: textSecondary,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        note,
+                        style: const TextStyle(
+                          color: textPrimary,
+                          fontSize: 12,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
+              const Row(children: [
+                Text('Review check',
+                    style: TextStyle(color: textSecondary, fontSize: 12)),
+                SizedBox(width: 4),
+                Icon(Icons.chevron_right, color: textSecondary, size: 18),
+              ]),
             ],
-          ],
+          ),
         ),
       ),
     );

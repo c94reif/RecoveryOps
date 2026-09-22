@@ -3,7 +3,6 @@ import 'package:ivy_pulse/core/di/injection.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_fault.dart';
 import 'package:ivy_pulse/presentation/common/widgets/confirm_dialog.dart';
-import 'package:ivy_pulse/presentation/common/widgets/custom_snack_bar.dart';
 import 'package:ivy_pulse/presentation/home/home_view_model.dart';
 import 'package:ivy_pulse/presentation/inspection/inspection_view_model.dart';
 import 'package:ivy_pulse/presentation/common/widgets/fault_tally_bar.dart';
@@ -31,11 +30,112 @@ class ReportsPageState extends State<ReportsPage> {
   /// state: it is where the maintainer is looking, not anything about the
   /// PMCS themselves.
   ReportsTab selectedTab = ReportsTab.yours;
+  ReportVehicleKey? selectedVehicle;
+  String? startingPmcsId;
+  bool offeringContinuation = false;
+  final searchController = TextEditingController();
+  bool faultsOnly = false;
+  bool unreadOnly = false;
 
   @override
   void initState() {
     super.initState();
     viewModel = getIt<ReportsViewModel>();
+    viewModel.reportToOpen.addListener(openRequestedReport);
+    openRequestedReport();
+  }
+
+  @override
+  void dispose() {
+    viewModel.reportToOpen.removeListener(openRequestedReport);
+    searchController.dispose();
+    super.dispose();
+  }
+
+  void openRequestedReport() {
+    final report = viewModel.reportToOpen.value;
+    if (report == null) return;
+    viewModel.reportToOpen.value = null;
+    setState(() {
+      selectedTab = report.isOutgoing ? ReportsTab.yours : ReportsTab.unit;
+      selectedVehicle = (
+        bumperNumber: report.bumperNumber.trim().toUpperCase(),
+        uic: report.uic.trim().toUpperCase(),
+      );
+      expandedIds.add(report.entityId);
+    });
+    viewModel.markReportAsRead(report);
+  }
+
+  bool get hasVehicleFilters =>
+      searchController.text.trim().isNotEmpty ||
+      faultsOnly ||
+      (selectedTab == ReportsTab.unit && unreadOnly);
+
+  Map<ReportVehicleKey, List<PmcsReport>> filteredGroups(
+      List<PmcsReport> reports) {
+    final query = searchController.text.trim().toUpperCase();
+    return Map.fromEntries(
+        viewModel.groupByVehicle(reports).entries.where((entry) {
+      final vehicle = entry.key;
+      return (query.isEmpty ||
+              vehicle.bumperNumber.contains(query) ||
+              vehicle.uic.contains(query)) &&
+          (!faultsOnly || entry.value.first.faults.isNotEmpty) &&
+          (selectedTab != ReportsTab.unit ||
+              !unreadOnly ||
+              entry.value
+                  .any((report) => !report.isOutgoing && !report.isRead));
+    }));
+  }
+
+  void clearVehicleFilters() {
+    setState(() {
+      searchController.clear();
+      faultsOnly = false;
+      unreadOnly = false;
+    });
+  }
+
+  Widget buildVehicleFilters() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        TextField(
+          controller: searchController,
+          onChanged: (_) => setState(() {}),
+          textInputAction: TextInputAction.search,
+          onSubmitted: (_) => FocusScope.of(context).unfocus(),
+          decoration: InputDecoration(
+            labelText: 'Search bumper number or UIC',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: searchController.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Clear search',
+                    icon: const Icon(Icons.close),
+                    onPressed: () => setState(searchController.clear),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 4, children: [
+          FilterChip(
+              label: const Text('With faults'),
+              selected: faultsOnly,
+              onSelected: (value) => setState(() => faultsOnly = value)),
+          if (selectedTab == ReportsTab.unit)
+            FilterChip(
+                label: const Text('Unread'),
+                selected: unreadOnly,
+                onSelected: (value) => setState(() => unreadOnly = value)),
+          if (hasVehicleFilters)
+            TextButton(
+                onPressed: clearVehicleFilters,
+                child: const Text('Clear filters')),
+        ]),
+      ]),
+    );
   }
 
   void toggleExpanded(PmcsReport report) {
@@ -62,31 +162,59 @@ class ReportsPageState extends State<ReportsPage> {
     }
   }
 
-  /// Walk this vehicle again: hand its bumper number, UIC and platform to the
-  /// PMCS tab and switch to it, so the operator starts from BEGIN PMCS instead
-  /// of retyping what is already on the card.
+  /// Start a fresh session using the report's vehicle details, then open the
+  /// PMCS tab at phase selection.
   ///
   /// Resolved at tap time rather than in [initState] so a reports screen can
   /// be built without an inspection flow behind it, as the widget tests do.
-  void startNewPmcs(PmcsReport report) {
+  Future<void> startNewPmcs(PmcsReport report) async {
+    if (startingPmcsId != null || offeringContinuation) return;
     if (!getIt.isRegistered<InspectionViewModel>() ||
         !getIt.isRegistered<HomeViewModel>()) {
       return;
     }
     final inspection = getIt<InspectionViewModel>();
+    if (inspection.isBusy) return;
     final accepted = inspection.prefillVehicle(
       bumperNumber: report.bumperNumber,
       uic: report.uic,
       vehicleType: report.vehicleType,
     );
     if (!accepted) {
-      SnackBarService.instance.enqueue(
-        'Finish or discard the open PMCS first',
-        isError: true,
-      );
+      final open = inspection.session;
+      if (open == null) return;
+      offeringContinuation = true;
+      try {
+        final shouldContinue = await showConfirmDialog(
+          context,
+          title: 'PMCS already in progress',
+          message: '${open.displayTitle} · ${open.uic} has an open PMCS. '
+              'Continue where you left off. Finish or discard that session '
+              'before starting another.',
+          confirmLabel: 'Continue PMCS',
+          cancelLabel: 'Stay in reports',
+        );
+        if (mounted &&
+            shouldContinue &&
+            inspection.session?.sessionId == open.sessionId) {
+          getIt<HomeViewModel>().selectTab(0);
+        }
+      } finally {
+        offeringContinuation = false;
+      }
       return;
     }
-    getIt<HomeViewModel>().selectTab(0);
+    setState(() => startingPmcsId = report.entityId);
+    try {
+      final started = await inspection.beginSession(
+        bumperNumber: report.bumperNumber,
+        uic: report.uic,
+      );
+      if (!mounted || !started) return;
+      getIt<HomeViewModel>().selectTab(0);
+    } finally {
+      if (mounted) setState(() => startingPmcsId = null);
+    }
   }
 
   /// Worst first — the maintainer reads the deadlining faults, not the order
@@ -132,7 +260,8 @@ class ReportsPageState extends State<ReportsPage> {
     );
   }
 
-  Widget buildFaultLine(PmcsFault fault) {
+  Widget buildFaultLine(PmcsFault fault, {required bool showNote}) {
+    final note = fault.note?.trim();
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Row(
@@ -152,6 +281,17 @@ class ReportsPageState extends State<ReportsPage> {
                   '${fault.phase.shortLabel} · ${fault.itemId}',
                   style: const TextStyle(color: textSecondary, fontSize: 10),
                 ),
+                if (showNote && note != null && note.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Operator note: $note',
+                    style: const TextStyle(
+                      color: textPrimary,
+                      fontSize: 12,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -160,13 +300,22 @@ class ReportsPageState extends State<ReportsPage> {
     );
   }
 
-  Widget buildReportCard(PmcsReport report) {
+  Widget buildReportCard(PmcsReport report, {bool isLatest = false}) {
     final faults = sortedFaults(report);
     final isExpanded = expandedIds.contains(report.entityId);
     final visible =
         isExpanded ? faults : faults.take(collapsedFaultLimit).toList();
     final worst = report.worstSeverity;
     final accent = worst != null ? severityColor(worst) : serviceableGreen;
+    final hasDetails = faults.length > collapsedFaultLimit ||
+        faults.any((fault) => fault.note?.trim().isNotEmpty ?? false);
+    final localTime = report.timestamp.toLocal();
+    final localizations = MaterialLocalizations.of(context);
+    final date = localizations.formatMediumDate(localTime);
+    final time = localizations.formatTimeOfDay(
+      TimeOfDay.fromDateTime(localTime),
+      alwaysUse24HourFormat: true,
+    );
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -181,10 +330,15 @@ class ReportsPageState extends State<ReportsPage> {
         borderRadius: BorderRadius.circular(8),
         onTap: () => toggleExpanded(report),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 4, 12),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                '${isLatest ? 'LATEST · ' : ''}$date · $time',
+                style: const TextStyle(color: textSecondary, fontSize: 11),
+              ),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Container(
@@ -269,18 +423,6 @@ class ReportsPageState extends State<ReportsPage> {
                       ],
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => startNewPmcs(report),
-                    icon: const Icon(Icons.add_task, size: 18),
-                    tooltip: 'New PMCS on this vehicle',
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  IconButton(
-                    onPressed: () => confirmDelete(report),
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    tooltip: 'Delete',
-                    visualDensity: VisualDensity.compact,
-                  ),
                 ],
               ),
               const SizedBox(height: 10),
@@ -294,17 +436,81 @@ class ReportsPageState extends State<ReportsPage> {
                   ),
                 )
               else ...[
-                for (final fault in visible) buildFaultLine(fault),
-                if (!isExpanded && faults.length > collapsedFaultLimit)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      '+${faults.length - collapsedFaultLimit} more — '
-                      'tap to expand',
-                      style: TextStyle(color: masterChiefGreen, fontSize: 11),
+                for (final fault in visible)
+                  buildFaultLine(fault, showNote: isExpanded),
+              ],
+              if (hasDetails)
+                TextButton.icon(
+                  onPressed: () => toggleExpanded(report),
+                  style: TextButton.styleFrom(
+                    foregroundColor: serviceableGreen,
+                    minimumSize: const Size(0, minTouchTarget),
+                  ),
+                  icon: Icon(
+                    isExpanded ? Icons.expand_less : Icons.expand_more,
+                    size: 18,
+                  ),
+                  label: Text(
+                    isExpanded
+                        ? 'Show less'
+                        : faults.length > collapsedFaultLimit
+                            ? '+${faults.length - collapsedFaultLimit} more — '
+                                'tap to expand'
+                            : 'View operator notes',
+                  ),
+                ),
+              const SizedBox(height: 6),
+              const Divider(height: 1, color: border),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Tooltip(
+                      message: 'New PMCS on this vehicle',
+                      child: OutlinedButton.icon(
+                        onPressed: startingPmcsId != null
+                            ? null
+                            : () => startNewPmcs(report),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: textPrimary,
+                          disabledForegroundColor: textSecondary,
+                          backgroundColor: greenGlow,
+                          side: BorderSide(color: masterChiefGreen),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                          minimumSize: const Size(0, minTouchTarget),
+                        ),
+                        icon: startingPmcsId == report.entityId
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: textSecondary,
+                                ),
+                              )
+                            : const Icon(Icons.add_task, size: 18),
+                        label: Text(startingPmcsId == report.entityId
+                            ? 'Starting PMCS…'
+                            : 'New PMCS'),
+                      ),
                     ),
                   ),
-              ],
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: startingPmcsId != null
+                        ? null
+                        : () => confirmDelete(report),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    tooltip: 'Delete',
+                    constraints: const BoxConstraints(
+                      minWidth: minTouchTarget,
+                      minHeight: minTouchTarget,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -349,8 +555,10 @@ class ReportsPageState extends State<ReportsPage> {
               ),
           ],
           selected: {selectedTab},
-          onSelectionChanged: (selection) =>
-              setState(() => selectedTab = selection.first),
+          onSelectionChanged: (selection) => setState(() {
+            selectedTab = selection.first;
+            selectedVehicle = null;
+          }),
         ),
       ),
     );
@@ -385,10 +593,12 @@ class ReportsPageState extends State<ReportsPage> {
   Widget buildBumperHeader(String bumperNumber, int count) {
     return Padding(
       padding: const EdgeInsets.only(top: 14, bottom: 2),
-      child: Row(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           SectionLabel(text: bumperNumber),
-          const SizedBox(width: 8),
           Text(
             count == 1 ? '1 PMCS' : '$count PMCS',
             style: const TextStyle(color: textSecondary, fontSize: 10),
@@ -399,16 +609,137 @@ class ReportsPageState extends State<ReportsPage> {
   }
 
   List<Widget> buildGroupedReports(
-    Map<String, List<PmcsReport>> groups,
+    Map<ReportVehicleKey, List<PmcsReport>> groups,
     String emptyMessage,
   ) {
     if (groups.isEmpty) return [buildEmptyLine(emptyMessage)];
     return [
-      for (final entry in groups.entries) ...[
-        buildBumperHeader(entry.key, entry.value.length),
-        for (final report in entry.value) buildReportCard(report),
-      ],
+      for (final entry in groups.entries)
+        buildVehicleCard(entry.key, entry.value),
     ];
+  }
+
+  Widget buildVehicleCard(ReportVehicleKey vehicle, List<PmcsReport> reports) {
+    final latest = reports.first;
+    final unread = reports.where((r) => !r.isOutgoing && !r.isRead).length;
+    final worst = latest.worstSeverity;
+    final accent = worst == null ? serviceableGreen : severityColor(worst);
+    return Card(
+      key: ValueKey(vehicle),
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: unread > 0 ? accent : border),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => setState(() => selectedVehicle = vehicle),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    worst == null
+                        ? Icons.check_circle_outline
+                        : severityIcon(worst),
+                    color: accent,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${vehicle.bumperNumber} - ${latest.vehicleType.displayName}',
+                          style: const TextStyle(
+                            color: textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text('UIC ${vehicle.uic}',
+                            style: const TextStyle(
+                                color: textSecondary, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: textSecondary),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                children: [
+                  Text('${reports.length} PMCS',
+                      style: const TextStyle(color: textPrimary, fontSize: 12)),
+                  Text('Latest ${relativeAge(latest.timestamp)}',
+                      style:
+                          const TextStyle(color: textSecondary, fontSize: 12)),
+                  if (unread > 0)
+                    Text('$unread unread',
+                        style:
+                            const TextStyle(color: circleXAmber, fontSize: 12)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('Latest report: ${latest.statusLabel}',
+                  style: TextStyle(color: accent, fontSize: 12)),
+              if (!latest.tally.isEmpty) ...[
+                const SizedBox(height: 6),
+                FaultTallyBar(tally: latest.tally),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<PmcsReport> get vehicleHistory {
+    final source = selectedTab == ReportsTab.yours
+        ? viewModel.yourReports
+        : viewModel.externalReports;
+    return viewModel.groupByVehicle(source)[selectedVehicle] ?? const [];
+  }
+
+  Widget buildHistoryHeader(ReportVehicleKey vehicle, int count) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () => setState(() => selectedVehicle = null),
+            tooltip: 'Back to vehicles',
+            icon: const Icon(Icons.arrow_back),
+            constraints: const BoxConstraints(
+              minWidth: minTouchTarget,
+              minHeight: minTouchTarget,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(vehicle.bumperNumber,
+                    style: const TextStyle(
+                        color: textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700)),
+                Text('UIC ${vehicle.uic} · $count PMCS',
+                    style: const TextStyle(color: textSecondary, fontSize: 12)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// A parked submission. Deliberately not a report card: this one has not
@@ -473,16 +804,20 @@ class ReportsPageState extends State<ReportsPage> {
   }
 
   List<Widget> buildTabBody() {
+    final emptyMessage =
+        hasVehicleFilters ? 'No vehicles match your search or filters.' : null;
     return switch (selectedTab) {
       ReportsTab.yours => buildGroupedReports(
-          viewModel.groupByBumperNumber(viewModel.yourReports),
-          'No PMCS submitted from this device yet',
+          filteredGroups(viewModel.yourReports),
+          emptyMessage ?? 'No PMCS submitted from this device yet',
         ),
       ReportsTab.unit => [
-          ...buildGroupedReports(
-            viewModel.groupByBumperNumber(viewModel.unitReports),
-            'No PMCS from other crews in your unit yet',
-          ),
+          if (filteredGroups(viewModel.unitReports).isNotEmpty ||
+              filteredGroups(viewModel.otherUnitReports).isEmpty)
+            ...buildGroupedReports(
+              filteredGroups(viewModel.unitReports),
+              emptyMessage ?? 'No PMCS from other crews in your unit yet',
+            ),
           ...buildOtherUnits(),
         ],
       ReportsTab.queued => buildQueuedList(),
@@ -492,17 +827,15 @@ class ReportsPageState extends State<ReportsPage> {
   /// PMCS from outside your UIC. They do not belong to this tab, but they are
   /// not dropped either — an attached vehicle can still be deadlined.
   List<Widget> buildOtherUnits() {
-    final others = viewModel.groupByBumperNumber(viewModel.otherUnitReports);
+    final others = filteredGroups(viewModel.otherUnitReports);
     if (others.isEmpty) return const [];
     return [
       const Padding(
         padding: EdgeInsets.only(top: 22, bottom: 2),
         child: SectionLabel(text: 'OTHER UNITS'),
       ),
-      for (final entry in others.entries) ...[
-        buildBumperHeader(entry.key, entry.value.length),
-        for (final report in entry.value) buildReportCard(report),
-      ],
+      for (final entry in others.entries)
+        buildVehicleCard(entry.key, entry.value),
     ];
   }
 
@@ -511,24 +844,42 @@ class ReportsPageState extends State<ReportsPage> {
     return ListenableBuilder(
       listenable: viewModel,
       builder: (context, _) {
+        final vehicle = selectedVehicle;
+        final history = vehicle == null ? const <PmcsReport>[] : vehicleHistory;
         return Column(
           children: [
             // The banner stays above the switch: a parked submission is worth
             // knowing about from whichever tab you are standing on.
             buildQueueBanner(),
             buildTabBar(),
+            if (vehicle != null) buildHistoryHeader(vehicle, history.length),
             Expanded(
               child: RefreshIndicator(
                 color: masterChiefGreen,
                 backgroundColor: surface,
                 onRefresh: viewModel.syncRemoteLatticeReports,
                 child: ListView(
+                  key: PageStorageKey((selectedTab, vehicle)),
                   // Always scrollable so pull-to-refresh still reaches a
                   // maintainer holding an empty list after a comms blackout.
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  children: buildTabBody(),
+                  children: vehicle == null
+                      ? [
+                          if (selectedTab != ReportsTab.queued)
+                            buildVehicleFilters(),
+                          ...buildTabBody(),
+                        ]
+                      : history.isEmpty
+                          ? [
+                              buildEmptyLine(
+                                  'No PMCS reports remain for this vehicle.')
+                            ]
+                          : [
+                              for (final (index, report) in history.indexed)
+                                buildReportCard(report, isLatest: index == 0),
+                            ],
                 ),
               ),
             ),

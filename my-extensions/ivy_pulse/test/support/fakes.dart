@@ -311,6 +311,7 @@ class FakeFaultClassifier implements FaultClassifierStrategy {
 
 class FakePmcsEntityPort implements PmcsEntityPort {
   bool publishSucceeds = true;
+  Completer<bool>? publishGate;
   bool deleteSucceeds = true;
   final List<PmcsReport> published = [];
   final List<String> publishedPayloads = [];
@@ -319,6 +320,7 @@ class FakePmcsEntityPort implements PmcsEntityPort {
   @override
   Future<bool> publishPmcsReport(PmcsReport report) async {
     published.add(report);
+    if (publishGate != null) return publishGate!.future;
     return publishSucceeds;
   }
 
@@ -562,6 +564,9 @@ QueuedSubmission buildQueuedSubmission({
 /// report stops landing under NOT MISSION CAPABLE.
 class FakeReportsViewModel extends ChangeNotifier implements ReportsViewModel {
   @override
+  final ValueNotifier<PmcsReport?> reportToOpen = ValueNotifier(null);
+
+  @override
   final List<PmcsReport> reports = [];
 
   @override
@@ -602,24 +607,31 @@ class FakeReportsViewModel extends ChangeNotifier implements ReportsViewModel {
       myUic.isEmpty || report.uic.trim().toUpperCase() == myUic;
 
   @override
-  List<PmcsReport> get unitReports => externalReports.where(isSameUnit).toList();
+  List<PmcsReport> get unitReports =>
+      externalReports.where(isSameUnit).toList();
 
   @override
   List<PmcsReport> get otherUnitReports =>
       externalReports.where((r) => !isSameUnit(r)).toList();
 
   @override
-  Map<String, List<PmcsReport>> groupByBumperNumber(List<PmcsReport> source) {
-    final groups = <String, List<PmcsReport>>{};
+  Map<ReportVehicleKey, List<PmcsReport>> groupByVehicle(
+      List<PmcsReport> source) {
+    final groups = <ReportVehicleKey, List<PmcsReport>>{};
     for (final report in source) {
-      groups
-          .putIfAbsent(report.bumperNumber.trim().toUpperCase(), () => [])
-          .add(report);
+      groups.putIfAbsent((
+        bumperNumber: report.bumperNumber.trim().toUpperCase(),
+        uic: report.uic.trim().toUpperCase(),
+      ), () => []).add(report);
     }
     for (final list in groups.values) {
       list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     }
-    final keys = groups.keys.toList()..sort();
+    final keys = groups.keys.toList()
+      ..sort((a, b) {
+        final bumperOrder = a.bumperNumber.compareTo(b.bumperNumber);
+        return bumperOrder != 0 ? bumperOrder : a.uic.compareTo(b.uic);
+      });
     return {for (final key in keys) key: groups[key]!};
   }
 
@@ -662,6 +674,11 @@ class FakeReportsViewModel extends ChangeNotifier implements ReportsViewModel {
   @override
   Future<void> markReportAsRead(PmcsReport report) async {
     markedRead.add(report);
+    final index = reports.indexOf(report);
+    if (index < 0 || report.isRead) return;
+    reports[index] = report.copyWith(isRead: true);
+    unreadCount.value = reports.where((r) => !r.isOutgoing && !r.isRead).length;
+    notifyListeners();
   }
 
   @override

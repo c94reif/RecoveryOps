@@ -5,6 +5,7 @@ import 'package:ivy_pulse/presentation/inspection/inspection_view_model.dart';
 import 'package:ivy_pulse/presentation/inspection/phase_select_page.dart';
 import 'package:ivy_pulse/presentation/inspection/setup_page.dart';
 import 'package:ivy_pulse/presentation/inspection/summary_page.dart';
+import 'package:ivy_pulse/presentation/inspection/submission_result_page.dart';
 
 /// Routes the PMCS tab to whichever screen the current walk-around is on.
 /// The stage lives on the view model rather than the Navigator so the tab can
@@ -35,6 +36,7 @@ class InspectionFlowPageState extends State<InspectionFlowPage> {
         InspectionStage.phaseSelect => const PhaseSelectPage(),
         InspectionStage.inspecting => const InspectionPage(),
         InspectionStage.summary => const SummaryPage(),
+        InspectionStage.submitted => const SubmissionResultPage(),
       },
     );
   }

@@ -83,8 +83,12 @@ class PhaseSelectPageState extends State<PhaseSelectPage> {
               ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: discard,
-              child: const Text('DISCARD SESSION'),
+              onPressed: viewModel.isBusy ? null : discard,
+              style: TextButton.styleFrom(
+                foregroundColor: textSecondary,
+                minimumSize: const Size(0, minTouchTarget),
+              ),
+              child: const Text('Discard session'),
             ),
           ],
         );
@@ -94,6 +98,15 @@ class PhaseSelectPageState extends State<PhaseSelectPage> {
 
   Widget buildPhaseCard(PmcsPhase phase, bool isComplete) {
     final itemCount = viewModel.catalog?.itemCountFor(phase) ?? 0;
+    final answered = viewModel.answeredCountFor(phase);
+    final status = isComplete
+        ? 'COMPLETE'
+        : answered > 0
+            ? 'IN PROGRESS'
+            : 'NOT STARTED';
+    final progress = isComplete || answered > 0
+        ? '${isComplete ? itemCount : answered} of $itemCount complete'
+        : '$itemCount ${itemCount == 1 ? 'check' : 'checks'}';
     final accent = isComplete ? serviceableGreen : masterChiefGreen;
 
     return Card(
@@ -106,7 +119,7 @@ class PhaseSelectPageState extends State<PhaseSelectPage> {
         children: [
           InkWell(
             borderRadius: BorderRadius.circular(8),
-            onTap: () => viewModel.openPhase(phase),
+            onTap: viewModel.isBusy ? null : () => viewModel.openPhase(phase),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               child: Row(
@@ -126,35 +139,31 @@ class PhaseSelectPageState extends State<PhaseSelectPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '$itemCount ${itemCount == 1 ? 'check' : 'checks'}',
+                          progress,
                           style: const TextStyle(
                             color: textSecondary,
                             fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          status,
+                          style: TextStyle(
+                            color:
+                                isComplete ? serviceableGreen : textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ],
                     ),
                   ),
                   if (isComplete)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.check_circle,
-                          color: serviceableGreen,
-                          size: 22,
-                        ),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'COMPLETE',
-                          style: TextStyle(
-                            color: serviceableGreen,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                      ],
+                    const Icon(
+                      Icons.check_circle,
+                      color: serviceableGreen,
+                      size: 22,
                     )
                   else
                     Icon(Icons.chevron_right, color: accent, size: 24),

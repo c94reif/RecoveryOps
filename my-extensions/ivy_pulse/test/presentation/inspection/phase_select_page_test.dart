@@ -94,6 +94,7 @@ void main() {
       // BEFORE carries both brake checks; DURING and AFTER carry one each.
       expect(find.text('2 checks'), findsOneWidget);
       expect(find.text('1 check'), findsNWidgets(2));
+      expect(find.text('NOT STARTED'), findsNWidgets(3));
     });
 
     testWidgets('a phase the catalog has nothing for reads as zero checks',
@@ -117,6 +118,67 @@ void main() {
       expect(harness.viewModel.stage, InspectionStage.inspecting);
       expect(harness.viewModel.activePhase, PmcsPhase.during);
       expect(harness.viewModel.totalCount, 1);
+    });
+  });
+
+  group('saved phase progress', () {
+    testWidgets('returning to phases shows answers without closing the phase',
+        (tester) async {
+      await harness.beginPhase(PmcsPhase.before);
+      await harness.viewModel.answer(brakeFluid, 1);
+      harness.viewModel.backToPhases();
+      await pumpPage(tester);
+
+      expect(find.text('1 of 2 complete'), findsOneWidget);
+      expect(find.text('IN PROGRESS'), findsOneWidget);
+      expect(find.text('NOT STARTED'), findsNWidgets(2));
+
+      await harness.viewModel.openPhase(PmcsPhase.before);
+      await harness.viewModel.answer(parkingBrake, 0);
+      harness.viewModel.backToPhases();
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 of 2 complete'), findsOneWidget);
+      expect(find.text('IN PROGRESS'), findsOneWidget);
+      expect(find.text('COMPLETE'), findsNothing);
+
+      await harness.viewModel.openPhase(PmcsPhase.before);
+      await harness.viewModel.completeActivePhase();
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 of 2 complete'), findsOneWidget);
+      expect(find.text('COMPLETE'), findsOneWidget);
+      expect(find.text('IN PROGRESS'), findsNothing);
+    });
+
+    testWidgets('resuming restores progress across multiple unfinished phases',
+        (tester) async {
+      await harness.beginPhase(PmcsPhase.before);
+      await harness.viewModel.answer(brakeFluid, 0);
+      await harness.viewModel.openPhase(PmcsPhase.during);
+      await harness.viewModel.answer(tirePressure, 1);
+      final session = harness.viewModel.session!;
+      await harness.viewModel.resetToSetup();
+      await harness.viewModel.resumeSession(session);
+      await pumpPage(tester);
+
+      expect(find.text('1 of 2 complete'), findsOneWidget);
+      expect(find.text('1 of 1 complete'), findsOneWidget);
+      expect(find.text('IN PROGRESS'), findsNWidgets(2));
+      expect(find.text('NOT STARTED'), findsOneWidget);
+    });
+
+    testWidgets('discarding a session clears progress for the next vehicle',
+        (tester) async {
+      await harness.beginPhase(PmcsPhase.before);
+      await harness.viewModel.answer(brakeFluid, 0);
+      await harness.viewModel.discardSession();
+      await harness.viewModel.beginSession(bumperNumber: 'B-22', uic: 'WAB4C0');
+      await pumpPage(tester);
+
+      expect(find.text('NOT STARTED'), findsNWidgets(3));
+      expect(find.text('IN PROGRESS'), findsNothing);
+      expect(find.text('2 checks'), findsOneWidget);
     });
   });
 
@@ -246,7 +308,7 @@ void main() {
       await harness.begin();
       await pumpPage(tester);
 
-      await tester.tap(find.text('DISCARD SESSION'));
+      await tester.tap(find.text('Discard session'));
       await tester.pumpAndSettle();
 
       expect(find.text('Discard PMCS?'), findsOneWidget);
@@ -258,7 +320,7 @@ void main() {
       await harness.begin();
       await pumpPage(tester);
 
-      await tester.tap(find.text('DISCARD SESSION'));
+      await tester.tap(find.text('Discard session'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
@@ -273,7 +335,7 @@ void main() {
       await harness.begin();
       await pumpPage(tester);
 
-      await tester.tap(find.text('DISCARD SESSION'));
+      await tester.tap(find.text('Discard session'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('DISCARD'));
       await tester.pumpAndSettle();

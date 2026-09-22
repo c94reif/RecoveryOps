@@ -20,6 +20,9 @@ import 'package:ivy_pulse/presentation/common/widgets/custom_snack_bar.dart';
 export 'package:ivy_pulse/domain/entities/pmcs_report.dart';
 export 'package:ivy_pulse/domain/entities/queued_submission.dart';
 
+/// Bumper numbers are only unique within a unit.
+typedef ReportVehicleKey = ({String bumperNumber, String uic});
+
 /// The three views a maintainer flips between on the Reports tab.
 enum ReportsTab {
   /// PMCS this device submitted.
@@ -67,6 +70,7 @@ class ReportsViewModel extends ChangeNotifier {
 
   final List<PmcsReport> reports = [];
   final ValueNotifier<int> unreadCount = ValueNotifier(0);
+  final ValueNotifier<PmcsReport?> reportToOpen = ValueNotifier(null);
 
   /// Submissions still parked because a transport was down. Surfaced so a
   /// Soldier never walks away believing a fault reached the maintainer.
@@ -313,19 +317,25 @@ class ReportsViewModel extends ChangeNotifier {
   List<PmcsReport> get otherUnitReports =>
       externalReports.where((r) => !isSameUnit(r)).toList();
 
-  /// One entry per vehicle, keyed by bumper number, each holding that
-  /// vehicle's PMCS newest first. Vehicles come out in bumper-number order so
-  /// a maintainer looking for one can run down the list.
-  Map<String, List<PmcsReport>> groupByBumperNumber(List<PmcsReport> source) {
-    final groups = <String, List<PmcsReport>>{};
+  /// One entry per bumper number and UIC, holding its PMCS newest first.
+  Map<ReportVehicleKey, List<PmcsReport>> groupByVehicle(
+      List<PmcsReport> source) {
+    final groups = <ReportVehicleKey, List<PmcsReport>>{};
     for (final report in source) {
-      final bumper = report.bumperNumber.trim().toUpperCase();
-      groups.putIfAbsent(bumper, () => []).add(report);
+      final vehicle = (
+        bumperNumber: report.bumperNumber.trim().toUpperCase(),
+        uic: report.uic.trim().toUpperCase(),
+      );
+      groups.putIfAbsent(vehicle, () => []).add(report);
     }
     for (final list in groups.values) {
       list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     }
-    final keys = groups.keys.toList()..sort();
+    final keys = groups.keys.toList()
+      ..sort((a, b) {
+        final bumperOrder = a.bumperNumber.compareTo(b.bumperNumber);
+        return bumperOrder != 0 ? bumperOrder : a.uic.compareTo(b.uic);
+      });
     return {for (final key in keys) key: groups[key]!};
   }
 
@@ -379,6 +389,7 @@ class ReportsViewModel extends ChangeNotifier {
     sub?.cancel();
     unreadCount.dispose();
     queuedCount.dispose();
+    reportToOpen.dispose();
     super.dispose();
   }
 }

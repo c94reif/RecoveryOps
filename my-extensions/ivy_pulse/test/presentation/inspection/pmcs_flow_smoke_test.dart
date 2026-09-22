@@ -294,7 +294,8 @@ void main() {
         (tester) async {
       await pumpPanel(tester);
 
-      final listHeight = tester.getSize(find.byType(ListView)).height;
+      final listHeight =
+          tester.getSize(find.byType(SingleChildScrollView)).height;
 
       expect(listHeight / panel.height, greaterThan(0.7),
           reason: 'header plus any bottom bar should cost under 30% of the '
@@ -393,6 +394,28 @@ void main() {
           reason: 'the TM instruction is scrolled off the top');
       expect(tester.getRect(lastOption).bottom, lessThanOrEqualTo(panel.height),
           reason: 'the last condition hangs off the bottom of the panel');
+    });
+
+    testWidgets(
+        'resuming a phase scrolls to an unanswered check far down the list',
+        (tester) async {
+      await pumpPanel(tester);
+      final viewModel = getIt<InspectionViewModel>();
+      for (final item in viewModel.phaseItems.take(20).toList()) {
+        await viewModel.answer(item, 0);
+      }
+      viewModel.backToPhases();
+      await tester.pumpAndSettle();
+      await viewModel.openPhase(PmcsPhase.before);
+      await tester.pumpAndSettle();
+
+      expect(viewModel.answeredCount, 20);
+      final open = expandedCard(tester);
+      expect(open.item.id, viewModel.nextUnansweredItemId);
+      final instruction = tester.getRect(find.text(open.item.check));
+      expect(instruction.top, greaterThanOrEqualTo(0));
+      expect(instruction.bottom, lessThan(panel.height));
+      expect(tester.takeException(), isNull);
     });
   });
 }

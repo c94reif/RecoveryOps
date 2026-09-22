@@ -21,6 +21,8 @@ class CheckItemCard extends StatelessWidget {
   final VoidCallback onExpand;
   final VoidCallback onCollapse;
   final VoidCallback onDictateNote;
+  final VoidCallback? onEditNote;
+  final bool enabled;
 
   const CheckItemCard({
     super.key,
@@ -33,6 +35,8 @@ class CheckItemCard extends StatelessWidget {
     required this.onExpand,
     required this.onCollapse,
     required this.onDictateNote,
+    this.onEditNote,
+    this.enabled = true,
   });
 
   static const Color recordingRed = Color(0xFFE53935);
@@ -61,9 +65,10 @@ class CheckItemCard extends StatelessWidget {
 
   Widget buildCollapsed(BuildContext context) {
     final answer = result;
+    if (answer != null && answer.isFault) return buildCollapsedFault(answer);
     return InkWell(
       borderRadius: BorderRadius.circular(8),
-      onTap: onExpand,
+      onTap: enabled ? onExpand : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         child: ConstrainedBox(
@@ -83,7 +88,7 @@ class CheckItemCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              if (answer != null) buildCollapsedAnswer(answer),
+              if (answer != null) buildServiceableAnswer(),
             ],
           ),
         ),
@@ -91,34 +96,74 @@ class CheckItemCard extends StatelessWidget {
     );
   }
 
-  Widget buildCollapsedAnswer(CheckResult answer) {
-    final severity = answer.severity;
-    if (severity == null) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.check_circle, color: serviceableGreen, size: 20),
-          const SizedBox(width: 6),
-          Text('OK', style: okStyle),
-        ],
-      );
-    }
+  Widget buildCollapsedFault(CheckResult answer) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: enabled ? onExpand : null,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: minTouchTarget),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.id, style: idStyle),
+                        Text(item.item,
+                            style: const TextStyle(
+                                color: textPrimary, fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                if (answer.severity case final severity?) ...[
+                  SeverityBadge(severity: severity),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: Text(answer.faultLabel,
+                      style: const TextStyle(color: textPrimary, fontSize: 12)),
+                ),
+              ],
+            ),
+            if (onEditNote != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: enabled ? onEditNote : null,
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, minTouchTarget),
+                  ),
+                  icon: const Icon(Icons.edit_note, size: 20),
+                  label: Text(noteActionLabel(answer)),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
+  String noteActionLabel(CheckResult answer) =>
+      answer.note?.isNotEmpty == true ? 'Edit description' : 'Add description';
+
+  Widget buildServiceableAnswer() {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SeverityBadge(severity: severity),
-        const SizedBox(width: 8),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 110),
-          child: Text(
-            answer.faultLabel,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.end,
-            style: TextStyle(color: severityColor(severity), fontSize: 12),
-          ),
-        ),
+        const Icon(Icons.check_circle, color: serviceableGreen, size: 20),
+        const SizedBox(width: 6),
+        Text('OK', style: okStyle),
       ],
     );
   }
@@ -132,7 +177,7 @@ class CheckItemCard extends StatelessWidget {
       children: [
         InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: answer == null ? null : onCollapse,
+          onTap: answer == null || !enabled ? null : onCollapse,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
             child: Column(
@@ -245,7 +290,7 @@ class CheckItemCard extends StatelessWidget {
       width: double.infinity,
       height: faultButtonHeight,
       child: OutlinedButton.icon(
-        onPressed: () => onAnswer(0),
+        onPressed: enabled ? () => onAnswer(0) : null,
         icon: Icon(
           isSelected ? Icons.check_circle : Icons.check_circle_outline,
           size: 20,
@@ -315,7 +360,7 @@ class CheckItemCard extends StatelessWidget {
     return SizedBox(
       height: faultButtonHeight,
       child: OutlinedButton(
-        onPressed: () => onAnswer(faultIndex),
+        onPressed: enabled ? () => onAnswer(faultIndex) : null,
         style: OutlinedButton.styleFrom(
           foregroundColor: color,
           backgroundColor: isSelected ? color.withAlpha(70) : glow,
@@ -362,7 +407,9 @@ class CheckItemCard extends StatelessWidget {
         buildMicButton(),
         Expanded(
           child: Text(
-            note == null || note.isEmpty ? 'Tap to dictate a note' : note,
+            note == null || note.isEmpty
+                ? 'Optional description · up to 155 characters'
+                : note,
             style: TextStyle(
               color: note == null || note.isEmpty ? textSecondary : textPrimary,
               fontSize: 12,
@@ -372,13 +419,23 @@ class CheckItemCard extends StatelessWidget {
             ),
           ),
         ),
+        if (onEditNote != null)
+          IconButton(
+            onPressed: enabled ? onEditNote : null,
+            tooltip: noteActionLabel(answer),
+            icon: const Icon(Icons.edit_note),
+            constraints: const BoxConstraints(
+              minWidth: minTouchTarget,
+              minHeight: minTouchTarget,
+            ),
+          ),
       ],
     );
   }
 
   Widget buildMicButton() {
     return IconButton(
-      onPressed: onDictateNote,
+      onPressed: enabled ? onDictateNote : null,
       icon: Icon(
         isDictating ? Icons.mic : Icons.mic_none,
         color: isDictating ? recordingRed : masterChiefGreen,

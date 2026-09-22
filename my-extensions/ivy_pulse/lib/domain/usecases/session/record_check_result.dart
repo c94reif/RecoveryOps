@@ -1,4 +1,5 @@
 import 'package:ivy_pulse/domain/entities/check_result.dart';
+import 'package:ivy_pulse/domain/entities/fault_description.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_check_item.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
 import 'package:ivy_pulse/domain/repositories/results_repo.dart';
@@ -31,7 +32,7 @@ class RecordCheckResult {
       faultIndex: faultIndex,
       faultLabel: item.labelAt(faultIndex),
       severity: classifier.classify(itemId: item.id, faultIndex: faultIndex),
-      note: note,
+      note: faultIndex == 0 ? null : normalizeFaultDescription(note),
       recordedAt: clock.nowUtc(),
     );
 

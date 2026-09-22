@@ -508,8 +508,7 @@ void main() {
       expect(viewModel.yourReports.single.id, 2);
     });
 
-    test('brings the queue along, for a submission that was parked',
-        () async {
+    test('brings the queue along, for a submission that was parked', () async {
       await start();
       queuedRepository.submissions.add(buildQueuedSubmission(id: 1));
       queueWorker.pending = 1;
@@ -580,7 +579,35 @@ void main() {
     });
   });
 
-  group('grouping by bumper number', () {
+  group('grouping by bumper number and UIC', () {
+    test(
+        'matching normalized identities merge, but different UICs stay separate',
+        () async {
+      repository.reports.addAll([
+        buildReport(
+            entityId: 'alpha-old',
+            bumperNumber: ' a-11 ',
+            uic: ' wj8taa ',
+            timestamp: DateTime.utc(2026, 3, 24, 6)),
+        buildReport(
+            entityId: 'alpha-new',
+            bumperNumber: 'A-11',
+            uic: 'WJ8TAA',
+            timestamp: DateTime.utc(2026, 3, 24, 9)),
+        buildReport(entityId: 'bravo', bumperNumber: 'A-11', uic: 'WBBBBB'),
+      ]);
+      await start();
+
+      final groups = viewModel.groupByVehicle(viewModel.yourReports);
+      expect(groups, hasLength(2));
+      expect(
+          groups[(bumperNumber: 'A-11', uic: 'WJ8TAA')]!.map((r) => r.entityId),
+          ['alpha-new', 'alpha-old']);
+      expect(
+          groups[(bumperNumber: 'A-11', uic: 'WBBBBB')]!.map((r) => r.entityId),
+          ['bravo']);
+    });
+
     test('a vehicle walked twice comes back as one entry, newest first',
         () async {
       repository.reports.addAll([
@@ -601,10 +628,12 @@ void main() {
       ]);
       await start();
 
-      final groups = viewModel.groupByBumperNumber(viewModel.yourReports);
+      final groups = viewModel.groupByVehicle(viewModel.yourReports);
 
-      expect(groups.keys, ['A-11']);
-      expect(groups['A-11']!.map((r) => r.entityId), ['newer', 'older']);
+      expect(groups.keys, [(bumperNumber: 'A-11', uic: 'WJ8TAA')]);
+      expect(
+          groups[(bumperNumber: 'A-11', uic: 'WJ8TAA')]!.map((r) => r.entityId),
+          ['newer', 'older']);
     });
 
     test('vehicles come out in bumper-number order', () async {
@@ -624,9 +653,12 @@ void main() {
       ]);
       await start();
 
-      final groups = viewModel.groupByBumperNumber(viewModel.yourReports);
+      final groups = viewModel.groupByVehicle(viewModel.yourReports);
 
-      expect(groups.keys.toList(), ['A-11', 'C-33']);
+      expect(groups.keys.toList(), [
+        (bumperNumber: 'A-11', uic: 'WJ8TAA'),
+        (bumperNumber: 'C-33', uic: 'WJ8TAA'),
+      ]);
     });
   });
 

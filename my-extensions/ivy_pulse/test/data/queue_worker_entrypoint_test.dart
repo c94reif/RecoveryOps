@@ -93,6 +93,30 @@ void main() {
   });
 
   group('resuming a backlog', () {
+    test('a probe retries a down leg with its oldest parked submission',
+        () async {
+      toWorker.send(mainHello([
+        submission(id: 1, payload: 'encoded:oldest'),
+        submission(id: 2, payload: 'encoded:newer'),
+      ]));
+      toWorker.send(mainOutcome(transport: 'lattice', success: false));
+      await pump();
+      expect(executes(), isEmpty);
+
+      toWorker.send(mainProbe());
+      await pump();
+
+      expect(idsOf(executes()), [1]);
+      expect((executes().single['submission']! as Map)['payload'],
+          'encoded:oldest');
+      expect(prompts(), isEmpty);
+
+      // A second probe must not send the same report while it is in flight.
+      toWorker.send(mainProbe());
+      await pump();
+      expect(idsOf(executes()), [1]);
+    });
+
     test('takes on the rows the main side read off disk', () async {
       toWorker.send(
         mainHello([submission(id: 1), submission(id: 2)]),
@@ -251,16 +275,12 @@ void main() {
       expect(idsOf(executes()), [1]);
     });
 
-    test('a probe retries a down leg with its oldest parked submission',
-        () async {
-      // Regression: a backlog restored at start-up used to sit untouched
-      // until the operator happened to submit another PMCS on the same leg.
+    test('a probe does not bypass an open confirmation prompt', () async {
       toWorker.send(mainProbe());
       await pump();
 
-      expect(idsOf(executes()), [1]);
-      // Probed, not prompted — the operator already chose to send this one.
-      expect(prompts().length, greaterThanOrEqualTo(1));
+      expect(executes(), isEmpty);
+      expect(idsOf(prompts()), [1]);
     });
 
     test('a deferred prompt unwinds the drain and leaves the row parked',

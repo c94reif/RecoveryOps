@@ -27,20 +27,63 @@ class HomePageState extends State<HomePage> {
   Color tabColor(int i) =>
       homeViewModel.pageIndex == i ? masterChiefGreen : textSecondary;
 
-  Widget tabIcon(int i, IconData icon) {
+  Widget buildTab(int i, IconData icon, String label, int unreadCount) {
+    final selected = homeViewModel.pageIndex == i;
     final color = tabColor(i);
-    final iconWidget = Icon(icon, size: 18, color: color);
-    if (i != 1) return iconWidget;
-    return ValueListenableBuilder<int>(
-      valueListenable: getIt<ReportsViewModel>().unreadCount,
-      builder: (_, count, child) {
-        if (count == 0) return child!;
-        return Badge(
-          label: Text('$count', style: const TextStyle(fontSize: 8)),
-          child: child,
-        );
-      },
-      child: iconWidget,
+    final iconWidget = Icon(icon, size: 20, color: color);
+    void select() {
+      FocusManager.instance.primaryFocus?.unfocus();
+      homeViewModel.selectTab(i);
+    }
+
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        value: i == 1 && unreadCount > 0 ? '$unreadCount unread' : null,
+        onTap: select,
+        excludeSemantics: true,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: selected ? greenGlow : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: InkWell(
+              onTap: select,
+              borderRadius: BorderRadius.circular(8),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: minTouchTarget),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (i == 1 && unreadCount > 0)
+                        Badge.count(count: unreadCount, child: iconWidget)
+                      else
+                        iconWidget,
+                      const SizedBox(height: 3),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: color,
+                          fontWeight:
+                              selected ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -64,47 +107,29 @@ class HomePageState extends State<HomePage> {
                     ],
                   ),
                 ),
-                Container(
+                Material(
                   color: bgDark,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      for (final (i, tab) in [
-                        (Icons.checklist_rtl, 'PMCS'),
-                        (Icons.assignment_late_outlined, 'Reports'),
-                        (Icons.person, 'Profile'),
-                      ].indexed)
-                        Expanded(
-                          // Gloved thumbs miss small targets, and a mistap here
-                          // can drop an operator out of an open inspection.
-                          child: SizedBox(
-                            height: minTouchTarget,
-                            child: GestureDetector(
-                              onTap: () {
-                                homeViewModel.selectTab(i);
-                              },
-                              behavior: HitTestBehavior.opaque,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  tabIcon(i, tab.$1),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    tab.$2,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: tabColor(i),
-                                      fontWeight: homeViewModel.pageIndex == i
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
+                      ),
+                      child: ValueListenableBuilder<int>(
+                        valueListenable: getIt<ReportsViewModel>().unreadCount,
+                        builder: (_, count, __) => Row(
+                          children: [
+                            for (final (i, tab) in [
+                              (Icons.checklist_rtl, 'PMCS'),
+                              (Icons.assignment_late_outlined, 'Reports'),
+                              (Icons.person, 'Profile'),
+                            ].indexed)
+                              buildTab(i, tab.$1, tab.$2, count),
+                          ],
                         ),
-                    ],
+                      ),
+                    ),
                   ),
                 ),
               ],

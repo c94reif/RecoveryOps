@@ -90,6 +90,47 @@ void main() {
   final unverifiedButton =
       find.widgetWithText(CustomButton, 'SUBMIT UNVERIFIED');
 
+  testWidgets(
+      'coverage distinguishes included, unfinished, and untouched phases',
+      (tester) async {
+    await harness.beginPhase(PmcsPhase.before);
+    await harness.viewModel.answer(brakeFluid, 0);
+    await harness.viewModel.answer(parkingBrake, 0);
+    await harness.viewModel.completeActivePhase();
+    await harness.viewModel.openPhase(PmcsPhase.during);
+    await harness.viewModel.answer(tirePressure, 1);
+    harness.viewModel.backToPhases();
+    harness.viewModel.openSummary();
+    await pumpPage(tester);
+
+    expect(find.text('Before Operations · Complete'), findsOneWidget);
+    expect(find.text('During Operations · Unfinished (1 of 1 checks)'),
+        findsOneWidget);
+    expect(find.text('After Operations · Not started'), findsOneWidget);
+    expect(find.text('Only completed phases are included in this report.'),
+        findsOneWidget);
+  });
+
+  testWidgets(
+      'a summary fault opens the matching check with its saved description',
+      (tester) async {
+    await harness.beginPhase(PmcsPhase.before);
+    await harness.viewModel.answer(brakeFluid, 3);
+    await harness.viewModel.saveNote(brakeFluid, 'Crack below reservoir');
+    await harness.viewModel.answer(parkingBrake, 0);
+    await harness.viewModel.completeActivePhase();
+    harness.viewModel.openSummary();
+    await pumpPage(tester);
+
+    await tester.tap(find.text('Review check'));
+    await tester.pumpAndSettle();
+    expect(harness.viewModel.stage, InspectionStage.inspecting);
+    expect(harness.viewModel.expandedItemId, brakeFluid.id);
+    expect(harness.viewModel.results[brakeFluid.id]!.note,
+        'Crack below reservoir');
+    expect(harness.viewModel.results[parkingBrake.id]!.isServiceable, isTrue);
+  });
+
   group('the overall status', () {
     testWidgets('reads NMC when a RED X is on the vehicle', (tester) async {
       await walkPmcs(faults: [deferrable, restricting, deadlining]);
@@ -357,7 +398,7 @@ void main() {
       final report = harness.reports.reports.single;
       expect(report.isSignatureVerified, isFalse);
       expect(report.signature!.blockedBy, CacRejection.noCamera);
-      expect(harness.viewModel.stage, InspectionStage.setup);
+      expect(harness.viewModel.stage, InspectionStage.submitted);
     });
 
     testWidgets('RESCAN throws the first read away', (tester) async {
@@ -398,7 +439,7 @@ void main() {
       expect(harness.reports.reports.single.operator, 'SGT SMITH, JOHN A');
       expect(harness.reports.reports.single.isSignatureVerified, isTrue);
       expect(harness.viewModel.session, isNull);
-      expect(harness.viewModel.stage, InspectionStage.setup);
+      expect(harness.viewModel.stage, InspectionStage.submitted);
     });
 
     testWidgets('the report goes out on Lattice and the mesh together',
@@ -429,7 +470,7 @@ void main() {
       // Stored locally first, so the PMCS is never lost with the net.
       expect(harness.reports.reports, hasLength(1));
       expect(harness.queueWorker.enqueued, hasLength(2));
-      expect(harness.viewModel.stage, InspectionStage.setup);
+      expect(harness.viewModel.stage, InspectionStage.submitted);
     });
 
     testWidgets('back to phases leaves the walk-around unsubmitted',

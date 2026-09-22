@@ -33,10 +33,26 @@ two independent transports.
   "Not Mission Capable If" are treated as critical systems.
 - **Nothing is lost.** Every answer is written to SQLite on tap. Kill the app, hand the
   EUD off, lose power — the walk-around resumes exactly where it stopped.
+- **Phase progress at a glance.** Phase cards show saved check counts and distinguish
+  not started, in progress, and complete, including after resuming a session.
 - **Nothing blocks on the net.** Submission is stored locally first, then pushed on
   Lattice and the mesh in parallel. Either leg failing parks its own copy on a queue that
   drains when that transport comes back, asking before it sends.
-- **Voice notes.** A faulted check can take a dictated note — no typing in gloves.
+- **Optional fault descriptions.** Add, edit, remove, or dictate up to 155 characters
+  on a faulted check. The description is saved with the fault and included in both
+  Lattice and mesh messages, including queued retries. A failed save keeps the draft.
+- **Review before signing.** The summary identifies complete, unfinished, and untouched
+  phases. Tap a fault to review its check and description, then return to the summary.
+- **A saved-report receipt.** Submission shows local save confirmation and delivery
+  status, with a View report action, without waiting for the network.
+- **One report entry per vehicle.** Reports with the same bumper number and UIC
+  share a vehicle card showing the latest report's status. Open the card to see
+  the individual PMCS reports, newest first, with their notes and signatures.
+- **Find a vehicle quickly.** Search bumper numbers or UICs, filter vehicles whose latest
+  report has faults, and filter received vehicles with unread reports.
+- **Start again from a report.** New PMCS reuses the vehicle platform, bumper number,
+  and UIC and opens phase selection. A starting indicator stays visible while the
+  session saves; an existing inspection offers Continue PMCS to return to that work.
 - **Signed by the Soldier who walked it.** Submitting is gated behind a CAC scan. The
   PDF417 on the front of the card decodes to a name, rank, service and DoD ID, and those
   ride the report to the maintainer. A scan that cannot happen can be overridden, but the

@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:characters/characters.dart';
+import 'package:ivy_pulse/domain/entities/fault_description.dart';
 import 'package:ivy_pulse/domain/entities/cac_scan.dart';
 import 'package:ivy_pulse/domain/entities/check_result.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_catalog.dart';
@@ -38,6 +40,7 @@ enum InspectionStage {
   phaseSelect,
   inspecting,
   summary,
+  submitted,
 }
 
 class InspectionViewModel extends ChangeNotifier {
@@ -92,13 +95,19 @@ class InspectionViewModel extends ChangeNotifier {
   PmcsCatalog? catalog;
   VehicleType selectedVehicle = VehicleType.stryker;
   PhaseWorkspace? workspace;
+  bool reviewingSummaryFault = false;
+  PmcsReport? submittedReport;
+  PublishResult? submissionDelivery;
+  bool submissionDeliveryFailed = false;
   Profile? profile;
   List<PmcsFault> sessionFaults = [];
   List<PmcsSession> openSessions = [];
+  final Map<PmcsPhase, int> phaseAnswerCounts = {};
   String? pendingScrollItemId;
   bool isBusy = false;
   bool isListening = false;
   String? listeningItemId;
+  int dictationGeneration = 0;
 
   /// The most recent CAC read, or the reason it did not happen. Null means
   /// the operator has not tried yet.
@@ -163,7 +172,9 @@ class InspectionViewModel extends ChangeNotifier {
     required String uic,
     required VehicleType vehicleType,
   }) {
-    if (stage != InspectionStage.setup) return false;
+    if (stage != InspectionStage.setup && stage != InspectionStage.submitted) {
+      return false;
+    }
     selectedVehicle = vehicleType;
     pendingPrefill = (bumperNumber: bumperNumber, uic: uic);
     notifyListeners();
@@ -202,6 +213,11 @@ class InspectionViewModel extends ChangeNotifier {
       catalog = catalogSource.catalogFor(selectedVehicle);
       sessionFaults = [];
       workspace = null;
+      phaseAnswerCounts.clear();
+      submittedReport = null;
+      submissionDelivery = null;
+      submissionDeliveryFailed = false;
+      reviewingSummaryFault = false;
       stage = InspectionStage.phaseSelect;
     } catch (e) {
       debugPrint('[IvyPulse] beginSession failed: $e');
@@ -243,6 +259,20 @@ class InspectionViewModel extends ChangeNotifier {
       session = open;
       selectedVehicle = open.vehicleType;
       sessionFaults = await faultsRepository.getForSession(open.sessionId);
+      final counts = await Future.wait(PmcsPhase.values.map((phase) async {
+        final saved = await resultsRepository.getResults(open.sessionId, phase);
+        return MapEntry(
+          phase,
+          PhaseWorkspace(
+            phase: phase,
+            categories: catalog!.categoriesFor(phase),
+            results: saved,
+          ).answeredCount,
+        );
+      }));
+      phaseAnswerCounts
+        ..clear()
+        ..addEntries(counts);
       workspace = null;
       stage = InspectionStage.phaseSelect;
 
@@ -253,6 +283,7 @@ class InspectionViewModel extends ChangeNotifier {
       snackBarService.enqueue('Could not resume PMCS — $e', isError: true);
       session = null;
       catalog = null;
+      phaseAnswerCounts.clear();
       stage = InspectionStage.setup;
     } finally {
       isBusy = false;
@@ -262,7 +293,7 @@ class InspectionViewModel extends ChangeNotifier {
 
   Future<void> openPhase(PmcsPhase phase) async {
     final current = session;
-    if (current == null) return;
+    if (current == null || isBusy) return;
 
     isBusy = true;
     notifyListeners();
@@ -275,6 +306,7 @@ class InspectionViewModel extends ChangeNotifier {
         categories: catalog?.categoriesFor(phase) ?? const [],
         results: await resultsRepository.getResults(current.sessionId, phase),
       );
+      phaseAnswerCounts[phase] = workspace!.answeredCount;
       pendingScrollItemId = nextUnansweredItemId;
       stage = InspectionStage.inspecting;
     } catch (e) {
@@ -292,78 +324,174 @@ class InspectionViewModel extends ChangeNotifier {
   Future<void> answer(PmcsCheckItem item, int faultIndex) async {
     final current = session;
     final open = workspace;
-    if (current == null || open == null) return;
+    if (current == null || open == null || isBusy) return;
 
-    final result = await recordCheckResult(
-      sessionId: current.sessionId,
-      phase: open.phase,
-      item: item,
-      faultIndex: faultIndex,
-      // A note describes the deficiency that was there; calling the component
-      // serviceable retires it.
-      note: faultIndex == 0 ? null : open.resultFor(item.id)?.note,
-    );
-
-    open.record(result);
-    pendingScrollItemId = open.expandedItemId;
+    isBusy = true;
     notifyListeners();
+    try {
+      if (isListening) await stopNoteDictation(discardResult: true);
+      final result = await recordCheckResult(
+        sessionId: current.sessionId,
+        phase: open.phase,
+        item: item,
+        faultIndex: faultIndex,
+        // Calling the component serviceable also retires its fault note.
+        note: faultIndex == 0 ? null : open.resultFor(item.id)?.note,
+      );
+      open.record(result);
+      phaseAnswerCounts[open.phase] = open.answeredCount;
+      pendingScrollItemId = open.expandedItemId;
+    } catch (e) {
+      debugPrint('[IvyPulse] answer failed: $e');
+      snackBarService.enqueue(
+        'Could not save ${item.item}. Your previous answers are kept. '
+        'Tap the condition again to retry.',
+        isError: true,
+      );
+    } finally {
+      isBusy = false;
+      notifyListeners();
+    }
   }
 
   void expandItem(String itemId) {
+    if (isBusy) return;
     workspace?.expand(itemId);
     notifyListeners();
   }
 
   void collapseItem(String itemId) {
+    if (isBusy) return;
     workspace?.collapse(itemId);
     notifyListeners();
   }
 
+  void continueToNextCheck() {
+    final next = nextUnansweredItemId;
+    if (next == null || isBusy) return;
+    workspace?.expand(next);
+    pendingScrollItemId = next;
+    notifyListeners();
+  }
+
   Future<void> toggleNoteDictation(PmcsCheckItem item) async {
+    final open = workspace;
+    if (open == null || open.resultFor(item.id)?.isFault != true || isBusy) {
+      return;
+    }
     if (isListening && listeningItemId == item.id) {
       await stopNoteDictation();
       return;
     }
-    if (isListening) await stopNoteDictation();
+    if (isListening) await stopNoteDictation(discardResult: true);
 
+    final generation = ++dictationGeneration;
     isListening = true;
     listeningItemId = item.id;
     notifyListeners();
 
-    await speechStrategy.startListening(
-      onResult: (text) async {
+    try {
+      await speechStrategy.startListening(
+        onResult: (text) async {
+          if (dictationGeneration != generation ||
+              !identical(workspace, open) ||
+              listeningItemId != item.id) {
+            return;
+          }
+          isListening = false;
+          listeningItemId = null;
+          notifyListeners();
+          await attachNote(item, text);
+        },
+      );
+      if (dictationGeneration == generation &&
+          isListening &&
+          !speechStrategy.isListening) {
+        isListening = false;
+        listeningItemId = null;
+        snackBarService
+            .enqueue('Dictation unavailable — use Add description to type.');
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[IvyPulse] dictation failed: $e');
+      if (dictationGeneration != generation) return;
+      isListening = false;
+      listeningItemId = null;
+      snackBarService
+          .enqueue('Dictation unavailable — use Add description to type.');
+      notifyListeners();
+    }
+  }
+
+  Future<void> stopNoteDictation({bool discardResult = false}) async {
+    final generation =
+        discardResult ? ++dictationGeneration : dictationGeneration;
+    if (discardResult) {
+      isListening = false;
+      listeningItemId = null;
+      notifyListeners();
+    }
+    try {
+      await speechStrategy.stopListening();
+    } catch (e) {
+      debugPrint('[IvyPulse] stop dictation failed: $e');
+    } finally {
+      if (dictationGeneration == generation) {
         isListening = false;
         listeningItemId = null;
         notifyListeners();
-        await attachNote(item, text);
-      },
-    );
-  }
-
-  Future<void> stopNoteDictation() async {
-    await speechStrategy.stopListening();
-    isListening = false;
-    listeningItemId = null;
-    notifyListeners();
+      }
+    }
   }
 
   /// Re-records the existing answer with [note] attached — the note rides the
   /// fault onto the 5988-E, so it has to live on the stored result.
   Future<void> attachNote(PmcsCheckItem item, String note) async {
+    if (note.trim().isEmpty) return;
+    final description = note.trim().characters;
+    if (!await saveNote(
+        item, description.take(maxFaultDescriptionLength).toString())) {
+      snackBarService.enqueue(
+          'Could not save the description. Try typing it again.',
+          isError: true);
+    } else if (description.length > maxFaultDescriptionLength) {
+      snackBarService.enqueue(
+          'Description limited to 155 characters. Use Edit description to review it.');
+    }
+  }
+
+  /// Saving a note leaves the operator on the check they were reviewing.
+  /// An empty typed note removes the old note; an empty transcript does not.
+  Future<bool> saveNote(PmcsCheckItem item, String note) async {
     final current = session;
     final open = workspace;
     final existing = open?.resultFor(item.id);
-    if (current == null || open == null || existing == null) return;
-    if (note.trim().isEmpty) return;
-
-    open.record(await recordCheckResult(
-      sessionId: current.sessionId,
-      phase: open.phase,
-      item: item,
-      faultIndex: existing.faultIndex,
-      note: note.trim(),
-    ));
+    if (current == null ||
+        open == null ||
+        existing?.isFault != true ||
+        isBusy) {
+      return false;
+    }
+    isBusy = true;
     notifyListeners();
+    try {
+      final trimmed = note.trim();
+      open.results[item.id] = await recordCheckResult(
+        sessionId: current.sessionId,
+        phase: open.phase,
+        item: item,
+        faultIndex: existing!.faultIndex,
+        note: trimmed.isEmpty ? null : trimmed,
+      );
+      return true;
+    } catch (e) {
+      debugPrint('[IvyPulse] saveNote failed: $e');
+      return false;
+    } finally {
+      isBusy = false;
+      notifyListeners();
+    }
   }
 
   /// Hands the page the item it should scroll to, once. Scrolling needs a
@@ -378,13 +506,14 @@ class InspectionViewModel extends ChangeNotifier {
     final current = session;
     final open = workspace;
     final loaded = catalog;
-    if (current == null || open == null || loaded == null) return;
+    if (current == null || open == null || loaded == null || isBusy) return;
     final phase = open.phase;
 
     isBusy = true;
     notifyListeners();
 
     try {
+      if (isListening) await stopNoteDictation(discardResult: true);
       final outcome = await completePhase(
         session: current,
         phase: phase,
@@ -396,9 +525,10 @@ class InspectionViewModel extends ChangeNotifier {
       sessionFaults = await faultsRepository.getForSession(current.sessionId);
       workspace = null;
       pendingScrollItemId = null;
-      stage = outcome.session.allPhasesComplete
+      stage = reviewingSummaryFault || outcome.session.allPhasesComplete
           ? InspectionStage.summary
           : InspectionStage.phaseSelect;
+      reviewingSummaryFault = false;
 
       debugPrint('[IvyPulse] completeActivePhase — ${phase.wireName}, '
           '${outcome.faults.length} fault(s)');
@@ -419,8 +549,34 @@ class InspectionViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> reviewFault(PmcsFault fault) async {
+    if (isBusy || session == null) return;
+    await openPhase(fault.phase);
+    final open = workspace;
+    if (stage != InspectionStage.inspecting || open == null) return;
+    if (!open.items.any((item) => item.id == fault.itemId)) return;
+    reviewingSummaryFault = true;
+    open.expand(fault.itemId);
+    pendingScrollItemId = fault.itemId;
+    notifyListeners();
+  }
+
+  Future<void> returnToSummary() async {
+    // Rebuild faults before showing the summary so edits made during review
+    // are included in the report, including description changes.
+    if (isBusy) return;
+    if (workspace?.isComplete == true) {
+      await completeActivePhase();
+    } else {
+      backToPhases();
+    }
+  }
+
   void backToPhases() {
+    if (isBusy) return;
+    if (isListening) stopNoteDictation(discardResult: true);
     workspace = null;
+    reviewingSummaryFault = false;
     pendingScrollItemId = null;
     lastScan = null;
     // Every scan-shaped field goes together. Leaving isScanning set here was
@@ -611,7 +767,7 @@ class InspectionViewModel extends ChangeNotifier {
 
   Future<void> submitWith(PmcsSignature signature) async {
     final current = session;
-    if (current == null) return;
+    if (current == null || isBusy) return;
 
     isBusy = true;
     notifyListeners();
@@ -643,12 +799,22 @@ class InspectionViewModel extends ChangeNotifier {
     // should show it whether or not the transports are up.
     onReportSubmitted?.call(report);
 
-    // The report is on disk before a packet leaves the device, so the operator
-    // is released the moment it is stored — the two transports report in on
-    // their own time and park themselves on the queue if they cannot.
-    publishPmcsReport(report).then(announceLegOutcomes).catchError((e) {
+    await resetToSetup();
+    submittedReport = report;
+    stage = InspectionStage.submitted;
+    notifyListeners();
+
+    // The receipt is available as soon as the local save succeeds. Network
+    // callbacks only update the receipt that belongs to this report.
+    publishPmcsReport(report).then((outcome) {
+      if (!identical(submittedReport, report)) return;
+      submissionDelivery = outcome;
+      notifyListeners();
+    }).catchError((e) {
       debugPrint('[IvyPulse] Publish error: $e');
-      snackBarService.enqueue('Publish error: $e', isError: true);
+      if (!identical(submittedReport, report)) return;
+      submissionDeliveryFailed = true;
+      notifyListeners();
     });
 
     snackBarService.enqueue(
@@ -657,7 +823,6 @@ class InspectionViewModel extends ChangeNotifier {
           : 'PMCS submitted UNVERIFIED — ${report.statusLabel}',
       isError: !signature.isVerified,
     );
-    await resetToSetup();
   }
 
   void announceLegOutcomes(PublishResult outcome) {
@@ -699,7 +864,12 @@ class InspectionViewModel extends ChangeNotifier {
     session = null;
     catalog = null;
     workspace = null;
+    reviewingSummaryFault = false;
+    submittedReport = null;
+    submissionDelivery = null;
+    submissionDeliveryFailed = false;
     sessionFaults = [];
+    phaseAnswerCounts.clear();
     pendingScrollItemId = null;
     lastScan = null;
     // Same three as backToPhases, for the same reason, and because this runs
@@ -736,6 +906,10 @@ class InspectionViewModel extends ChangeNotifier {
   List<PmcsCheckItem> get phaseItems => workspace?.items ?? const [];
 
   int get answeredCount => workspace?.answeredCount ?? 0;
+
+  /// Counts survive closing a phase and are restored from saved answers when
+  /// resuming a session. Only items in the current catalog count as progress.
+  int answeredCountFor(PmcsPhase phase) => phaseAnswerCounts[phase] ?? 0;
 
   int get totalCount => workspace?.totalCount ?? 0;
 

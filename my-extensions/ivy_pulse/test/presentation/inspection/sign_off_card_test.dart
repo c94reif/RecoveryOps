@@ -67,6 +67,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byType(SignOffCard), 80,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
   }
 
   final scanButton = find.widgetWithText(CustomButton, 'SCAN CAC');
@@ -182,8 +185,8 @@ void main() {
 
       // No disclosure, no auto-expand: a Soldier who has not scanned yet is
       // exactly who this is for.
-      expect(
-          find.text('Turn the card over — the side the gate scans'), findsOneWidget);
+      expect(find.text('Turn the card over — the side the gate scans'),
+          findsOneWidget);
       expect(
         find.text('Fill the box; the DoD ID number sits above the wide strip'),
         findsOneWidget,
@@ -361,8 +364,8 @@ void main() {
       await scan(tester);
       await scan(tester, from: scanAgainButton);
 
-      expect(
-          find.textContaining('running straight across the frame'), findsOneWidget);
+      expect(find.textContaining('running straight across the frame'),
+          findsOneWidget);
     });
 
     testWidgets('moves on to glare on the third', (tester) async {
@@ -373,7 +376,8 @@ void main() {
       await scan(tester, from: scanAgainButton);
       await scan(tester, from: scanAgainButton);
 
-      expect(find.textContaining('shadow falls across the card'), findsOneWidget);
+      expect(
+          find.textContaining('shadow falls across the card'), findsOneWidget);
       expect(find.textContaining('fill the box'), findsNothing);
     });
 
@@ -654,8 +658,8 @@ void main() {
       harness.cacScanner.willFail(CacRejection.codeUnreadable);
       await scan(tester);
       await scan(tester, from: scanAgainButton);
-      expect(
-          find.textContaining('running straight across the frame'), findsOneWidget);
+      expect(find.textContaining('running straight across the frame'),
+          findsOneWidget);
 
       await reach(tester, overrideLink);
       final box = tester.getRect(overrideLink);

@@ -104,14 +104,16 @@ class ProfilePageState extends State<ProfilePage> {
                   mainAxisSize: MainAxisSize.max,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SectionLabel(text: 'UIC'),
-                    const SizedBox(height: 8),
                     CustomTextField(
                       controller: uicController,
                       label: 'UIC',
+                      floatingLabelBehavior: FloatingLabelBehavior.always,
                       icon: Icons.groups_outlined,
                       hint: 'W12ABC',
                       textCapitalization: TextCapitalization.characters,
+                      uppercase: true,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => FocusScope.of(context).unfocus(),
                     ),
                     const SizedBox(height: 12),
                     const Text(
@@ -132,14 +134,10 @@ class ProfilePageState extends State<ProfilePage> {
                         onPressed: () => viewModel.save(uicController.text),
                       ),
                     const SizedBox(height: 32),
-                    const SectionLabel(text: 'TESTING'),
+                    const SectionLabel(text: 'DISPLAY'),
                     const SizedBox(height: 8),
                     const Text(
-                      'Both are on by default: the UI opens portrait, and the '
-                      'first touch anywhere takes the whole device — status '
-                      'bar, map and nav rail included. These back them out, or '
-                      'turn the rotation the other way if it reads upside '
-                      'down.',
+                      'Choose full screen or adjust the screen orientation.',
                       style: TextStyle(
                         color: textSecondary,
                         fontSize: 11,
@@ -164,7 +162,8 @@ class ProfilePageState extends State<ProfilePage> {
                             on ? Icons.fullscreen_exit : Icons.fullscreen,
                             size: 18,
                           ),
-                          label: Text(on ? 'Leave full screen' : 'Full screen'),
+                          label: Text(
+                              on ? 'Exit full screen' : 'Enter full screen'),
                         ),
                       ),
                     ),
@@ -187,9 +186,9 @@ class ProfilePageState extends State<ProfilePage> {
                             size: 18,
                           ),
                           label: Text(switch (turns) {
-                            0 => 'Vertical',
-                            1 => 'Turn the other way',
-                            _ => 'Back to landscape',
+                            0 => 'Switch to portrait',
+                            1 => 'Flip portrait',
+                            _ => 'Switch to landscape',
                           }),
                         ),
                       ),

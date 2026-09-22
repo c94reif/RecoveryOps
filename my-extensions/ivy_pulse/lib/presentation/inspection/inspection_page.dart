@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:ivy_pulse/core/di/injection.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
+import 'package:ivy_pulse/domain/entities/pmcs_check_item.dart';
 import 'package:ivy_pulse/domain/services/fault_classifier_strategy.dart';
 import 'package:ivy_pulse/presentation/common/widgets/custom_button.dart';
 import 'package:ivy_pulse/presentation/common/widgets/fault_tally_bar.dart';
 import 'package:ivy_pulse/presentation/common/widgets/phase_progress_bar.dart';
 import 'package:ivy_pulse/presentation/common/widgets/section_label.dart';
 import 'package:ivy_pulse/presentation/inspection/check_item_card.dart';
+import 'package:ivy_pulse/presentation/inspection/fault_note_dialog.dart';
 import 'package:ivy_pulse/presentation/inspection/inspection_view_model.dart';
 
 /// The walk-around itself: one phase of TM checks, in TM order, with progress
@@ -36,6 +38,29 @@ class InspectionPageState extends State<InspectionPage> {
   GlobalKey keyFor(String itemId) =>
       itemKeys.putIfAbsent(itemId, () => GlobalKey());
 
+  Future<void> editNote(PmcsCheckItem item) async {
+    final open = viewModel.workspace;
+    if (viewModel.isListening) {
+      await viewModel.stopNoteDictation(discardResult: true);
+    }
+    if (!mounted || !identical(open, viewModel.workspace)) return;
+    final answer = viewModel.results[item.id];
+    if (answer == null || !answer.isFault) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => FaultNoteDialog(
+        itemName: item.item,
+        condition: answer.faultLabel,
+        initialNote: answer.note,
+        onSave: (note) async {
+          if (!identical(open, viewModel.workspace)) return false;
+          return viewModel.saveNote(item, note);
+        },
+      ),
+    );
+  }
+
   /// The card the operator just answered has to collapse before the next one
   /// can be positioned, so the scroll waits for the frame that does it.
   void honourPendingScroll() {
@@ -43,6 +68,7 @@ class InspectionPageState extends State<InspectionPage> {
     if (itemId == null) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final target = itemKeys[itemId]?.currentContext;
       if (target == null) return;
       Scrollable.ensureVisible(
@@ -96,18 +122,24 @@ class InspectionPageState extends State<InspectionPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            height: 44,
+            height: minTouchTarget,
             child: Row(
               children: [
                 SizedBox(
                   width: minTouchTarget,
-                  height: 44,
+                  height: minTouchTarget,
                   child: IconButton(
-                    onPressed: viewModel.backToPhases,
+                    onPressed: viewModel.isBusy
+                        ? null
+                        : viewModel.reviewingSummaryFault
+                            ? viewModel.returnToSummary
+                            : viewModel.backToPhases,
                     padding: EdgeInsets.zero,
                     icon: const Icon(Icons.arrow_back, size: 20),
                     color: masterChiefGreen,
-                    tooltip: 'Back to phases',
+                    tooltip: viewModel.reviewingSummaryFault
+                        ? 'Back to summary'
+                        : 'Back to phases',
                   ),
                 ),
                 Expanded(
@@ -134,14 +166,31 @@ class InspectionPageState extends State<InspectionPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  '${viewModel.answeredCount}/${viewModel.totalCount}',
-                  style: const TextStyle(
-                    color: textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    viewModel.isBusy
+                        ? 'Saving…'
+                        : '${viewModel.answeredCount}/${viewModel.totalCount}',
+                    style: const TextStyle(
+                      color: textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
+                if (viewModel.nextUnansweredItemId != null &&
+                    viewModel.expandedItemId != viewModel.nextUnansweredItemId)
+                  IconButton(
+                    onPressed:
+                        viewModel.isBusy ? null : viewModel.continueToNextCheck,
+                    tooltip: 'Next unanswered check',
+                    icon: const Icon(Icons.skip_next, size: 20),
+                    constraints: const BoxConstraints(
+                      minWidth: minTouchTarget,
+                      minHeight: minTouchTarget,
+                    ),
+                  ),
                 const SizedBox(width: 10),
               ],
             ),
@@ -162,31 +211,38 @@ class InspectionPageState extends State<InspectionPage> {
   }
 
   Widget buildCheckList() {
-    return ListView(
+    // A phase has a bounded TM catalog. Lay out its collapsed rows so a
+    // resumed check far down the list has a context for ensureVisible.
+    return SingleChildScrollView(
       physics: const ClampingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-      children: [
-        for (final category in viewModel.phaseCategories) ...[
-          Padding(
-            padding: const EdgeInsets.only(top: 10, bottom: 6),
-            child: SectionLabel(text: category.name),
-          ),
-          for (final item in category.items)
-            CheckItemCard(
-              key: keyFor(item.id),
-              item: item,
-              result: viewModel.results[item.id],
-              isExpanded: viewModel.isItemExpanded(item.id),
-              isDictating:
-                  viewModel.isListening && viewModel.listeningItemId == item.id,
-              classifier: classifier,
-              onAnswer: (faultIndex) => viewModel.answer(item, faultIndex),
-              onExpand: () => viewModel.expandItem(item.id),
-              onCollapse: () => viewModel.collapseItem(item.id),
-              onDictateNote: () => viewModel.toggleNoteDictation(item),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final category in viewModel.phaseCategories) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 10, bottom: 6),
+              child: SectionLabel(text: category.name),
             ),
+            for (final item in category.items)
+              CheckItemCard(
+                key: keyFor(item.id),
+                item: item,
+                result: viewModel.results[item.id],
+                isExpanded: viewModel.isItemExpanded(item.id),
+                isDictating: viewModel.isListening &&
+                    viewModel.listeningItemId == item.id,
+                classifier: classifier,
+                enabled: !viewModel.isBusy,
+                onAnswer: (faultIndex) => viewModel.answer(item, faultIndex),
+                onExpand: () => viewModel.expandItem(item.id),
+                onCollapse: () => viewModel.collapseItem(item.id),
+                onDictateNote: () => viewModel.toggleNoteDictation(item),
+                onEditNote: () => editNote(item),
+              ),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -211,7 +267,7 @@ class InspectionPageState extends State<InspectionPage> {
           text: hasRedX ? 'COMPLETE WITH RED X' : 'COMPLETE PHASE',
           icon: hasRedX ? Icons.dangerous_outlined : Icons.check,
           color: hasRedX ? redXRed : null,
-          onPressed: viewModel.completeActivePhase,
+          onPressed: viewModel.isBusy ? null : viewModel.completeActivePhase,
         ),
       ),
     );

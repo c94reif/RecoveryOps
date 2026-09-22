@@ -1,4 +1,7 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ivy_pulse/core/di/injection.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
@@ -190,12 +193,58 @@ void main() {
           tester
               .getSize(find.ancestor(
                 of: find.text(label),
-                matching: find.byType(GestureDetector),
+                matching: find.byType(InkWell),
               ))
               .height,
           greaterThanOrEqualTo(minTouchTarget),
         );
       }
+    });
+
+    testWidgets('tabs can be activated from the keyboard', (tester) async {
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+
+      Focus.of(tester.element(find.text('Reports'))).requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(visibleTab(tester), 1);
+    });
+
+    testWidgets('announces the selected tab and unread report count',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      reportsViewModel.unreadCount.value = 3;
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+
+      expect(
+          tester
+              .getSemantics(find.bySemanticsLabel('PMCS'))
+              .flagsCollection
+              .isSelected,
+          Tristate.isTrue);
+      expect(tester.getSemantics(find.bySemanticsLabel('Reports')).value,
+          '3 unread');
+
+      await tester.tap(find.text('Reports'));
+      await tester.pumpAndSettle();
+
+      expect(
+          tester
+              .getSemantics(find.bySemanticsLabel('Reports'))
+              .flagsCollection
+              .isSelected,
+          Tristate.isTrue);
+      expect(
+          tester
+              .getSemantics(find.bySemanticsLabel('PMCS'))
+              .flagsCollection
+              .isSelected,
+          Tristate.isFalse);
+      semantics.dispose();
     });
   });
 

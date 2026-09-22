@@ -42,6 +42,31 @@ void main() {
       tester.widget<CustomButton>(beginButton).onPressed != null;
 
   group('starting a PMCS', () {
+    testWidgets(
+        'Next focuses UIC, Done dismisses the keyboard, and input is uppercase',
+        (tester) async {
+      await tester.pumpWidget(createWidgetUnderTest());
+      await tester.enterText(field('Bumper Number'), 'b-22');
+      expect(
+          tester
+              .widget<CustomTextField>(field('Bumper Number'))
+              .controller
+              .text,
+          'B-22');
+      await tester.testTextInput.receiveAction(TextInputAction.next);
+      await tester.pump();
+      expect(tester.widget<CustomTextField>(field('UIC')).focusNode!.hasFocus,
+          isTrue);
+      await tester.enterText(field('UIC'), 'wab4c0');
+      expect(tester.widget<CustomTextField>(field('UIC')).controller.text,
+          'WAB4C0');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      expect(tester.widget<CustomTextField>(field('UIC')).focusNode!.hasFocus,
+          isFalse);
+      expect(tester.testTextInput.isVisible, isFalse);
+    });
+
     testWidgets('BEGIN PMCS stays dead until a bumper number and a UIC are in',
         (tester) async {
       await tester.pumpWidget(createWidgetUnderTest());

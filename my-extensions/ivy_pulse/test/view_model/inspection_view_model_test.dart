@@ -631,13 +631,13 @@ void main() {
       expect(reportsRepo.reports.single.isDeadlined, isTrue);
     });
 
-    test('the operator is returned to setup without waiting on the net',
+    test('the operator is shown a receipt without waiting on the net',
         () async {
       await completeAndSign();
 
       await viewModel.submit();
 
-      expect(viewModel.stage, InspectionStage.setup);
+      expect(viewModel.stage, InspectionStage.submitted);
       expect(viewModel.session, isNull);
       expect(viewModel.isBusy, isFalse);
     });
@@ -659,7 +659,7 @@ void main() {
       await viewModel.submit();
       await Future<void>.delayed(Duration.zero);
 
-      expect(viewModel.stage, InspectionStage.setup);
+      expect(viewModel.stage, InspectionStage.submitted);
       expect(queueWorker.enqueued, hasLength(1));
     });
 
@@ -726,7 +726,7 @@ void main() {
       expect(report.isSignatureVerified, isFalse);
       expect(report.signature!.blockedBy, CacRejection.noCamera);
       expect(report.operator, 'UNVERIFIED');
-      expect(viewModel.stage, InspectionStage.setup);
+      expect(viewModel.stage, InspectionStage.submitted);
     });
 
     test('the override is not reachable before a scan has been tried',
@@ -739,7 +739,8 @@ void main() {
       expect(reportsRepo.reports, isEmpty);
     });
 
-    test('the typed fallback sends the PMCS unverified, with the name, the '
+    test(
+        'the typed fallback sends the PMCS unverified, with the name, the '
         'DoD ID and the reason the scan failed', () async {
       await completeEverything();
       cacScanner.willFail(CacRejection.codeUnreadable);
@@ -757,10 +758,11 @@ void main() {
       expect(report.signature!.method, 'typed');
       expect(report.signature!.dodId, '1087987498');
       expect(report.signature!.blockedBy, CacRejection.codeUnreadable);
-      expect(viewModel.stage, InspectionStage.setup);
+      expect(viewModel.stage, InspectionStage.submitted);
     });
 
-    test('a typed entry that cannot be a Soldier is refused and nothing is '
+    test(
+        'a typed entry that cannot be a Soldier is refused and nothing is '
         'stored', () async {
       await completeEverything();
       cacScanner.willFail(CacRejection.codeUnreadable);

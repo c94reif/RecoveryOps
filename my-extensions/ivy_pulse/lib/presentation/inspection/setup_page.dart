@@ -22,6 +22,7 @@ class SetupPageState extends State<SetupPage> {
   late final InspectionViewModel viewModel;
   final bumperNumberController = TextEditingController();
   final uicController = TextEditingController();
+  final uicFocus = FocusNode();
 
   @override
   void initState() {
@@ -75,6 +76,7 @@ class SetupPageState extends State<SetupPage> {
     viewModel.removeListener(applyPrefill);
     bumperNumberController.dispose();
     uicController.dispose();
+    uicFocus.dispose();
     super.dispose();
   }
 
@@ -101,23 +103,28 @@ class SetupPageState extends State<SetupPage> {
             const SectionLabel(text: 'VEHICLE PLATFORM'),
             const SizedBox(height: 8),
             buildVehicleSelector(),
-            const SizedBox(height: 20),
-            const SectionLabel(text: 'BUMPER NUMBER'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 24),
             CustomTextField(
               controller: bumperNumberController,
               label: 'Bumper Number',
+              floatingLabelBehavior: FloatingLabelBehavior.always,
               icon: Icons.directions_car_outlined,
               textCapitalization: TextCapitalization.characters,
+              uppercase: true,
+              textInputAction: TextInputAction.next,
+              onSubmitted: (_) => uicFocus.requestFocus(),
             ),
-            const SizedBox(height: 20),
-            const SectionLabel(text: 'UIC'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 24),
             CustomTextField(
               controller: uicController,
+              focusNode: uicFocus,
               label: 'UIC',
+              floatingLabelBehavior: FloatingLabelBehavior.always,
               icon: Icons.groups_outlined,
               textCapitalization: TextCapitalization.characters,
+              uppercase: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => FocusScope.of(context).unfocus(),
             ),
             const SizedBox(height: 28),
             CustomButton(
