@@ -1,32 +1,40 @@
 import 'package:ivy_pulse/domain/entities/cac_scan.dart';
 import 'package:ivy_pulse/domain/services/cac_scanner_strategy.dart';
 import 'package:ivy_pulse/domain/usecases/identity/parse_cac_barcode.dart';
+import 'package:ivy_pulse/domain/usecases/identity/parse_dod_id.dart';
 
-/// Reads the Soldier closing a PMCS out off the front of their CAC — the tall
-/// PDF417 beside the gold chip, never the gate strip on the back.
+/// Reads the operator's CAC and turns whatever the scanner handed back into
+/// a Soldier — or into the reason it could not.
 ///
-/// Two halves that fail differently: the camera can come back with nothing,
-/// and what it does come back with can turn out not to be a CAC. Both land as
-/// a [CacScan] the operator can act on, because the difference decides what
-/// they do next — shoot the card again, or turn it over and find a current
-/// one.
+/// Two kinds of read arrive here. The Android scanner OCRs the back of the
+/// card and hands over the ten-digit DoD ID number; the web scanner, kept
+/// for development, decodes a barcode and hands over the raw record — 89
+/// characters off the front, 18 off the back. They are told apart by shape
+/// alone, which is unambiguous: no barcode record is ten characters long.
 class VerifyOperatorIdentity {
   final CacScannerStrategy scanner;
   final ParseCacBarcode parseBarcode;
+  final ParseDodId parseDodId;
 
-  const VerifyOperatorIdentity({
+  VerifyOperatorIdentity({
     required this.scanner,
     required this.parseBarcode,
-  });
+    ParseDodId? parseDodId,
+  }) : parseDodId = parseDodId ?? ParseDodId(parseBarcode.clock);
+
+  /// Exactly ten digits — a DoD ID number read as text, not a barcode.
+  static final RegExp _dodIdShape = RegExp(r'^\d{10}$');
 
   Future<CacScan> call() async {
     final capture = await scanner.capture();
 
-    final barcode = capture.barcode;
-    if (barcode == null) {
+    final read = capture.barcode;
+    if (read == null) {
       return CacScan.rejected(capture.rejection ?? CacRejection.noCodeFound);
     }
 
-    return parseBarcode(barcode);
+    final trimmed = read.trim();
+    if (_dodIdShape.hasMatch(trimmed)) return parseDodId(trimmed);
+    return parseBarcode(read);
   }
 }

@@ -127,7 +127,7 @@ void main() {
       await tester.pump();
 
       expect(
-          find.textContaining('cannot close the camera app'), findsOneWidget);
+          find.textContaining('Cancelling closes the camera'), findsOneWidget);
     });
 
     testWidgets('names the landmarks rather than "the front"', (tester) async {
@@ -138,7 +138,7 @@ void main() {
       await tester.tap(scanButton);
       await tester.pump();
 
-      expect(find.textContaining('photo and the gold chip'), findsOneWidget);
+      expect(find.textContaining('wide barcode strip'), findsOneWidget);
       expect(find.textContaining('front of the CAC'), findsNothing);
     });
 
@@ -183,13 +183,13 @@ void main() {
       // No disclosure, no auto-expand: a Soldier who has not scanned yet is
       // exactly who this is for.
       expect(
-          find.text('Your photo and the gold chip face you'), findsOneWidget);
+          find.text('Turn the card over — the side the gate scans'), findsOneWidget);
       expect(
-        find.text('The tall barcode is bottom left, beside the chip'),
+        find.text('Fill the box; the DoD ID number sits above the wide strip'),
         findsOneWidget,
       );
       expect(
-        find.text('Not the wide strip the gate guard scans'),
+        find.text('It reads by itself — no button to press'),
         findsOneWidget,
       );
     });
@@ -223,7 +223,7 @@ void main() {
 
       final size = tester.getSize(schematic());
       expect(size.width, SignOffCard.cardWidth);
-      expect(size.height, closeTo(SignOffCard.cardWidth * 1.587, 0.01),
+      expect(size.height, closeTo(SignOffCard.cardWidth / 1.587, 0.01),
           reason: 'the CAC front is printed portrait at 1:1.587');
       // The version a judge killed was 96x152. The size discipline is the
       // whole reason the diagram is allowed to render without a toggle.
@@ -251,7 +251,7 @@ void main() {
 
       expect(schematic(), findsNothing);
       expect(
-          find.text('Not the wide strip the gate guard scans'), findsNothing);
+          find.text('It reads by itself — no button to press'), findsNothing);
     });
   });
 
@@ -350,7 +350,7 @@ void main() {
       harness.cacScanner.willFail(CacRejection.noCodeFound);
       await scan(tester);
 
-      expect(find.textContaining('sideways'), findsNothing);
+      expect(find.textContaining('fill the box'), findsNothing);
       expect(find.textContaining('shadow'), findsNothing);
     });
 
@@ -362,7 +362,7 @@ void main() {
       await scan(tester, from: scanAgainButton);
 
       expect(
-          find.textContaining('reads at about twice the size'), findsOneWidget);
+          find.textContaining('running straight across the frame'), findsOneWidget);
     });
 
     testWidgets('moves on to glare on the third', (tester) async {
@@ -373,8 +373,8 @@ void main() {
       await scan(tester, from: scanAgainButton);
       await scan(tester, from: scanAgainButton);
 
-      expect(find.textContaining('shadow falls across it'), findsOneWidget);
-      expect(find.textContaining('sideways'), findsNothing);
+      expect(find.textContaining('shadow falls across the card'), findsOneWidget);
+      expect(find.textContaining('fill the box'), findsNothing);
     });
 
     testWidgets('is not offered where another photograph cannot help',
@@ -384,13 +384,13 @@ void main() {
       harness.cacScanner.willFail(CacRejection.noCodeFound);
       await scan(tester);
       await scan(tester, from: scanAgainButton);
-      expect(find.textContaining('sideways'), findsOneWidget);
+      expect(find.textContaining('fill the box'), findsOneWidget);
 
       // The count stands, but the card is now the thing being refused.
       harness.cacScanner.willRead(cacBarcode(expires: 'BBQH'));
       await scan(tester, from: scanAgainButton);
 
-      expect(find.textContaining('sideways'), findsNothing);
+      expect(find.textContaining('fill the box'), findsNothing);
       expect(find.textContaining('shadow'), findsNothing);
     });
   });
@@ -476,6 +476,69 @@ void main() {
       await scan(tester);
 
       expect(find.textContaining(line), findsOneWidget);
+    });
+  });
+
+  group('the typed fallback', () {
+    final dodIdField = find.widgetWithText(TextField, 'DoD ID');
+    final typedSubmit =
+        find.widgetWithText(CustomButton, 'SUBMIT WITH TYPED ID');
+
+    Future<void> refuseScan(WidgetTester tester) async {
+      await walkPmcs();
+      harness.cacScanner.willFail(CacRejection.codeUnreadable);
+      await pumpPanel(tester);
+      await scan(tester);
+    }
+
+    testWidgets('is offered once a scan has been refused, not before',
+        (tester) async {
+      await walkPmcs();
+      await pumpPanel(tester);
+      expect(typedSubmit, findsNothing);
+
+      harness.cacScanner.willFail(CacRejection.codeUnreadable);
+      await scan(tester);
+      await reach(tester, typedSubmit);
+
+      expect(typedSubmit, findsOneWidget);
+      expect(dodIdField, findsOneWidget);
+    });
+
+    testWidgets('counts DoD ID digits live as they are typed', (tester) async {
+      await refuseScan(tester);
+      await reach(tester, dodIdField);
+
+      expect(find.text('0/10'), findsOneWidget);
+
+      await tester.enterText(dodIdField, '1087 987');
+      await tester.pumpAndSettle();
+      // Spaces are not digits — the count is what the parser will judge.
+      expect(find.text('7/10'), findsOneWidget);
+
+      await tester.enterText(dodIdField, '1087987498');
+      await tester.pumpAndSettle();
+      expect(find.text('10/10'), findsOneWidget);
+
+      await tester.enterText(dodIdField, '10879874981');
+      await tester.pumpAndSettle();
+      expect(find.text('11/10'), findsOneWidget);
+    });
+
+    testWidgets('the submit stays dead until every field has something in it',
+        (tester) async {
+      await refuseScan(tester);
+      await reach(tester, typedSubmit);
+      expect(tester.widget<CustomButton>(typedSubmit).onPressed, isNull);
+
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Last name'), 'SMITH');
+      await tester.enterText(
+          find.widgetWithText(TextField, 'First name'), 'JOHN');
+      await tester.enterText(dodIdField, '1087987498');
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<CustomButton>(typedSubmit).onPressed, isNotNull);
     });
   });
 
@@ -592,7 +655,7 @@ void main() {
       await scan(tester);
       await scan(tester, from: scanAgainButton);
       expect(
-          find.textContaining('reads at about twice the size'), findsOneWidget);
+          find.textContaining('running straight across the frame'), findsOneWidget);
 
       await reach(tester, overrideLink);
       final box = tester.getRect(overrideLink);

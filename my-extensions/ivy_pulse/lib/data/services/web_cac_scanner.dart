@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:web/web.dart' as web;
 
 import 'package:ivy_pulse/core/constants/app_constants.dart';
+import 'package:ivy_pulse/data/services/native_barcode_reader.dart';
 import 'package:ivy_pulse/data/services/pdf417_image_decoder.dart';
 import 'package:ivy_pulse/domain/entities/cac_scan.dart';
 import 'package:ivy_pulse/domain/services/cac_scanner_strategy.dart';
@@ -36,7 +37,19 @@ import 'package:ivy_pulse/domain/services/cac_scanner_strategy.dart';
 class WebCacScanner implements CacScannerStrategy {
   final Pdf417ImageDecoder decoder;
 
-  WebCacScanner({this.decoder = const Pdf417ImageDecoder()});
+  /// The WebView's own detector, tried before [decoder] on every photo. Null
+  /// on a WebView that has none, in which case the Dart passes are the whole
+  /// pipeline as they always were.
+  final NativeBarcodeReader? nativeReader;
+
+  WebCacScanner({
+    this.decoder = const Pdf417ImageDecoder(),
+    NativeBarcodeReader? nativeReader,
+    bool useNativeReader = true,
+  }) : nativeReader = nativeReader ??
+            (useNativeReader && NativeBarcodeReader.isSupported
+                ? NativeBarcodeReader()
+                : null);
 
   /// Long edges to try, in order. A CAC's PDF417 is physically small, so a
   /// hard downscale loses the modules — but a full 12MP frame is millions of
@@ -47,7 +60,19 @@ class WebCacScanner implements CacScannerStrategy {
   /// How long to wait after the WebView regains focus before calling an
   /// unfired `change` event a cancellation. The file chooser returns focus
   /// before it delivers the file, so this cannot be zero.
-  static const Duration cancelGrace = Duration(milliseconds: 1500);
+  ///
+  /// Generous on purpose. Focus comes back the instant the camera activity
+  /// finishes, but the photo arrives only after the camera app has written
+  /// its JPEG and the host's WebView plugin has copied it into a temp file —
+  /// on a 12 MP shot that is not a short interval, and it was measured at
+  /// about a second and a half of grace before this was widened. Guessing
+  /// low is the expensive mistake: a real photo judged late is discarded and
+  /// the operator is told they cancelled a scan they did not cancel. Guessing
+  /// high costs only how long a genuine back-out takes to register, and the
+  /// CANCEL SCAN control is on screen for all of it. The hard timeout in
+  /// [AppConstants.cacCaptureTimeout] still catches a camera that never
+  /// returns.
+  static const Duration cancelGrace = Duration(seconds: 12);
 
   /// The in-flight capture's completion closure, or null when nothing is in
   /// flight. Held in a field solely so [cancel] has something to call: the
@@ -127,6 +152,9 @@ class WebCacScanner implements CacScannerStrategy {
     Timer? timeoutTimer;
     JSFunction? onFocus;
     var timedOut = false;
+    // Set on the most recent focus return — the moment the grace period is
+    // measured from.
+    DateTime? focusReturnedAt;
 
     void finish(web.File? file) {
       // Only clear the handle if it is still this capture's.
@@ -147,7 +175,18 @@ class WebCacScanner implements CacScannerStrategy {
 
     input.onchange = (web.Event _) {
       final files = input.files;
-      finish(files != null && files.length > 0 ? files.item(0) : null);
+      final photo = files != null && files.length > 0 ? files.item(0) : null;
+      // The number the grace period is set against. Logged on every delivery
+      // so a field device can say how close a real photo came to being
+      // judged late — without it that failure is indistinguishable from an
+      // operator who backed out.
+      final since = focusReturnedAt;
+      if (since != null) {
+        final lag = DateTime.now().difference(since).inMilliseconds;
+        debugPrint('[IvyPulse] CAC photo arrived ${lag}ms after focus '
+            '(grace ${cancelGrace.inMilliseconds}ms)');
+      }
+      finish(photo);
     }.toJS;
 
     input.oncancel = ((web.Event _) => finish(null)).toJS;
@@ -160,7 +199,15 @@ class WebCacScanner implements CacScannerStrategy {
       // reports itself cancelled, and the real photo is then silently thrown
       // away when `change` finally fires.
       cancelTimer?.cancel();
-      cancelTimer = Timer(cancelGrace, () => finish(null));
+      focusReturnedAt = DateTime.now();
+      cancelTimer = Timer(cancelGrace, () {
+        // Said out loud, because from the operator's side this is the same
+        // screen as a genuine back-out — the log is the only place the two
+        // can be told apart.
+        debugPrint('[IvyPulse] CAC photo did not arrive within '
+            '${cancelGrace.inMilliseconds}ms of focus — treating as cancelled');
+        finish(null);
+      });
     }).toJS;
     web.window.addEventListener('focus', onFocus);
 
@@ -219,6 +266,13 @@ class WebCacScanner implements CacScannerStrategy {
         .toDart;
 
     try {
+      // The native detector reads the full-resolution bitmap as shot: it
+      // wants every pixel the sensor gave it, and it costs nothing to hand
+      // over since the bitmap is already decoded. Only when it has no answer
+      // does the frame get rasterised and swept by hand below.
+      final native = await nativeReader?.read(bitmap);
+      if (native != null) return native;
+
       var located = false;
       double? widestModulePx;
 

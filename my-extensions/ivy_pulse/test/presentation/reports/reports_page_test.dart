@@ -3,6 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ivy_pulse/core/di/injection.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
 import 'package:ivy_pulse/domain/entities/fault_severity.dart';
+import 'package:ivy_pulse/domain/entities/attested_identity.dart';
+import 'package:ivy_pulse/domain/entities/cac_scan.dart';
+import 'package:ivy_pulse/domain/entities/pmcs_signature.dart';
 import 'package:ivy_pulse/domain/entities/vehicle_type.dart';
 import 'package:ivy_pulse/presentation/common/widgets/fault_tally_bar.dart';
 import 'package:ivy_pulse/presentation/common/widgets/severity_badge.dart';
@@ -517,18 +520,35 @@ void main() {
     });
   });
 
-  testWidgets('the map button hands the report to the view model',
-      (tester) async {
-    final report = buildReport(id: 1, entityId: 'mine-1', isOutgoing: true);
-    viewModel.reports.add(report);
+  group('walking the vehicle again', () {
+    testWidgets('the map button is gone and a new-PMCS button stands in its '
+        'place', (tester) async {
+      viewModel.reports.add(
+        buildReport(id: 1, entityId: 'mine-1', isOutgoing: true),
+      );
 
-    await tester.pumpWidget(subject());
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.place_outlined));
-    await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.place_outlined), findsNothing);
+      expect(find.byIcon(Icons.add_task), findsOneWidget);
+      expect(find.byTooltip('New PMCS on this vehicle'), findsOneWidget);
+    });
 
-    expect(viewModel.viewed, [report]);
+    testWidgets('with no inspection flow behind it the button is inert, not '
+        'a crash', (tester) async {
+      viewModel.reports.add(
+        buildReport(id: 1, entityId: 'mine-1', isOutgoing: true),
+      );
+
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.add_task));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    });
   });
 
   group('who signed it', () {
@@ -555,6 +575,60 @@ void main() {
 
       expect(find.byIcon(Icons.gpp_maybe_outlined), findsOneWidget);
       expect(find.textContaining('UNVERIFIED'), findsOneWidget);
+    });
+
+    testWidgets('a verified report prints the DoD ID under the name',
+        (tester) async {
+      viewModel.reports.add(buildReport(
+        operator: 'SGT SMITH, JOHN A',
+        signature: buildSignature(),
+      ));
+
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('SGT SMITH, JOHN A'), findsOneWidget);
+      expect(find.text('DoD ID 1087987498'), findsOneWidget);
+    });
+
+    testWidgets('an unverified report has no DoD ID to print',
+        (tester) async {
+      viewModel.reports.add(buildReport(
+        operator: 'UNVERIFIED',
+        signature: buildUnverifiedSignature(),
+      ));
+
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('DoD ID'), findsNothing);
+    });
+
+    testWidgets('a typed name is printed with its DoD ID and says it was '
+        'typed, not scanned', (tester) async {
+      viewModel.reports.add(buildReport(
+        operator: 'SMITH, JOHN',
+        signature: PmcsSignature.unverified(
+          blockedBy: CacRejection.codeUnreadable,
+          signedAt: DateTime.utc(2026, 3, 24, 9),
+          attestedBy: const AttestedIdentity(
+            edipi: '1087987498',
+            firstName: 'JOHN',
+            lastName: 'SMITH',
+          ),
+        ),
+      ));
+
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('SMITH, JOHN'), findsOneWidget);
+      expect(
+        find.text('DoD ID 1087987498 · typed, not scanned'),
+        findsOneWidget,
+      );
+      // Still flagged: a typed name is a claim, and the card says so.
+      expect(find.byIcon(Icons.gpp_maybe_outlined), findsOneWidget);
     });
 
     testWidgets('a report from a build that predates verification is flagged',

@@ -55,9 +55,12 @@ class ProfilePageState extends State<ProfilePage> {
   /// spend it.
   Future<void> toggleFullScreen() async {
     if (fullScreenOn.value) {
+      // Deliberate: the next tap must not take the screen straight back.
+      fullScreenWanted.value = false;
       await leaveFullScreen();
       return;
     }
+    fullScreenWanted.value = true;
     final ok = await enterFullScreen();
     if (ok || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

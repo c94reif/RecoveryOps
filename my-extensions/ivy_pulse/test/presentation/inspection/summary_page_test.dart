@@ -318,7 +318,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.textContaining('not a CAC barcode'),
+        find.textContaining('not a CAC'),
         findsOneWidget,
       );
       expect(submitButton, findsNothing);

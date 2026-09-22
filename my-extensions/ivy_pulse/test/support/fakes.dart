@@ -653,6 +653,13 @@ class FakeReportsViewModel extends ChangeNotifier implements ReportsViewModel {
   }
 
   @override
+  Future<void> addOutgoing(PmcsReport stored) async {
+    reports.removeWhere((r) => r.entityId == stored.entityId);
+    reports.insert(0, stored);
+    notifyListeners();
+  }
+
+  @override
   Future<void> markReportAsRead(PmcsReport report) async {
     markedRead.add(report);
   }

@@ -3,6 +3,9 @@ import 'package:ivy_pulse/core/di/injection.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_fault.dart';
 import 'package:ivy_pulse/presentation/common/widgets/confirm_dialog.dart';
+import 'package:ivy_pulse/presentation/common/widgets/custom_snack_bar.dart';
+import 'package:ivy_pulse/presentation/home/home_view_model.dart';
+import 'package:ivy_pulse/presentation/inspection/inspection_view_model.dart';
 import 'package:ivy_pulse/presentation/common/widgets/fault_tally_bar.dart';
 import 'package:ivy_pulse/presentation/common/widgets/section_label.dart';
 import 'package:ivy_pulse/presentation/common/widgets/severity_badge.dart';
@@ -57,6 +60,33 @@ class ReportsPageState extends State<ReportsPage> {
     if (confirmed) {
       await viewModel.deleteReport(report);
     }
+  }
+
+  /// Walk this vehicle again: hand its bumper number, UIC and platform to the
+  /// PMCS tab and switch to it, so the operator starts from BEGIN PMCS instead
+  /// of retyping what is already on the card.
+  ///
+  /// Resolved at tap time rather than in [initState] so a reports screen can
+  /// be built without an inspection flow behind it, as the widget tests do.
+  void startNewPmcs(PmcsReport report) {
+    if (!getIt.isRegistered<InspectionViewModel>() ||
+        !getIt.isRegistered<HomeViewModel>()) {
+      return;
+    }
+    final inspection = getIt<InspectionViewModel>();
+    final accepted = inspection.prefillVehicle(
+      bumperNumber: report.bumperNumber,
+      uic: report.uic,
+      vehicleType: report.vehicleType,
+    );
+    if (!accepted) {
+      SnackBarService.instance.enqueue(
+        'Finish or discard the open PMCS first',
+        isError: true,
+      );
+      return;
+    }
+    getIt<HomeViewModel>().selectTab(0);
   }
 
   /// Worst first — the maintainer reads the deadlining faults, not the order
@@ -216,13 +246,33 @@ class ReportsPageState extends State<ReportsPage> {
                             ),
                           ],
                         ),
+                        // The DoD ID is what ties the name to a person in
+                        // DEERS, so a maintainer chasing a signature has it
+                        // on the card. A typed one is printed too — it is
+                        // still the number to chase — but says so, because
+                        // it was never checked against a card.
+                        if (report.signature?.dodId case final dodId?) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            report.isSignatureVerified
+                                ? 'DoD ID $dodId'
+                                : 'DoD ID $dodId · typed, not scanned',
+                            style: TextStyle(
+                              color: report.isSignatureVerified
+                                  ? textSecondary
+                                  : circleXAmber,
+                              fontSize: 10,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
                   IconButton(
-                    onPressed: () => viewModel.viewReport(report),
-                    icon: const Icon(Icons.place_outlined, size: 18),
-                    tooltip: 'Show on map',
+                    onPressed: () => startNewPmcs(report),
+                    icon: const Icon(Icons.add_task, size: 18),
+                    tooltip: 'New PMCS on this vehicle',
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(

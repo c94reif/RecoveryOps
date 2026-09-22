@@ -23,7 +23,7 @@ void main() {
       final hint = cacRetryHint(2);
 
       expect(hint, isNotNull);
-      expect(hint, contains('sideways'));
+      expect(hint, contains('fill the box'));
       expect(hint, contains('across the frame'));
     });
 
@@ -32,7 +32,7 @@ void main() {
 
       expect(hint, isNotNull);
       expect(hint, contains('shadow'));
-      expect(hint, isNot(contains('sideways')),
+      expect(hint, isNot(contains('fill the box')),
           reason: 'repeating advice that has already failed twice reads as '
               'the app not listening');
     });

@@ -60,23 +60,23 @@ enum CacRejection {
 
   String get message => switch (this) {
         CacRejection.noCodeFound =>
-          'No barcode found. Fill the frame with the side that has your photo '
-              'and the gold chip, and hold steady.',
+          'No DoD ID number found. Fill the frame with the back of the card '
+              '— the side with the wide barcode strip — and hold steady.',
         CacRejection.codeUnreadable =>
-          'Found the barcode but could not read it. Wipe the card, tilt it '
-              'away from the light, and hold steady.',
+          'Found the card but could not read the DoD ID number. Wipe the '
+              'card, tilt it away from the light, and hold steady.',
         CacRejection.cardTooSmall =>
-          'The barcode is too small in the frame. Turn the card sideways so '
-              'the barcode runs across the frame, and move closer.',
+          'The card is too small in the frame. Move closer until the DoD ID '
+              'number is clear.',
         // Says "tall", never "large": the strip on the back is more than twice
         // the area of the symbol this wants, so "the large block" names the
         // wrong one — and contradicts the diagram drawn right under it.
         CacRejection.notACac =>
-          'That is not a CAC barcode. Scan the tall barcode on the side with '
-              'your photo and the gold chip, bottom left beside the chip.',
+          'That is not a CAC. Scan the back of the card — the side with the '
+              'wide barcode strip and the DoD ID number.',
         CacRejection.wrongSideOfCard =>
-          'That is the strip the gate guard scans, on the back. Turn the card '
-              'over — the tall barcode is bottom left, beside the gold chip.',
+          'That is the side with your photo. Turn it over — the DoD ID number is '
+              'printed on the back, above the wide barcode strip.',
         CacRejection.legacySsnCard =>
           'That card predates 2012 and carries an SSN. It cannot be used — '
               'draw a current CAC.',

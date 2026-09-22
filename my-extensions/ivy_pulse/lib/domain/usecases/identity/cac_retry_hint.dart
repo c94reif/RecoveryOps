@@ -1,32 +1,23 @@
-/// Aiming advice that only earns its place after the operator has already
-/// missed, keyed to how many scans in a row have come back without a Soldier.
+/// What to tell an operator after a scan has missed more than once.
 ///
-/// Pure, and in the domain rather than inside a build method, because the two
-/// things it says are the only non-obvious facts about photographing a CAC and
-/// they have to stay testable without a camera or a widget.
-///
-/// Nothing on the first miss on purpose. The rejection carries its own
-/// instruction — wipe the card, move closer, turn it over — and stacking a
-/// second piece of advice on top of it while the operator is still lining the
-/// card up is how a Soldier in the rain stops reading the panel at all.
-///
-/// [attempts] counts scans since the last verified read, so the escalation is
-/// about *this* card and *this* light, not about the day.
+/// The first miss gets nothing — the refusal itself already says what to
+/// fix, and a hint on top of it is noise. The advice escalates from there,
+/// framing first and light second, because that is the order the fixes are
+/// cheap in and the order they actually fail in.
 String? cacRetryHint(int attempts) => switch (attempts) {
-      // The PDF417's bars run the long way up a portrait card, so a card held
-      // upright puts a tall thin symbol in a frame that is wide — most of the
-      // sensor is spent on card stock and sky. Turned sideways the symbol
-      // fills the frame and every module lands on roughly twice as many
-      // pixels, which is the whole difference between a miss and a read. It
-      // costs nothing to decode: the detector sweeps all four rotations
-      // whatever the operator does.
-      2 => 'Turn the card sideways so the barcode runs across the frame — it '
-          'reads at about twice the size that way.',
-      // Glare is the failure that survives good framing, and a phone held over
-      // a card at arm's length is the worst possible angle for it. Standing so
-      // the operator's own body shades the card kills the specular highlight
-      // without needing anything they do not already have.
-      >= 3 => 'Lay the card flat, stand so your own shadow falls across it, '
-          'and shoot straight down.',
+      // The back of the card is landscape and the DoD ID number is one short
+      // line of small print on it. A card held at an angle or half out of the
+      // box puts that line on too few pixels, skewed, and OCR reads a 3 for
+      // an 8. Flat and filling the box, the number runs straight across the
+      // frame at a size that reads on the first frame.
+      2 => 'Lay the card flat and fill the box with the whole back — the '
+          'number reads best running straight across the frame.',
+      // Glare is the failure that survives good framing: the card's
+      // holographic overlay throws a highlight straight over the digits, and
+      // a phone held over a card at arm's length is the worst angle for it.
+      // Standing so the operator's own body shades the card kills the
+      // highlight without needing anything they do not already have.
+      >= 3 => 'Stand so your own shadow falls across the card and tilt it '
+          'until the number stops shining.',
       _ => null,
     };

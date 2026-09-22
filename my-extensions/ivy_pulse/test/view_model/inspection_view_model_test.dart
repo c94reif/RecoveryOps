@@ -226,6 +226,55 @@ void main() {
     );
   }
 
+  group('walking a known vehicle again', () {
+    test('a vehicle handed over from a report is queued for the setup fields',
+        () async {
+      await viewModel.load();
+
+      final accepted = viewModel.prefillVehicle(
+        bumperNumber: 'B-22',
+        uic: 'WAB4C0',
+        vehicleType: VehicleType.jltv,
+      );
+
+      expect(accepted, isTrue);
+      expect(viewModel.selectedVehicle, VehicleType.jltv);
+      expect(viewModel.pendingPrefill?.bumperNumber, 'B-22');
+      expect(viewModel.pendingPrefill?.uic, 'WAB4C0');
+    });
+
+    test('the hand-over is consumed once, so an edit is not overwritten',
+        () async {
+      await viewModel.load();
+      viewModel.prefillVehicle(
+        bumperNumber: 'B-22',
+        uic: 'WAB4C0',
+        vehicleType: VehicleType.stryker,
+      );
+
+      expect(viewModel.takePrefill()?.bumperNumber, 'B-22');
+      expect(viewModel.takePrefill(), isNull);
+      expect(viewModel.pendingPrefill, isNull);
+    });
+
+    test('is refused while another walk-around is open', () async {
+      await viewModel.load();
+      await viewModel.beginSession(bumperNumber: 'A-11', uic: 'WJ8TAA');
+      expect(viewModel.stage, isNot(InspectionStage.setup));
+
+      final accepted = viewModel.prefillVehicle(
+        bumperNumber: 'B-22',
+        uic: 'WAB4C0',
+        vehicleType: VehicleType.jltv,
+      );
+
+      expect(accepted, isFalse);
+      expect(viewModel.pendingPrefill, isNull);
+      // The open session's vehicle is left exactly as it was.
+      expect(viewModel.session?.bumperNumber, 'A-11');
+    });
+  });
+
   group('setup', () {
     test('opens on the first supported platform', () {
       expect(viewModel.stage, InspectionStage.setup);
@@ -686,6 +735,56 @@ void main() {
 
       expect(viewModel.canSubmitUnverified, isFalse);
       await viewModel.submitUnverified();
+
+      expect(reportsRepo.reports, isEmpty);
+    });
+
+    test('the typed fallback sends the PMCS unverified, with the name, the '
+        'DoD ID and the reason the scan failed', () async {
+      await completeEverything();
+      cacScanner.willFail(CacRejection.codeUnreadable);
+      await viewModel.scanCac();
+
+      await viewModel.submitAttested(
+        lastName: 'smith',
+        firstName: 'john',
+        edipi: '1087 987 498',
+      );
+
+      final report = reportsRepo.reports.single;
+      expect(report.isSignatureVerified, isFalse);
+      expect(report.operator, 'SMITH, JOHN');
+      expect(report.signature!.method, 'typed');
+      expect(report.signature!.dodId, '1087987498');
+      expect(report.signature!.blockedBy, CacRejection.codeUnreadable);
+      expect(viewModel.stage, InspectionStage.setup);
+    });
+
+    test('a typed entry that cannot be a Soldier is refused and nothing is '
+        'stored', () async {
+      await completeEverything();
+      cacScanner.willFail(CacRejection.codeUnreadable);
+      await viewModel.scanCac();
+
+      await viewModel.submitAttested(
+        lastName: 'SMITH',
+        firstName: 'JOHN',
+        edipi: '12345',
+      );
+
+      expect(reportsRepo.reports, isEmpty);
+      expect(viewModel.canSubmitUnverified, isTrue);
+    });
+
+    test('the typed fallback is not reachable before a scan has been tried',
+        () async {
+      await completeEverything();
+
+      await viewModel.submitAttested(
+        lastName: 'SMITH',
+        firstName: 'JOHN',
+        edipi: '1087987498',
+      );
 
       expect(reportsRepo.reports, isEmpty);
     });

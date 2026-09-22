@@ -176,6 +176,44 @@ void main() {
     });
   });
 
+  group('the RED X badge', () {
+    void deadline(PmcsPhase phase) {
+      harness.faults.byPhase['session-1|${phase.wireName}'] = [
+        buildFault(severity: FaultSeverity.redX, phase: phase),
+      ];
+    }
+
+    testWidgets('marks the phase holding a RED X, and only that phase',
+        (tester) async {
+      deadline(PmcsPhase.before);
+      await resumeWith([]);
+      await pumpPage(tester);
+
+      expect(find.byIcon(Icons.cancel), findsOneWidget);
+    });
+
+    testWidgets('a CIRCLE X does not earn it — the vehicle can still roll',
+        (tester) async {
+      harness.faults.byPhase['session-1|${PmcsPhase.before.wireName}'] = [
+        buildFault(severity: FaultSeverity.circleX, phase: PmcsPhase.before),
+      ];
+      await resumeWith([]);
+      await pumpPage(tester);
+
+      expect(find.byIcon(Icons.cancel), findsNothing);
+    });
+
+    testWidgets('stays on the card once the phase is closed out',
+        (tester) async {
+      deadline(PmcsPhase.after);
+      await resumeWith([PmcsPhase.after]);
+      await pumpPage(tester);
+
+      expect(find.byIcon(Icons.cancel), findsOneWidget);
+      expect(find.text('COMPLETE'), findsOneWidget);
+    });
+  });
+
   group('the summary button', () {
     testWidgets('is not offered before a single phase is done', (tester) async {
       await harness.begin();

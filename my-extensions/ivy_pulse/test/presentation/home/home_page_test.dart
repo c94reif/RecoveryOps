@@ -23,6 +23,28 @@ import '../../support/fakes.dart';
 /// beyond the one the picker reads.
 class FakeInspectionViewModel extends ChangeNotifier
     implements InspectionViewModel {
+  // The setup page asks for a handed-over vehicle on every build; the shell
+  // test has none to give.
+  @override
+  ({String bumperNumber, String uic})? pendingPrefill;
+
+  @override
+  ({String bumperNumber, String uic})? takePrefill() {
+    final prefill = pendingPrefill;
+    pendingPrefill = null;
+    return prefill;
+  }
+
+  @override
+  bool prefillVehicle({
+    required String bumperNumber,
+    required String uic,
+    required VehicleType vehicleType,
+  }) {
+    pendingPrefill = (bumperNumber: bumperNumber, uic: uic);
+    return true;
+  }
+
   @override
   final PmcsCatalogSource catalogSource = const StaticPmcsCatalogSource();
 

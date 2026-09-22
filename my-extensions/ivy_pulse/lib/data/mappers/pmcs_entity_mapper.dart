@@ -34,6 +34,7 @@ class PmcsEntityMapper {
           ? sdk.Disposition.hostile
           : sdk.Disposition.friendly,
       description: jsonEncode(codec.reportBody(report)),
+      extra: signerFields(report),
       environment: 'land',
       ontology: sdk.EntityOntology(
         platformType: report.vehicleType.displayName,
@@ -57,6 +58,30 @@ class PmcsEntityMapper {
       expiryTime: now.add(AppConstants.entityTtl),
       isLive: true,
     );
+  }
+
+  /// Who signed the PMCS, as top-level fields on the entity.
+  ///
+  /// The full signature already rides inside the description blob, but that
+  /// is a JSON string a Lattice operator sees raw. A maintainer clicking the
+  /// vehicle on the COP wants the name and the DoD ID number where the
+  /// platform can show them — and an integration keying off the entity wants
+  /// them without parsing our report format. `signedBy` is the operator
+  /// column as the report card prints it, which on an unverified PMCS reads
+  /// `UNVERIFIED` rather than a name the app could not check.
+  static Map<String, dynamic> signerFields(PmcsReport report) {
+    final signature = report.signature;
+    final dodId = signature?.dodId;
+    return {
+      'signedBy': report.operator,
+      'signatureVerified': report.isSignatureVerified,
+      // `cac`, `typed` or `none` — a typed name carries a DoD ID too, so the
+      // verified flag alone would not tell a consumer which kind it is.
+      'signatureMethod': signature?.method ?? 'none',
+      if (dodId != null) 'dodId': dodId,
+      if (signature != null)
+        'signedAt': signature.signedAt.toUtc().toIso8601String(),
+    };
   }
 
   /// Rebuilds an entity from a queued payload, where the report object that

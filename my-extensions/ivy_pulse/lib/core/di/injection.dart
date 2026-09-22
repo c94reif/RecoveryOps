@@ -295,6 +295,10 @@ void configureDependencies(sdk.ExtensionContext extensionContext) {
       verifyOperatorIdentity: getIt<VerifyOperatorIdentity>(),
       cacScanner: getIt<CacScannerStrategy>(),
       profileRepository: getIt<ProfileRepository>(),
+      // Resolved at call time, not here: the reports screen is registered
+      // below, and a submitted PMCS has to land on its YOURS tab at once.
+      onReportSubmitted: (report) =>
+          getIt<ReportsViewModel>().addOutgoing(report),
     ),
   );
 

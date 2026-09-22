@@ -7,6 +7,8 @@ import 'package:ivy_pulse/presentation/common/widgets/confirm_dialog.dart';
 import 'package:ivy_pulse/presentation/common/widgets/custom_button.dart';
 import 'package:ivy_pulse/presentation/common/widgets/section_label.dart';
 import 'package:ivy_pulse/presentation/inspection/inspection_view_model.dart';
+import 'package:ivy_pulse/presentation/inspection/typed_identity_form.dart';
+import 'package:ivy_pulse/presentation/inspection/viewfinder/cac_viewfinder.dart';
 
 /// The last thing between a walked PMCS and the net: who is signing for it.
 ///
@@ -35,12 +37,12 @@ class SignOffCard extends StatelessWidget {
   /// and SUBMIT UNVERIFIED off a 314-pixel panel at the exact moment the
   /// Soldier needed them, which is a worse failure than a diagram nobody can
   /// read the fine detail of — the detail is in the three lines beside it.
-  static const double cardWidth = 60;
+  static const double cardWidth = 88;
 
-  /// A CR80 card is 1:1.587, and the front is printed portrait. Held to the
-  /// real proportion so the drawing is recognisably the thing in the
-  /// operator's hand rather than a generic rectangle.
-  static const double cardHeight = cardWidth * 1.587;
+  /// A CR80 card is 1.587:1, and the back — the side asked for — is printed
+  /// landscape. Held to the real proportion so the drawing is recognisably
+  /// the thing in the operator's hand rather than a generic rectangle.
+  static const double cardHeight = cardWidth / 1.587;
 
   @override
   Widget build(BuildContext context) {
@@ -68,8 +70,8 @@ class SignOffCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'A PMCS is signed by the Soldier who walked it. Scan the tall '
-          'barcode on your CAC.',
+          'A PMCS is signed by the Soldier who walked it. Show the camera '
+          'the back of your CAC — it reads your DoD ID number.',
           style: TextStyle(color: textSecondary, fontSize: 12, height: 1.4),
         ),
         if (viewModel.cacScannerAvailable) ...[
@@ -113,33 +115,41 @@ class SignOffCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: border, width: 1),
-          ),
-          child: Row(
-            children: [
-              const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
+        // On Android the scan is a live view: the camera is drawn right here
+        // and reads the number the moment it is legible. Where the platform
+        // has no live view — the web build photographs through the system
+        // camera app — the operator is told what is happening instead.
+        buildCacViewfinder(viewModel.cacScanner) ??
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+              decoration: BoxDecoration(
+                color: surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: border, width: 1),
               ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Text(
-                  'Reading the card — fill the frame with the side that has '
-                  'your photo and the gold chip.',
-                  style:
-                      TextStyle(color: textPrimary, fontSize: 13, height: 1.35),
-                ),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Text(
+                      'Reading the card — fill the frame with the back, the '
+                      'side with the wide barcode strip.',
+                      style: TextStyle(
+                        color: textPrimary,
+                        fontSize: 13,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
         // This state used to render no controls at all, which made a camera
         // that never came back the end of the PMCS. It is also the state the
         // operator sits in for up to two minutes while the capture timeout
@@ -156,8 +166,8 @@ class SignOffCard extends StatelessWidget {
           ),
         ),
         const Text(
-          'Cancelling gives up on this side and drops any photo that arrives '
-          'late. It cannot close the camera app — back out of that yourself.',
+          'Nothing is saved — the camera reads the number and the frames are '
+          'gone. Cancelling closes the camera and leaves the PMCS unsigned.',
           textAlign: TextAlign.center,
           style: TextStyle(color: textSecondary, fontSize: 11, height: 1.4),
         ),
@@ -405,6 +415,8 @@ class SignOffCard extends StatelessWidget {
           const SizedBox(height: 10),
           buildAimGuide(),
         ],
+        const SizedBox(height: 14),
+        TypedIdentityForm(viewModel: viewModel),
         const SizedBox(height: 6),
         const Text(
           'An unverified PMCS still reaches the maintainer, marked as signed '
@@ -531,11 +543,12 @@ class SignOffCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AimGuideLine('Your photo and the gold chip face you'),
+              AimGuideLine('Turn the card over — the side the gate scans'),
               SizedBox(height: 5),
-              AimGuideLine('The tall barcode is bottom left, beside the chip'),
+              AimGuideLine('Fill the box; the DoD ID number sits above the '
+                  'wide strip'),
               SizedBox(height: 5),
-              AimGuideLine('Not the wide strip the gate guard scans'),
+              AimGuideLine('It reads by itself — no button to press'),
             ],
           ),
         ),
@@ -543,6 +556,10 @@ class SignOffCard extends StatelessWidget {
     );
   }
 
+  /// The back of the card, as the operator holds it: landscape, the wide
+  /// Code 39 strip along the lower edge, and the DoD ID number printed
+  /// above it. Only the number is lit — it is the thing the camera is
+  /// reading — and the strip is drawn muted as the landmark it sits above.
   Widget buildCardSchematic() {
     return SizedBox(
       width: cardWidth,
@@ -561,49 +578,17 @@ class SignOffCard extends StatelessWidget {
               ),
             ),
           ),
-          // Photo, upper left.
+          // The other printed numbers — benefits number, date of birth —
+          // as muted rules, so the lit one reads as one of several.
+          buildPrintedRule(top: 0.10, width: 0.40),
+          buildPrintedRule(top: 0.20, width: 0.30),
+          // The target: the DoD ID number. The only lit element, filled solid
+          // rather than glowed so it still reads on a sunlit EUD.
           Positioned(
             left: cardWidth * 0.08,
-            top: cardHeight * 0.06,
-            width: cardWidth * 0.32,
-            height: cardHeight * 0.25,
-            child: Container(
-              decoration: BoxDecoration(
-                color: border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          // The printed name under the photo, as two rules — enough to place
-          // the photo in the layout without pretending to be legible.
-          buildPrintedRule(top: 0.34, width: 0.32),
-          buildPrintedRule(top: 0.39, width: 0.22),
-          // The gold ICC chip, lower centre. The landmark an operator finds
-          // without reading anything — but drawn muted, because it is the
-          // reference point and not the thing being aimed at. Solid amber here
-          // out-shouted the target beside it and the drawing then pointed at
-          // the wrong rectangle.
-          Positioned(
-            left: cardWidth * 0.41,
-            top: cardHeight * 0.60,
-            width: cardWidth * 0.23,
-            height: cardHeight * 0.12,
-            child: Container(
-              decoration: BoxDecoration(
-                color: border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          // The target. Roughly to scale against the real 12.5 x 24.7 mm
-          // symbol, and the only lit element on the drawing — filled solid
-          // rather than glowed, so it still reads as the brightest thing here
-          // on a sunlit EUD.
-          Positioned(
-            left: cardWidth * 0.08,
-            top: cardHeight * 0.58,
-            width: cardWidth * 0.21,
-            height: cardHeight * 0.29,
+            top: cardHeight * 0.32,
+            width: cardWidth * 0.62,
+            height: cardHeight * 0.09,
             child: Container(
               decoration: BoxDecoration(
                 color: serviceableGreen,
@@ -612,6 +597,22 @@ class SignOffCard extends StatelessWidget {
               ),
             ),
           ),
+          // The wide Code 39 strip along the long edge — the landmark, so
+          // muted, not the thing being aimed at.
+          Positioned(
+            left: cardWidth * 0.08,
+            top: cardHeight * 0.58,
+            width: cardWidth * 0.84,
+            height: cardHeight * 0.14,
+            child: Container(
+              decoration: BoxDecoration(
+                color: border,
+                borderRadius: BorderRadius.circular(1),
+              ),
+            ),
+          ),
+          // The magnetic stripe, right at the bottom edge.
+          buildPrintedRule(top: 0.86, width: 0.84),
         ],
       ),
     );

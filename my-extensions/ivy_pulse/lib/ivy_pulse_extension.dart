@@ -82,11 +82,6 @@ class IvyPulseExtensionUI extends StatefulWidget {
 class IvyPulseExtensionUIState extends State<IvyPulseExtensionUI> {
   StreamSubscription<IncomingMessage>? messageSub;
 
-  /// Set once the screen is actually ours, so leaving full screen from the
-  /// Profile control stays left — without this the next tap would drag the
-  /// operator straight back in.
-  bool screenClaimed = false;
-
   /// Height of the strip reserved for the exit control in full screen.
   static const double exitBarHeight = minTouchTarget + 16;
 
@@ -145,13 +140,18 @@ class IvyPulseExtensionUIState extends State<IvyPulseExtensionUI> {
   /// transient activation in Chrome — wiring it too just logged
   /// `API can only be initiated by a user gesture` on every touch — while the
   /// release does, which is why the tested-good path was a button's
-  /// `onPressed`. [screenClaimed] latches on the first granted attempt so a
-  /// deliberate exit from the Profile control stays exited.
+  /// `onPressed`.
+  ///
+  /// Not latched. This used to remember the first granted claim and never
+  /// ask again, which meant the CAC scan — a separate camera activity that
+  /// makes the browser drop fullscreen — left the operator stranded in the
+  /// panel afterwards. Now it asks whenever the operator wants full screen
+  /// and does not have it, so the first tap after the camera returns takes
+  /// the screen back. A deliberate exit clears [fullScreenWanted] and is
+  /// left alone.
   void claimScreen() {
-    if (screenClaimed) return;
-    unawaited(enterFullScreen().then((granted) {
-      if (granted) screenClaimed = true;
-    }));
+    if (!fullScreenWanted.value || fullScreenOn.value) return;
+    unawaited(enterFullScreen());
   }
 
   /// Give the screen back and close the plugin.
@@ -165,6 +165,8 @@ class IvyPulseExtensionUIState extends State<IvyPulseExtensionUI> {
   /// deploy), not by [AppConstants.extensionId], so ask it who is active
   /// rather than asserting a name.
   Future<void> exitPlugin() async {
+    // A deliberate exit — do not take the screen back on the next tap.
+    fullScreenWanted.value = false;
     await leaveFullScreen();
     final ui = widget.extensionContext.ui;
     try {

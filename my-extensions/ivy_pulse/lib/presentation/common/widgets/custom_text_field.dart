@@ -9,6 +9,9 @@ class CustomTextField extends StatelessWidget {
   final TextCapitalization textCapitalization;
   final ValueChanged<String>? onChanged;
 
+  /// Which keyboard comes up. A DoD ID wants the number pad; a name does not.
+  final TextInputType? keyboardType;
+
   const CustomTextField({
     super.key,
     required this.controller,
@@ -18,6 +21,7 @@ class CustomTextField extends StatelessWidget {
     this.hint,
     this.textCapitalization = TextCapitalization.none,
     this.onChanged,
+    this.keyboardType,
   });
 
   @override
@@ -26,6 +30,7 @@ class CustomTextField extends StatelessWidget {
       controller: controller,
       textCapitalization: textCapitalization,
       onChanged: onChanged,
+      keyboardType: keyboardType,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,

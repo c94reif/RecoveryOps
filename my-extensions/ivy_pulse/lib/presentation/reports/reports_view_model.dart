@@ -179,6 +179,27 @@ class ReportsViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// A PMCS this device just submitted, handed over by the inspection flow.
+  ///
+  /// Without this the YOURS tab only ever showed what was in the database
+  /// when the app started — a walk-around submitted a minute ago was
+  /// invisible until the next launch, and on the WebView build the next
+  /// launch starts with an empty database, so it was invisible for good.
+  /// [stored] is the row as the repository returned it, id and all, so
+  /// delete and mark-read work on it the same as on anything loaded at start.
+  /// A resubmission under an entity id already on the list replaces the old
+  /// row rather than stacking a duplicate.
+  Future<void> addOutgoing(PmcsReport stored) async {
+    reports.removeWhere((r) => r.entityId == stored.entityId);
+    reports.insert(0, stored);
+    updateUnread();
+    notifyListeners();
+    // A submission that could not reach its transport is parked at the same
+    // moment, so the QUEUED tab moves with it.
+    await refreshQueuedCount();
+    await refreshQueued();
+  }
+
   Future<void> applyRemoteDeletion(String entityId) async {
     final index = reports.indexWhere((r) => r.entityId == entityId);
     if (index == -1) return;

@@ -1,33 +1,32 @@
 import 'package:ivy_pulse/domain/entities/cac_scan.dart';
 
-/// Reads the PDF417 on the front of a CAC with the device camera.
+/// Reads the DoD ID number off the **back** of a CAC with the device camera.
 ///
-/// A CAC carries two barcodes, on opposite faces, and only one of them can
-/// sign a 5988-E. Stated in full here because the wrong half of it is the
-/// mistake every layer above this one has to guard against:
+/// A CAC has two faces, and the one this port wants is the one a Soldier is
+/// already trained to present — at an installation gate the *back* goes on
+/// the AIE/DBIDS reader. Stated in full because the two faces are printed
+/// ninety degrees apart and confusing them is the mistake every layer above
+/// this one has to guard against:
 ///
-/// - **Front**, printed *portrait* (CR80, 1:1.587). Photo upper left, gold ICC
-///   chip lower centre, and the **PDF417** in the lower-left corner
-///   immediately left of that chip — about 12.5 x 24.7 mm, some 6% of the
-///   face. 89 characters (88 on a legacy version-`1` card): name, rank,
-///   branch, personnel category, DoD ID, expiry. This is the one this port
-///   reads.
-/// - **Back**, printed *landscape* — so the two faces' "up" directions are 90
-///   degrees apart. A horizontal **Code 39** strip about 70 x 9.3 mm runs
-///   along the long edge. 18 characters, and no name, no rank, no dates. It
-///   can never sign anything; its only use is telling an operator they
-///   photographed the wrong face.
+/// - **Back**, printed *landscape*. A wide **Code 39** strip runs along the
+///   long edge, and the **DoD ID Number** is printed in plain digits above
+///   it, beside the DoD Benefits Number and the date of birth. This is the
+///   face this port reads: on Android by OCR of the printed number from a
+///   live preview, on the web build by decoding the strip, which encodes
+///   the same number.
+/// - **Front**, printed *portrait*. Photo, name, rank, gold chip, and a tall
+///   PDF417 beside the chip carrying the full record. The web build still
+///   decodes it if it is what the camera is shown, but nothing asks for it.
 ///
-/// Never describe either one to an operator as "the front". At an installation
-/// gate a Soldier is trained to present the *back* so AIE/DBIDS can read that
-/// Code 39 strip, and every state driving licence in their wallet carries its
-/// PDF417 on the back as well — so "front" is the one word guaranteed to send
-/// them the wrong way. Name landmarks instead: the photo, the gold chip, the
-/// tall barcode beside it.
+/// What comes off the back is a number and nothing else — no name, no rank —
+/// so a signature made this way names the Soldier by DoD ID. Name landmarks
+/// to the operator, not faces: the wide strip, the DoD ID number above it.
 ///
-/// Only the capture and the decode live behind this port. Turning the barcode
-/// into a Soldier is `ParseCacBarcode`'s job, so the rules the DMDC spec lays
-/// down stay testable without a camera.
+/// Only the capture and the read live behind this port. Turning what was
+/// read into a Soldier is `ParseDodId`'s job (and `ParseCacBarcode`'s for a
+/// barcode record), so the rules stay testable without a camera. A capture
+/// hands back either the ten-digit number or the raw barcode text; the
+/// verify step tells them apart by shape.
 abstract class CacScannerStrategy {
   /// False when nothing on this platform can reach a camera, so the operator
   /// finds out before they have walked a whole PMCS they cannot sign.

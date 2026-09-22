@@ -25,3 +25,13 @@ final ValueNotifier<int> verticalQuarterTurns =
 /// Whether the extension currently owns the whole device screen, kept in step
 /// with the document so the system back gesture can't leave the label lying.
 final ValueNotifier<bool> fullScreenOn = ValueNotifier<bool>(false);
+
+/// Whether the operator *wants* full screen — distinct from whether they have
+/// it. The browser drops fullscreen whenever another activity takes the
+/// screen, and the CAC scan hands the whole screen to the camera app, so a
+/// failed scan used to come back to a plugin sitting in the panel with no
+/// way to re-enter short of finding the Profile tab. This is what the
+/// first-touch claim checks: true, and not currently full screen, means the
+/// next tap takes the screen back. Only a deliberate exit — the ✕ or the
+/// Profile control — clears it.
+final ValueNotifier<bool> fullScreenWanted = ValueNotifier<bool>(true);

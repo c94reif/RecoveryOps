@@ -464,6 +464,65 @@ void main() {
     });
   });
 
+  group('a PMCS submitted from this device', () {
+    test('lands on the YOURS tab the moment it is stored', () async {
+      await start();
+      expect(viewModel.yourReports, isEmpty);
+
+      await viewModel.addOutgoing(
+        buildReport(id: 7, entityId: 'just-now', isOutgoing: true),
+      );
+
+      expect(viewModel.yourReports.map((r) => r.entityId), ['just-now']);
+      // Our own PMCS is never "unread" — the badge is for other crews.
+      expect(viewModel.unreadCount.value, 0);
+    });
+
+    test('goes to the top, ahead of what was loaded at start', () async {
+      repository.reports.add(
+        buildReport(id: 1, entityId: 'earlier', isOutgoing: true),
+      );
+      await start();
+
+      await viewModel.addOutgoing(
+        buildReport(id: 2, entityId: 'later', isOutgoing: true),
+      );
+
+      expect(
+        viewModel.yourReports.map((r) => r.entityId),
+        ['later', 'earlier'],
+      );
+    });
+
+    test('a resubmission replaces its earlier row instead of stacking',
+        () async {
+      await start();
+      await viewModel.addOutgoing(
+        buildReport(id: 1, entityId: 'same', isOutgoing: true),
+      );
+      await viewModel.addOutgoing(
+        buildReport(id: 2, entityId: 'same', isOutgoing: true),
+      );
+
+      expect(viewModel.yourReports, hasLength(1));
+      expect(viewModel.yourReports.single.id, 2);
+    });
+
+    test('brings the queue along, for a submission that was parked',
+        () async {
+      await start();
+      queuedRepository.submissions.add(buildQueuedSubmission(id: 1));
+      queueWorker.pending = 1;
+
+      await viewModel.addOutgoing(
+        buildReport(id: 1, entityId: 'parked', isOutgoing: true),
+      );
+
+      expect(viewModel.queued, hasLength(1));
+      expect(viewModel.queuedCount.value, 1);
+    });
+  });
+
   group('splitting reports across the tabs', () {
     test('the UIC on the profile is what a report is matched against',
         () async {

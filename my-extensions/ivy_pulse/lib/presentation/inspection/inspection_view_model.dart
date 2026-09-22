@@ -9,6 +9,7 @@ import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_report.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_session.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_signature.dart';
+import 'package:ivy_pulse/domain/entities/attested_identity.dart';
 import 'package:ivy_pulse/domain/entities/profile.dart';
 import 'package:ivy_pulse/domain/entities/publish_result.dart';
 import 'package:ivy_pulse/domain/entities/transport_kind.dart';
@@ -54,6 +55,14 @@ class InspectionViewModel extends ChangeNotifier {
   final VerifyOperatorIdentity verifyOperatorIdentity;
   final CacScannerStrategy cacScanner;
   final ProfileRepository profileRepository;
+
+  /// Told about every PMCS this device submits, with the row as stored.
+  ///
+  /// The reports screen keeps its own list and only reads the database at
+  /// start, so without this hand-off a walk-around just submitted was not on
+  /// the YOURS tab until the next launch. Optional so the flow can be built
+  /// without a reports screen behind it, as the tests do.
+  final void Function(PmcsReport report)? onReportSubmitted;
   final SnackBarService snackBarService;
 
   InspectionViewModel({
@@ -71,6 +80,7 @@ class InspectionViewModel extends ChangeNotifier {
     required this.verifyOperatorIdentity,
     required this.cacScanner,
     required this.profileRepository,
+    this.onReportSubmitted,
     SnackBarService? snackBarService,
   }) : snackBarService = snackBarService ?? SnackBarService.instance {
     final vehicles = catalogSource.supportedVehicles;
@@ -137,6 +147,35 @@ class InspectionViewModel extends ChangeNotifier {
   void selectVehicle(VehicleType vehicleType) {
     selectedVehicle = vehicleType;
     notifyListeners();
+  }
+
+  /// Bumper number and UIC waiting to be dropped into the setup fields —
+  /// handed over from a report card by "New PMCS on this vehicle". Consumed
+  /// by the setup page the next time it builds, via [takePrefill].
+  ({String bumperNumber, String uic})? pendingPrefill;
+
+  /// Queue up a walk-around of a known vehicle. Returns false, and changes
+  /// nothing, while an inspection is already open: the operator has to finish
+  /// or discard that one first, and silently swapping the vehicle out from
+  /// under it would be worse than making them do so.
+  bool prefillVehicle({
+    required String bumperNumber,
+    required String uic,
+    required VehicleType vehicleType,
+  }) {
+    if (stage != InspectionStage.setup) return false;
+    selectedVehicle = vehicleType;
+    pendingPrefill = (bumperNumber: bumperNumber, uic: uic);
+    notifyListeners();
+    return true;
+  }
+
+  /// The pending prefill, cleared as it is handed over so a later build of
+  /// the setup page does not overwrite what the operator has since typed.
+  ({String bumperNumber, String uic})? takePrefill() {
+    final prefill = pendingPrefill;
+    pendingPrefill = null;
+    return prefill;
   }
 
   Future<bool> beginSession({
@@ -531,6 +570,45 @@ class InspectionViewModel extends ChangeNotifier {
     ));
   }
 
+  /// Submits with the operator's name and DoD ID typed in by hand — the
+  /// fallback for a scan that failed.
+  ///
+  /// Goes out *unverified*, carrying both the reason the scan could not
+  /// happen and the typed identity, so a maintainer gets a 5988-E they can
+  /// chase without ever being shown a green tick this device cannot stand
+  /// behind. The same gate as [submitUnverified]: there has to have been a
+  /// refused scan, or the operator is sent to scan first.
+  Future<void> submitAttested({
+    required String lastName,
+    required String firstName,
+    required String edipi,
+  }) async {
+    if (session == null) return;
+
+    final rejection = lastScan?.rejection;
+    if (rejection == null) {
+      snackBarService.enqueue('Scan a CAC before submitting', isError: true);
+      return;
+    }
+
+    final parsed = AttestedIdentity.parse(
+      lastName: lastName,
+      firstName: firstName,
+      edipi: edipi,
+    );
+    final identity = parsed.identity;
+    if (identity == null) {
+      snackBarService.enqueue(parsed.error!, isError: true);
+      return;
+    }
+
+    await submitWith(PmcsSignature.unverified(
+      blockedBy: rejection,
+      signedAt: DateTime.now().toUtc(),
+      attestedBy: identity,
+    ));
+  }
+
   Future<void> submitWith(PmcsSignature signature) async {
     final current = session;
     if (current == null) return;
@@ -560,6 +638,10 @@ class InspectionViewModel extends ChangeNotifier {
     }
     debugPrint('[IvyPulse] submit — ${report.entityId} '
         '${report.statusLabel}, ${report.faults.length} fault(s)');
+
+    // Before the publish, not after: the row is stored and the YOURS tab
+    // should show it whether or not the transports are up.
+    onReportSubmitted?.call(report);
 
     // The report is on disk before a packet leaves the device, so the operator
     // is released the moment it is stored — the two transports report in on

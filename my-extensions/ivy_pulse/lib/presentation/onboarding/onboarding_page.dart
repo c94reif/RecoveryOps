@@ -37,8 +37,7 @@ class OnboardingPageState extends State<OnboardingPage> {
 
   void onFieldChanged() => setState(() {});
 
-  bool get canContinue =>
-      uicController.text.trim().isNotEmpty && !isSaving;
+  bool get canContinue => uicController.text.trim().isNotEmpty && !isSaving;
 
   Future<void> submit() async {
     setState(() => isSaving = true);

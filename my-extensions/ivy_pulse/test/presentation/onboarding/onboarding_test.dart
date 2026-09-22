@@ -90,7 +90,8 @@ void main() {
       expect(find.byType(OnboardingPage), findsOneWidget);
     });
 
-    testWidgets('a store that cannot be read lets the operator through '
+    testWidgets(
+        'a store that cannot be read lets the operator through '
         'rather than stranding them on a screen that cannot save',
         (tester) async {
       register(ExplodingProfileRepository());

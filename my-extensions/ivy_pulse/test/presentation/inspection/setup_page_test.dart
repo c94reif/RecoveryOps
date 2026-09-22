@@ -77,6 +77,32 @@ void main() {
       expect(isBeginEnabled(tester), isFalse);
     });
 
+    testWidgets('a vehicle handed over from a report card lands in the fields',
+        (tester) async {
+      await tester.pumpWidget(createWidgetUnderTest());
+      await tester.pumpAndSettle();
+
+      harness.viewModel.prefillVehicle(
+        bumperNumber: 'B-22',
+        uic: 'WAB4C0',
+        vehicleType: VehicleType.jltv,
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<CustomTextField>(field('Bumper Number')).controller.text,
+        'B-22',
+      );
+      expect(
+        tester.widget<CustomTextField>(field('UIC')).controller.text,
+        'WAB4C0',
+      );
+      expect(harness.viewModel.selectedVehicle, VehicleType.jltv);
+      // Consumed on arrival, so a later rebuild cannot put it back over an
+      // edit the operator has since made.
+      expect(harness.viewModel.pendingPrefill, isNull);
+    });
+
     testWidgets('the UIC the operator is signed for arrives with the profile',
         (tester) async {
       await harness.load();

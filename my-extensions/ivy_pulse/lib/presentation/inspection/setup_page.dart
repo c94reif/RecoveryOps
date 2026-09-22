@@ -29,9 +29,11 @@ class SetupPageState extends State<SetupPage> {
     viewModel = getIt<InspectionViewModel>();
 
     prefillUic();
+    applyPrefill();
     bumperNumberController.addListener(onFieldChanged);
     uicController.addListener(onFieldChanged);
     viewModel.addListener(prefillUic);
+    viewModel.addListener(applyPrefill);
   }
 
   /// The UIC on the profile is the one the operator is signed for, so it
@@ -44,6 +46,16 @@ class SetupPageState extends State<SetupPage> {
   }
 
   void onFieldChanged() => setState(() {});
+
+  /// A vehicle handed over from a report card lands in the fields as soon as
+  /// it is offered, and is taken off the view model in the same breath so a
+  /// rebuild after the operator edits it does not put it back.
+  void applyPrefill() {
+    final prefill = viewModel.takePrefill();
+    if (prefill == null) return;
+    bumperNumberController.text = prefill.bumperNumber;
+    uicController.text = prefill.uic;
+  }
 
   bool get canBegin =>
       bumperNumberController.text.trim().isNotEmpty &&
@@ -60,6 +72,7 @@ class SetupPageState extends State<SetupPage> {
   @override
   void dispose() {
     viewModel.removeListener(prefillUic);
+    viewModel.removeListener(applyPrefill);
     bumperNumberController.dispose();
     uicController.dispose();
     super.dispose();

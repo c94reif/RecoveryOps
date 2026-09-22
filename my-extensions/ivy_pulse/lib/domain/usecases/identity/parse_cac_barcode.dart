@@ -94,8 +94,18 @@ class ParseCacBarcode {
     // Tested before the front-of-card gate below, which would otherwise call
     // the back of the card `notACac` and send a Soldier looking for a card
     // already in their hand.
+    //
+    // The back is now the side the operator is asked for, and its strip
+    // carries the one thing the Android path also reads off it: the DoD ID
+    // number. So a Code 39 read is a signature by number — the same identity
+    // an OCR read produces — rather than the wrong side of the card.
     if (_isCacCode39(text)) {
-      return const CacScan.rejected(CacRejection.wrongSideOfCard);
+      return CacScan.verified(CacIdentity(
+        edipi: _base32(text, 8, 15)!.toString().padLeft(10, '0'),
+        firstName: '',
+        lastName: '',
+        verifiedAt: clock.nowUtc(),
+      ));
     }
 
     final version = text.isEmpty ? '' : text[0];
