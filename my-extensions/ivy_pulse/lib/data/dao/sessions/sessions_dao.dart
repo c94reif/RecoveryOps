@@ -67,7 +67,8 @@ class SessionsDao extends DatabaseAccessor<AppDatabase>
     double? latitude,
     double? longitude,
   }) async {
-    await (update(pmcsSessions)..where((t) => t.sessionId.equals(sessionId)))
+    final changed = await (update(pmcsSessions)
+          ..where((t) => t.sessionId.equals(sessionId)))
         .write(
       PmcsSessionsCompanion(
         bumperNumber: Value(bumperNumber),
@@ -78,9 +79,22 @@ class SessionsDao extends DatabaseAccessor<AppDatabase>
         completedPhases: Value(completedPhases),
         status: Value(status),
         signatureJson: Value(signatureJson),
-        latitude: Value(latitude),
-        longitude: Value(longitude),
+        latitude: Value.absentIfNull(latitude),
+        longitude: Value.absentIfNull(longitude),
       ),
+    );
+    if (changed != 1) throw StateError('Inspection no longer exists');
+  }
+
+  Future<void> updateLocation(
+      String sessionId, double latitude, double longitude) async {
+    await (update(pmcsSessions)
+          ..where((t) =>
+              t.sessionId.equals(sessionId) &
+              t.status.equals(SessionStatus.inProgress.wireName)))
+        .write(
+      PmcsSessionsCompanion(
+          latitude: Value(latitude), longitude: Value(longitude)),
     );
   }
 

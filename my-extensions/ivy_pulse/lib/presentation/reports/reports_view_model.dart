@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
+
 import 'package:ivy_pulse/core/constants/app_constants.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_report.dart';
 import 'package:ivy_pulse/domain/entities/queued_submission.dart';
 import 'package:ivy_pulse/domain/repositories/profile_repo.dart';
 import 'package:ivy_pulse/domain/repositories/queued_submissions_repo.dart';
 import 'package:ivy_pulse/domain/repositories/reports_repo.dart';
+import 'package:ivy_pulse/domain/services/delivery_coordinator.dart';
 import 'package:ivy_pulse/domain/services/queue_worker_strategy.dart';
 import 'package:ivy_pulse/domain/usecases/map/show_report_on_map.dart';
 import 'package:ivy_pulse/domain/usecases/publishing/publish_pmcs_deletion.dart';
@@ -55,6 +57,13 @@ class ReportsViewModel extends ChangeNotifier {
 
   StreamSubscription<sdk.IncomingMessage>? sub;
   Timer? remoteSyncTimer;
+  StreamSubscription<void>? deliverySubscription;
+  Future<void>? syncInFlight;
+  Future<void>? queueRefreshInFlight;
+  bool queueRefreshAgain = false;
+  bool disposed = false;
+  List<PmcsReport>? cachedYours, cachedExternal, cachedUnit, cachedOther;
+  final vehicleGroups = Expando<Map<ReportVehicleKey, List<PmcsReport>>>();
 
   /// Section keys for [groupedByStatus], worst first — a maintainer triages
   /// deadlined vehicles before anything that can still roll.
@@ -103,7 +112,9 @@ class ReportsViewModel extends ChangeNotifier {
     required this.profileRepository,
     required this.queuedRepository,
     SnackBarService? snackBarService,
+    DeliveryCoordinator? delivery,
   }) : snackBarService = snackBarService ?? SnackBarService.instance {
+    deliverySubscription = delivery?.changes.listen((_) => refreshQueued());
     sub = messaging.onMessageReceived.listen(onMessage);
     loadFromDb();
     startRemoteSyncPolling();
@@ -111,8 +122,13 @@ class ReportsViewModel extends ChangeNotifier {
 
   Future<void> loadFromDb() async {
     final rows = await repository.getAllReports();
-    reports.addAll(rows);
+    if (disposed) return;
+    final known = reports.map((r) => r.entityId).toSet();
+    for (final row in rows) {
+      if (known.add(row.entityId)) reports.add(row);
+    }
     await loadMyUic();
+    if (disposed) return;
     updateUnread();
     notifyListeners();
     await refreshQueuedCount();
@@ -123,6 +139,7 @@ class ReportsViewModel extends ChangeNotifier {
     try {
       final profile = await profileRepository.getProfile();
       myUic = (profile?.uic ?? '').trim().toUpperCase();
+      invalidateReportViews();
     } catch (e) {
       debugPrint('[IvyPulse] could not read UIC for report filtering: $e');
     }
@@ -133,25 +150,47 @@ class ReportsViewModel extends ChangeNotifier {
   /// The repository hands them back oldest first because that is the order
   /// the worker drains them in; the tab shows the reverse, so the submission
   /// an operator just watched fail is the one at the top.
-  Future<void> refreshQueued() async {
-    try {
-      final parked = await queuedRepository.getAll();
-      queued
-        ..clear()
-        ..addAll(parked.reversed);
-      notifyListeners();
-    } catch (e) {
-      debugPrint('[IvyPulse] refreshQueued error: $e');
+  Future<void> refreshQueued() {
+    if (queueRefreshInFlight != null) {
+      queueRefreshAgain = true;
+      return queueRefreshInFlight!;
     }
+    return queueRefreshInFlight = refreshQueueUntilCurrent().whenComplete(() {
+      queueRefreshInFlight = null;
+    });
+  }
+
+  Future<void> refreshQueueUntilCurrent() async {
+    do {
+      queueRefreshAgain = false;
+      try {
+        final parked = await queuedRepository.getAll();
+        if (disposed) return;
+        queued
+          ..clear()
+          ..addAll(parked.reversed);
+        await refreshQueuedCount();
+        if (disposed) return;
+        notifyListeners();
+      } catch (e) {
+        debugPrint('[IvyPulse] refreshQueued error: $e');
+      }
+    } while (queueRefreshAgain && !disposed);
+  }
+
+  void invalidateReportViews() {
+    cachedYours = cachedExternal = cachedUnit = cachedOther = null;
   }
 
   void updateUnread() {
+    invalidateReportViews();
     unreadCount.value = reports.where((r) => !r.isRead && !r.isOutgoing).length;
   }
 
   Future<void> refreshQueuedCount() async {
     try {
-      queuedCount.value = await queueWorker.pendingCount();
+      final count = await queueWorker.pendingCount();
+      if (!disposed) queuedCount.value = count;
     } catch (e) {
       debugPrint('[IvyPulse] refreshQueuedCount error: $e');
     }
@@ -178,6 +217,7 @@ class ReportsViewModel extends ChangeNotifier {
   /// reappear on next launch.
   Future<void> storeIncomingReport(PmcsReport report) async {
     final stored = await repository.insertReport(report);
+    reports.removeWhere((r) => r.entityId == stored.entityId);
     reports.insert(0, stored);
     updateUnread();
     notifyListeners();
@@ -218,14 +258,23 @@ class ReportsViewModel extends ChangeNotifier {
   void startRemoteSyncPolling() {
     remoteSyncTimer = Timer.periodic(
       AppConstants.remoteSyncInterval,
-      (_) => syncRemoteLatticeReports(),
+      (_) => unawaited(syncRemoteLatticeReports().catchError((Object error) {
+        debugPrint('[IvyPulse] Scheduled sync failed: $error');
+      })),
     );
   }
 
-  Future<void> syncRemoteLatticeReports() async {
+  Future<void> syncRemoteLatticeReports() =>
+      syncInFlight ??= performRemoteSync().whenComplete(() {
+        syncInFlight = null;
+      });
+
+  Future<void> performRemoteSync() async {
     final newReports = await syncRemoteReports(reports);
+    if (disposed) return;
     if (newReports.isNotEmpty) {
       for (final report in newReports) {
+        reports.removeWhere((r) => r.entityId == report.entityId);
         reports.insert(0, report);
       }
       updateUnread();
@@ -297,10 +346,10 @@ class ReportsViewModel extends ChangeNotifier {
   }
 
   List<PmcsReport> get yourReports =>
-      reports.where((r) => r.isOutgoing).toList();
+      cachedYours ??= List.unmodifiable(reports.where((r) => r.isOutgoing));
 
   List<PmcsReport> get externalReports =>
-      reports.where((r) => !r.isOutgoing).toList();
+      cachedExternal ??= List.unmodifiable(reports.where((r) => !r.isOutgoing));
 
   /// True when a report was signed for under the same UIC as this device.
   /// With no UIC of our own to compare against, every crew counts as ours
@@ -310,16 +359,23 @@ class ReportsViewModel extends ChangeNotifier {
 
   /// Other crews in your own unit.
   List<PmcsReport> get unitReports =>
-      externalReports.where(isSameUnit).toList();
+      cachedUnit ??= List.unmodifiable(externalReports.where(isSameUnit));
 
   /// Everything else that arrived over the net. Kept reachable rather than
   /// filtered away: a RED X on an attached vehicle still deadlines it.
-  List<PmcsReport> get otherUnitReports =>
-      externalReports.where((r) => !isSameUnit(r)).toList();
+  List<PmcsReport> get otherUnitReports => cachedOther ??=
+      List.unmodifiable(externalReports.where((r) => !isSameUnit(r)));
 
   /// One entry per bumper number and UIC, holding its PMCS newest first.
   Map<ReportVehicleKey, List<PmcsReport>> groupByVehicle(
       List<PmcsReport> source) {
+    final cacheable = identical(source, cachedYours) ||
+        identical(source, cachedExternal) ||
+        identical(source, cachedUnit) ||
+        identical(source, cachedOther);
+    if (cacheable && vehicleGroups[source] != null) {
+      return vehicleGroups[source]!;
+    }
     final groups = <ReportVehicleKey, List<PmcsReport>>{};
     for (final report in source) {
       final vehicle = (
@@ -336,7 +392,9 @@ class ReportsViewModel extends ChangeNotifier {
         final bumperOrder = a.bumperNumber.compareTo(b.bumperNumber);
         return bumperOrder != 0 ? bumperOrder : a.uic.compareTo(b.uic);
       });
-    return {for (final key in keys) key: groups[key]!};
+    final sorted = {for (final key in keys) key: groups[key]!};
+    if (cacheable) vehicleGroups[source] = sorted;
+    return sorted;
   }
 
   /// Parked submissions per vehicle, last in first out.
@@ -385,6 +443,8 @@ class ReportsViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    disposed = true;
+    deliverySubscription?.cancel();
     remoteSyncTimer?.cancel();
     sub?.cancel();
     unreadCount.dispose();

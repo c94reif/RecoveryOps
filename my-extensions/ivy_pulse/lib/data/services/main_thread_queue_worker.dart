@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
+
 import 'package:ivy_pulse/core/constants/app_constants.dart';
 import 'package:ivy_pulse/domain/entities/queued_submission.dart';
 import 'package:ivy_pulse/domain/entities/transport_kind.dart';
 import 'package:ivy_pulse/domain/repositories/queued_submissions_repo.dart';
+import 'package:ivy_pulse/domain/services/delivery_coordinator.dart';
 import 'package:ivy_pulse/domain/services/mesh_broadcaster_port.dart';
 import 'package:ivy_pulse/domain/services/pmcs_entity_port.dart';
 import 'package:ivy_pulse/domain/services/queue_prompt_strategy.dart';
@@ -31,6 +33,7 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
   final QueuePromptStrategy promptStrategy;
   final SnackBarService snackBarService;
   final Duration probeInterval;
+  final DeliveryCoordinator delivery;
 
   final Map<String, List<QueuedSubmission>> pending = {
     'lattice': [],
@@ -54,7 +57,9 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
     required this.promptStrategy,
     SnackBarService? snackBarService,
     Duration? probeInterval,
-  })  : snackBarService = snackBarService ?? SnackBarService.instance,
+    DeliveryCoordinator? delivery,
+  })  : delivery = delivery ?? DeliveryCoordinator(),
+        snackBarService = snackBarService ?? SnackBarService.instance,
         probeInterval = probeInterval ?? AppConstants.transportProbeInterval;
 
   @override
@@ -62,6 +67,10 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
     if (probeTimer != null) return;
 
     final resumed = await repository.getAll();
+    for (final submission in resumed) {
+      delivery.update(
+          submission.entityId, submission.transport, DeliveryStatus.queued);
+    }
     for (final submission in resumed) {
       pending[submission.transport.wireName]!.add(submission);
     }
@@ -86,6 +95,7 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
   @override
   Future<void> enqueue(QueuedSubmission submission) async {
     final stored = await repository.insert(submission);
+    delivery.queueChanged();
     final key = stored.transport.wireName;
     pending[key]!.add(stored);
     connected[key] = false;
@@ -146,14 +156,15 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
     final oldest = pending[key]!.first;
 
     draining[key] = true;
-    final success = await attemptSend(oldest);
-    draining[key] = false;
-
-    if (!success) return;
-
-    connected[key] = true;
-    await settle(oldest);
-    snackBarService.enqueue('${transport.displayName}: sent (queued)');
+    try {
+      final success = await attemptSend(oldest);
+      if (!success) return;
+      connected[key] = true;
+      await settle(oldest);
+      snackBarService.enqueue('${transport.displayName}: sent (queued)');
+    } finally {
+      draining[key] = false;
+    }
     await drainNext(transport);
   }
 
@@ -178,6 +189,8 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
         return;
       }
       if (!shouldSend) {
+        delivery.update(
+            next.entityId, next.transport, DeliveryStatus.discarded);
         await settle(next);
       } else {
         final success = await attemptSend(next);
@@ -203,19 +216,25 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
   }
 
   Future<bool> attemptSend(QueuedSubmission submission) async {
-    final position = LatLng(submission.latitude, submission.longitude);
-    switch (submission.transport) {
-      case TransportKind.lattice:
-        // The stored payload is re-sent verbatim: the session it came from may
-        // have been continued or abandoned since it was parked.
-        return entityPort.publishEncodedReport(
-          entityId: submission.entityId,
-          payload: submission.payload,
-          position: position,
-        );
-      case TransportKind.mesh:
-        return meshPort.broadcastEncodedReport(submission.payload);
+    if (delivery.status(submission.entityId, submission.transport) ==
+        DeliveryStatus.sent) {
+      return true;
     }
+    return delivery.send(submission.entityId, submission.transport, () async {
+      try {
+        return switch (submission.transport) {
+          TransportKind.lattice => await entityPort.publishEncodedReport(
+              entityId: submission.entityId,
+              payload: submission.payload,
+              position: LatLng(submission.latitude, submission.longitude)),
+          TransportKind.mesh =>
+            await meshPort.broadcastEncodedReport(submission.payload),
+        };
+      } catch (error) {
+        debugPrint('[IvyPulse] Queued send failed: $error');
+        return false;
+      }
+    }, queuedOnFailure: true);
   }
 
   /// Drop a submission for good — it either landed or the operator discarded
@@ -226,6 +245,7 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
     if (id == null) return;
     try {
       await repository.deleteById(id);
+      delivery.queueChanged();
     } catch (e) {
       debugPrint('[IvyPulse] QueueWorker: delete failed for $id: $e');
     }

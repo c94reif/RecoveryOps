@@ -1,5 +1,7 @@
 import 'package:drift/drift.dart';
 
+@TableIndex.sql(
+    "CREATE UNIQUE INDEX pmcs_reports_entity_id ON pmcs_reports (entity_id) WHERE entity_id <> ''")
 @DataClassName('PmcsReportData')
 class PmcsReports extends Table {
   IntColumn get id => integer().autoIncrement()();

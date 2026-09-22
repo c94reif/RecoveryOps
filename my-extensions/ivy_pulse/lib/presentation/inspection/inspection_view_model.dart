@@ -1,8 +1,12 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+
 import 'package:characters/characters.dart';
-import 'package:ivy_pulse/domain/entities/fault_description.dart';
+import 'package:flutter/foundation.dart';
+
+import 'package:ivy_pulse/domain/entities/attested_identity.dart';
 import 'package:ivy_pulse/domain/entities/cac_scan.dart';
 import 'package:ivy_pulse/domain/entities/check_result.dart';
+import 'package:ivy_pulse/domain/entities/fault_description.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_catalog.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_category.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_check_item.dart';
@@ -11,7 +15,6 @@ import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_report.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_session.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_signature.dart';
-import 'package:ivy_pulse/domain/entities/attested_identity.dart';
 import 'package:ivy_pulse/domain/entities/profile.dart';
 import 'package:ivy_pulse/domain/entities/publish_result.dart';
 import 'package:ivy_pulse/domain/entities/transport_kind.dart';
@@ -20,6 +23,7 @@ import 'package:ivy_pulse/domain/repositories/faults_repo.dart';
 import 'package:ivy_pulse/domain/repositories/profile_repo.dart';
 import 'package:ivy_pulse/domain/repositories/results_repo.dart';
 import 'package:ivy_pulse/domain/services/cac_scanner_strategy.dart';
+import 'package:ivy_pulse/domain/services/delivery_coordinator.dart';
 import 'package:ivy_pulse/domain/services/pmcs_catalog_source.dart';
 import 'package:ivy_pulse/domain/services/speech_recognition_strategy.dart';
 import 'package:ivy_pulse/domain/usecases/identity/verify_operator_identity.dart';
@@ -86,8 +90,25 @@ class InspectionViewModel extends ChangeNotifier {
     this.onReportSubmitted,
     SnackBarService? snackBarService,
   }) : snackBarService = snackBarService ?? SnackBarService.instance {
+    deliverySubscription = publishPmcsReport.delivery.changes.listen((_) {
+      if (submittedReport != null) notifyListeners();
+    });
     final vehicles = catalogSource.supportedVehicles;
     if (vehicles.isNotEmpty) selectedVehicle = vehicles.first;
+  }
+
+  late final StreamSubscription<void> deliverySubscription;
+
+  DeliveryStatus? deliveryStatus(TransportKind transport) => submittedReport ==
+          null
+      ? null
+      : publishPmcsReport.delivery.status(submittedReport!.entityId, transport);
+
+  @override
+  void dispose() {
+    deliverySubscription.cancel();
+    submittedReport = null;
+    super.dispose();
   }
 
   InspectionStage stage = InspectionStage.setup;

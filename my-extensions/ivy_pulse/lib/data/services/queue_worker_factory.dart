@@ -1,3 +1,4 @@
+import 'package:ivy_pulse/domain/services/delivery_coordinator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:ivy_pulse/data/services/isolate_queue_worker.dart';
 import 'package:ivy_pulse/data/services/main_thread_queue_worker.dart';
@@ -12,16 +13,19 @@ QueueWorkerStrategy createQueueWorker({
   required PmcsEntityPort entityPort,
   required MeshBroadcasterPort meshPort,
   required QueuePromptStrategy promptStrategy,
+  DeliveryCoordinator? delivery,
 }) =>
     kIsWeb
         ? MainThreadQueueWorker(
             repository: repository,
+            delivery: delivery,
             entityPort: entityPort,
             meshPort: meshPort,
             promptStrategy: promptStrategy,
           )
         : IsolateQueueWorker(
             repository: repository,
+            delivery: delivery,
             entityPort: entityPort,
             meshPort: meshPort,
             promptStrategy: promptStrategy,

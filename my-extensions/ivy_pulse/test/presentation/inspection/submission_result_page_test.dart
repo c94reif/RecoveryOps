@@ -1,3 +1,8 @@
+import 'package:ivy_pulse/data/services/main_thread_queue_worker.dart';
+
+import '../../data/main_thread_queue_worker_test.dart'
+
+    show FakeQueuePromptStrategy;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -54,6 +59,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('PMCS saved'), findsOneWidget);
     expect(find.text('Lattice · Sending…'), findsOneWidget);
+    expect(find.text('Mesh · Sent'), findsOneWidget);
     expect(harness.reports.reports, hasLength(1));
 
     gate.complete(false);
@@ -85,9 +91,36 @@ void main() {
     gate.completeError(StateError('transport unavailable'));
     await tester.pumpAndSettle();
     expect(find.text('PMCS saved'), findsOneWidget);
-    expect(find.textContaining('Delivery status unavailable'), findsOneWidget);
+    expect(find.text('Lattice · Queued'), findsOneWidget);
+    expect(find.text('Mesh · Sent'), findsOneWidget);
+    expect(harness.queueWorker.enqueued, hasLength(1));
     expect(harness.reports.reports, hasLength(1));
     expect(find.text('View report'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a queued retry updates the open receipt to sent',
+      (tester) async {
+    await ready(tester);
+    harness.entityPort.publishSucceeds = false;
+    await harness.viewModel.submitWith(buildSignature());
+    await tester.pumpAndSettle();
+    expect(find.text('Lattice · Queued'), findsOneWidget);
+    final worker = MainThreadQueueWorker(
+      repository: FakeQueuedSubmissionsRepository(),
+      entityPort: harness.entityPort,
+      meshPort: harness.meshPort,
+      promptStrategy: FakeQueuePromptStrategy(),
+      delivery: harness.viewModel.publishPmcsReport.delivery,
+    );
+    addTearDown(worker.stop);
+    await worker.enqueue(harness.queueWorker.enqueued.single);
+    harness.entityPort.publishSucceeds = true;
+    await worker.nudge(harness.queueWorker.enqueued.single.transport);
+    await tester.pumpAndSettle();
+    expect(find.text('Lattice · Sent'), findsOneWidget);
+    expect(find.text('Mesh · Sent'), findsOneWidget);
+    expect(find.textContaining('Queued delivery will retry'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

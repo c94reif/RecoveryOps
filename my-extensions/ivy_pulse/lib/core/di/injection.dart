@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
+
 import 'package:ivy_pulse/data/catalog/pmcs_reference_data.g.dart';
 import 'package:ivy_pulse/data/dao/faults/pmcs_faults_dao.dart';
 import 'package:ivy_pulse/data/dao/profile/profile_dao.dart';
@@ -19,6 +20,7 @@ import 'package:ivy_pulse/data/repositories/results_repo_impl.dart';
 import 'package:ivy_pulse/data/repositories/sessions_repo_impl.dart';
 import 'package:ivy_pulse/data/services/cac_scanner_factory.dart';
 import 'package:ivy_pulse/data/services/device_speech_recognition.dart';
+import 'package:ivy_pulse/data/services/drift_transaction_runner.dart';
 import 'package:ivy_pulse/data/services/lattice_pmcs_adapter.dart';
 import 'package:ivy_pulse/data/services/lattice_report_source.dart';
 import 'package:ivy_pulse/data/services/queue_worker_factory.dart';
@@ -35,6 +37,7 @@ import 'package:ivy_pulse/domain/repositories/results_repo.dart';
 import 'package:ivy_pulse/domain/repositories/sessions_repo.dart';
 import 'package:ivy_pulse/domain/services/cac_scanner_strategy.dart';
 import 'package:ivy_pulse/domain/services/clock.dart';
+import 'package:ivy_pulse/domain/services/delivery_coordinator.dart';
 import 'package:ivy_pulse/domain/services/fault_classifier_strategy.dart';
 import 'package:ivy_pulse/domain/services/id_generator.dart';
 import 'package:ivy_pulse/domain/services/mesh_broadcaster_port.dart';
@@ -123,6 +126,8 @@ void configureDependencies(sdk.ExtensionContext extensionContext) {
   );
 
   // ── Domain-facing services ───────────────────────────────────────────
+  getIt.registerLazySingleton<DeliveryCoordinator>(() => DeliveryCoordinator(),
+      dispose: (delivery) => delivery.dispose());
   getIt.registerLazySingleton<Clock>(() => const SystemClock());
   getIt.registerLazySingleton<IdGenerator>(() => UuidIdGenerator());
   getIt.registerLazySingleton<PmcsCatalogSource>(
@@ -172,6 +177,7 @@ void configureDependencies(sdk.ExtensionContext extensionContext) {
   // long backlog never stutters a walk-around.
   getIt.registerLazySingleton<QueueWorkerStrategy>(
     () => createQueueWorker(
+      delivery: getIt<DeliveryCoordinator>(),
       repository: getIt<QueuedSubmissionsRepository>(),
       entityPort: getIt<PmcsEntityPort>(),
       meshPort: getIt<MeshBroadcasterPort>(),
@@ -227,6 +233,7 @@ void configureDependencies(sdk.ExtensionContext extensionContext) {
   );
   getIt.registerLazySingleton<SubmitSession>(
     () => SubmitSession(
+      transactionRunner: DriftTransactionRunner(getIt<AppDatabase>()),
       sessionsRepository: getIt<SessionsRepository>(),
       faultsRepository: getIt<FaultsRepository>(),
       reportsRepository: getIt<ReportsRepository>(),
@@ -236,6 +243,7 @@ void configureDependencies(sdk.ExtensionContext extensionContext) {
   );
   getIt.registerLazySingleton<PublishPmcsReport>(
     () => PublishPmcsReport(
+      delivery: getIt<DeliveryCoordinator>(),
       entityPort: getIt<PmcsEntityPort>(),
       meshPort: getIt<MeshBroadcasterPort>(),
       queueWorker: getIt<QueueWorkerStrategy>(),
@@ -263,6 +271,8 @@ void configureDependencies(sdk.ExtensionContext extensionContext) {
   );
   getIt.registerLazySingleton<SyncLocalReportsToLattice>(
     () => SyncLocalReportsToLattice(
+      delivery: getIt<DeliveryCoordinator>(),
+      queuedRepository: getIt<QueuedSubmissionsRepository>(),
       getIt<RemoteReportSource>(),
       getIt<PmcsEntityPort>(),
     ),
@@ -317,6 +327,7 @@ void configureDependencies(sdk.ExtensionContext extensionContext) {
       getIt<QueueWorkerStrategy>(),
       profileRepository: getIt<ProfileRepository>(),
       queuedRepository: getIt<QueuedSubmissionsRepository>(),
+      delivery: getIt<DeliveryCoordinator>(),
     ),
   );
   getIt<ReportsViewModel>();

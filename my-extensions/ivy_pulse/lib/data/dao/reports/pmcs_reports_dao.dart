@@ -31,7 +31,7 @@ class PmcsReportsDao extends DatabaseAccessor<AppDatabase>
     required bool isOutgoing,
     required bool isRead,
   }) async {
-    return into(pmcsReports).insert(
+    await into(pmcsReports).insert(
       PmcsReportsCompanion.insert(
         entityId: entityId,
         fromCallsign: fromCallsign,
@@ -48,8 +48,20 @@ class PmcsReportsDao extends DatabaseAccessor<AppDatabase>
         isOutgoing: Value(isOutgoing),
         isRead: Value(isRead),
       ),
+      mode: InsertMode.insertOrIgnore,
     );
+    // The unique index arbitrates concurrent mesh/Lattice arrivals. Never
+    // replace the saved copy: that could reset read state or local ownership.
+    final row = await (select(pmcsReports)
+          ..where((t) => t.entityId.equals(entityId))
+          ..orderBy([(t) => OrderingTerm.desc(t.id)])
+          ..limit(1))
+        .getSingle();
+    return row.id;
   }
+
+  Future<PmcsReportData> getById(int id) =>
+      (select(pmcsReports)..where((t) => t.id.equals(id))).getSingle();
 
   Future<void> markAsRead(int id) async {
     await (update(pmcsReports)..where((t) => t.id.equals(id))).write(

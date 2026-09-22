@@ -220,6 +220,7 @@ class InspectionHarness {
         faultsRepository: faults,
       ),
       submitSession: SubmitSession(
+        transactionRunner: FakeTransactionRunner(),
         sessionsRepository: sessions,
         faultsRepository: faults,
         reportsRepository: reports,

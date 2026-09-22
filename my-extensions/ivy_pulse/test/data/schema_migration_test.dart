@@ -134,14 +134,14 @@ void main() {
     return db;
   }
 
-  test('a v1 database opens at v2', () async {
+  test('a v1 database opens at v3', () async {
     seedV1();
 
     final db = await openMigrated();
     addTearDown(db.close);
 
     final version = await db.customSelect('PRAGMA user_version').getSingle();
-    expect(version.data.values.first, 2);
+    expect(version.data.values.first, 3);
   });
 
   test('the unit the operator was signed for becomes their UIC', () async {
@@ -202,7 +202,7 @@ void main() {
     expect(reports.single.signatureJson, isNull);
   });
 
-  test('a fresh install creates v2 directly, with no migration to run',
+  test('a fresh install creates v3 directly, with no migration to run',
       () async {
     final db = AppDatabase.test(NativeDatabase(file));
     addTearDown(db.close);

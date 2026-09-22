@@ -12,5 +12,9 @@ abstract class SessionsRepository {
 
   Future<void> update(PmcsSession session);
 
+  /// Updates only the coordinates of an inspection that is still open.
+  Future<void> updateLocation(
+      String sessionId, double latitude, double longitude);
+
   Future<void> deleteBySessionId(String sessionId);
 }

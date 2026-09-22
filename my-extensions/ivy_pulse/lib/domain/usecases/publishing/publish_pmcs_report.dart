@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:ivy_pulse/domain/entities/publish_result.dart';
+
 import 'package:ivy_pulse/domain/entities/pmcs_report.dart';
+import 'package:ivy_pulse/domain/entities/publish_result.dart';
 import 'package:ivy_pulse/domain/entities/queued_submission.dart';
 import 'package:ivy_pulse/domain/entities/transport_kind.dart';
 import 'package:ivy_pulse/domain/services/clock.dart';
+import 'package:ivy_pulse/domain/services/delivery_coordinator.dart';
 import 'package:ivy_pulse/domain/services/mesh_broadcaster_port.dart';
 import 'package:ivy_pulse/domain/services/pmcs_entity_port.dart';
 import 'package:ivy_pulse/domain/services/queue_worker_strategy.dart';
@@ -22,40 +24,62 @@ class PublishPmcsReport {
   final ReportCodec codec;
   final Clock clock;
 
-  const PublishPmcsReport({
+  final DeliveryCoordinator delivery;
+  final Map<String, Future<PublishResult>> inFlight = {};
+
+  PublishPmcsReport({
     required this.entityPort,
     required this.meshPort,
     required this.queueWorker,
     required this.codec,
     required this.clock,
-  });
+    DeliveryCoordinator? delivery,
+  }) : delivery = delivery ?? DeliveryCoordinator();
 
-  Future<PublishResult> call(PmcsReport report) async {
+  Future<PublishResult> call(PmcsReport report) => inFlight.putIfAbsent(
+      report.entityId,
+      () => publish(report).whenComplete(() {
+            inFlight.remove(report.entityId);
+          }));
+
+  Future<PublishResult> publish(PmcsReport report) async {
     final payload = codec.encodeReport(report);
 
-    Future<bool> latticeLeg() async {
-      final ok = await entityPort.publishPmcsReport(report);
-      await _onLegOutcome(
-        transport: TransportKind.lattice,
-        success: ok,
-        report: report,
-        payload: payload,
-      );
+    Future<bool> leg(
+        TransportKind transport, Future<bool> Function() send) async {
+      final status = delivery.status(report.entityId, transport);
+      if (status == DeliveryStatus.sent) return true;
+      if (status == DeliveryStatus.queued) return false;
+      bool ok;
+      try {
+        ok = await delivery.send(report.entityId, transport, send);
+      } catch (error) {
+        debugPrint('[IvyPulse] ${transport.displayName} send failed: $error');
+        ok = false;
+      }
+      // Queue ownership belongs to this submission even if the network call
+      // joined a repair already in progress. The whole publish is coalesced,
+      // so repeated taps cannot enqueue the same failed leg twice.
+      try {
+        await _onLegOutcome(
+            transport: transport,
+            success: ok,
+            report: report,
+            payload: payload);
+        if (!ok) {
+          delivery.update(report.entityId, transport, DeliveryStatus.queued);
+        }
+      } catch (_) {
+        delivery.update(report.entityId, transport, DeliveryStatus.failed);
+        rethrow;
+      }
       return ok;
     }
 
-    Future<bool> meshLeg() async {
-      final ok = await meshPort.broadcastPmcsReport(report);
-      await _onLegOutcome(
-        transport: TransportKind.mesh,
-        success: ok,
-        report: report,
-        payload: payload,
-      );
-      return ok;
-    }
-
-    final results = await Future.wait([latticeLeg(), meshLeg()]);
+    final results = await Future.wait([
+      leg(TransportKind.lattice, () => entityPort.publishPmcsReport(report)),
+      leg(TransportKind.mesh, () => meshPort.broadcastPmcsReport(report)),
+    ]);
     final outcome = PublishResult(latticeOk: results[0], meshOk: results[1]);
     debugPrint('[IvyPulse] Publish ${report.entityId} — '
         'Lattice: ${outcome.latticeOk} | Mesh: ${outcome.meshOk}');

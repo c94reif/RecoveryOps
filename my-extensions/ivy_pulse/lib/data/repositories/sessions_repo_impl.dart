@@ -69,6 +69,11 @@ class SessionsRepoImpl implements SessionsRepository {
   }
 
   @override
+  Future<void> updateLocation(
+          String sessionId, double latitude, double longitude) =>
+      dao.updateLocation(sessionId, latitude, longitude);
+
+  @override
   Future<void> deleteBySessionId(String sessionId) =>
       dao.deleteBySessionId(sessionId);
 

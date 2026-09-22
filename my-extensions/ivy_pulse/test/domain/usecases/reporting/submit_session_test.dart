@@ -21,6 +21,7 @@ void main() {
     faults = FakeFaultsRepository();
     reports = FakeReportsRepository();
     usecase = SubmitSession(
+      transactionRunner: FakeTransactionRunner(),
       sessionsRepository: sessions,
       faultsRepository: faults,
       reportsRepository: reports,

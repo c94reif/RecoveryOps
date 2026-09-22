@@ -790,53 +790,50 @@ class ReportsPageState extends State<ReportsPage> {
     );
   }
 
-  List<Widget> buildQueuedList() {
-    final groups = viewModel.queuedByBumperNumber;
-    if (groups.isEmpty) {
-      return [buildEmptyLine('Nothing waiting — every PMCS has been sent')];
+  List<Widget Function()> tabRows() {
+    final rows = <Widget Function()>[];
+    if (selectedTab == ReportsTab.queued) {
+      final groups = viewModel.queuedByBumperNumber;
+      if (groups.isEmpty) {
+        return [
+          () => buildEmptyLine('Nothing waiting — every PMCS has been sent')
+        ];
+      }
+      for (final entry in groups.entries) {
+        rows.add(() => buildBumperHeader(entry.key, entry.value.length));
+        for (final submission in entry.value) {
+          rows.add(() => buildQueuedCard(submission));
+        }
+      }
+      return rows;
     }
-    return [
-      for (final entry in groups.entries) ...[
-        buildBumperHeader(entry.key, entry.value.length),
-        for (final submission in entry.value) buildQueuedCard(submission),
-      ],
-    ];
-  }
-
-  List<Widget> buildTabBody() {
-    final emptyMessage =
-        hasVehicleFilters ? 'No vehicles match your search or filters.' : null;
-    return switch (selectedTab) {
-      ReportsTab.yours => buildGroupedReports(
-          filteredGroups(viewModel.yourReports),
-          emptyMessage ?? 'No PMCS submitted from this device yet',
-        ),
-      ReportsTab.unit => [
-          if (filteredGroups(viewModel.unitReports).isNotEmpty ||
-              filteredGroups(viewModel.otherUnitReports).isEmpty)
-            ...buildGroupedReports(
-              filteredGroups(viewModel.unitReports),
-              emptyMessage ?? 'No PMCS from other crews in your unit yet',
-            ),
-          ...buildOtherUnits(),
-        ],
-      ReportsTab.queued => buildQueuedList(),
-    };
-  }
-
-  /// PMCS from outside your UIC. They do not belong to this tab, but they are
-  /// not dropped either — an attached vehicle can still be deadlined.
-  List<Widget> buildOtherUnits() {
-    final others = filteredGroups(viewModel.otherUnitReports);
-    if (others.isEmpty) return const [];
-    return [
-      const Padding(
-        padding: EdgeInsets.only(top: 22, bottom: 2),
-        child: SectionLabel(text: 'OTHER UNITS'),
-      ),
-      for (final entry in others.entries)
-        buildVehicleCard(entry.key, entry.value),
-    ];
+    rows.add(buildVehicleFilters);
+    final own = filteredGroups(selectedTab == ReportsTab.yours
+        ? viewModel.yourReports
+        : viewModel.unitReports);
+    final others = selectedTab == ReportsTab.unit
+        ? filteredGroups(viewModel.otherUnitReports)
+        : <ReportVehicleKey, List<PmcsReport>>{};
+    if (own.isEmpty && others.isEmpty) {
+      rows.add(() => buildEmptyLine(hasVehicleFilters
+          ? 'No vehicles match your search or filters.'
+          : selectedTab == ReportsTab.yours
+              ? 'No PMCS submitted from this device yet'
+              : 'No PMCS from other crews in your unit yet'));
+    }
+    for (final entry in own.entries) {
+      rows.add(() => buildVehicleCard(entry.key, entry.value));
+    }
+    if (others.isNotEmpty) {
+      rows.add(() => const Padding(
+            padding: EdgeInsets.only(top: 22, bottom: 2),
+            child: SectionLabel(text: 'OTHER UNITS'),
+          ));
+      for (final entry in others.entries) {
+        rows.add(() => buildVehicleCard(entry.key, entry.value));
+      }
+    }
+    return rows;
   }
 
   @override
@@ -846,6 +843,17 @@ class ReportsPageState extends State<ReportsPage> {
       builder: (context, _) {
         final vehicle = selectedVehicle;
         final history = vehicle == null ? const <PmcsReport>[] : vehicleHistory;
+        final rows = vehicle == null
+            ? tabRows()
+            : history.isEmpty
+                ? <Widget Function()>[
+                    () => buildEmptyLine(
+                        'No PMCS reports remain for this vehicle.')
+                  ]
+                : <Widget Function()>[
+                    for (final (index, report) in history.indexed)
+                      () => buildReportCard(report, isLatest: index == 0),
+                  ];
         return Column(
           children: [
             // The banner stays above the switch: a parked submission is worth
@@ -858,28 +866,15 @@ class ReportsPageState extends State<ReportsPage> {
                 color: masterChiefGreen,
                 backgroundColor: surface,
                 onRefresh: viewModel.syncRemoteLatticeReports,
-                child: ListView(
+                child: ListView.builder(
                   key: PageStorageKey((selectedTab, vehicle)),
                   // Always scrollable so pull-to-refresh still reaches a
                   // maintainer holding an empty list after a comms blackout.
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  children: vehicle == null
-                      ? [
-                          if (selectedTab != ReportsTab.queued)
-                            buildVehicleFilters(),
-                          ...buildTabBody(),
-                        ]
-                      : history.isEmpty
-                          ? [
-                              buildEmptyLine(
-                                  'No PMCS reports remain for this vehicle.')
-                            ]
-                          : [
-                              for (final (index, report) in history.indexed)
-                                buildReportCard(report, isLatest: index == 0),
-                            ],
+                  itemCount: rows.length,
+                  itemBuilder: (context, index) => rows[index](),
                 ),
               ),
             ),

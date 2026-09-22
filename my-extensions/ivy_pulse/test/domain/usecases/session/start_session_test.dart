@@ -76,8 +76,10 @@ void main() {
   test('captures the vehicle position for the map', () async {
     final session = await start();
 
-    expect(session.latitude, 33.5);
-    expect(session.longitude, -84.5);
+    await Future<void>.delayed(Duration.zero);
+    final saved = await sessions.getBySessionId(session.sessionId);
+    expect(saved!.latitude, 33.5);
+    expect(saved.longitude, -84.5);
   });
 
   test('starts even when the location bridge returns nothing', () async {

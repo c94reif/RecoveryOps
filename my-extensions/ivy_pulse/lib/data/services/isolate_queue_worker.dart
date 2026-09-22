@@ -3,12 +3,14 @@ import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
+
 import 'package:ivy_pulse/core/constants/app_constants.dart';
 import 'package:ivy_pulse/data/services/queue_protocol.dart';
 import 'package:ivy_pulse/data/services/queue_worker_entrypoint.dart';
 import 'package:ivy_pulse/domain/entities/queued_submission.dart';
 import 'package:ivy_pulse/domain/entities/transport_kind.dart';
 import 'package:ivy_pulse/domain/repositories/queued_submissions_repo.dart';
+import 'package:ivy_pulse/domain/services/delivery_coordinator.dart';
 import 'package:ivy_pulse/domain/services/mesh_broadcaster_port.dart';
 import 'package:ivy_pulse/domain/services/pmcs_entity_port.dart';
 import 'package:ivy_pulse/domain/services/queue_prompt_strategy.dart';
@@ -27,6 +29,7 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
   final SnackBarService snackBarService;
 
   final Duration probeInterval;
+  final DeliveryCoordinator delivery;
 
   Isolate? isolate;
   Timer? probeTimer;
@@ -41,7 +44,9 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
     required this.promptStrategy,
     SnackBarService? snackBarService,
     Duration? probeInterval,
-  })  : snackBarService = snackBarService ?? SnackBarService.instance,
+    DeliveryCoordinator? delivery,
+  })  : delivery = delivery ?? DeliveryCoordinator(),
+        snackBarService = snackBarService ?? SnackBarService.instance,
         probeInterval = probeInterval ?? AppConstants.transportProbeInterval;
 
   @override
@@ -49,6 +54,10 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
     if (isolate != null) return;
 
     final resumed = await repository.getAll();
+    for (final submission in resumed) {
+      delivery.update(
+          submission.entityId, submission.transport, DeliveryStatus.queued);
+    }
 
     final handshakePort = ReceivePort();
     final fromWorkerPort = ReceivePort();
@@ -77,6 +86,8 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
     toWorker!.send(
       mainHello(resumed.map((s) => s.toMap()).toList()),
     );
+    probeTimer =
+        Timer.periodic(probeInterval, (_) => toWorker?.send(mainProbe()));
   }
 
   @override
@@ -95,6 +106,7 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
   @override
   Future<void> enqueue(QueuedSubmission submission) async {
     final stored = await repository.insert(submission);
+    delivery.queueChanged();
     toWorker?.send(mainEnqueue(stored.toMap()));
     snackBarService.enqueue(
       '${stored.transport.displayName} unreachable — '
@@ -158,22 +170,25 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
     int submissionId,
     QueuedSubmission submission,
   ) async {
-    final position = LatLng(submission.latitude, submission.longitude);
-    bool success;
-    switch (submission.transport) {
-      case TransportKind.lattice:
-        // The stored payload is re-sent verbatim: the session it came from may
-        // have been continued or abandoned since it was parked.
-        success = await entityPort.publishEncodedReport(
-          entityId: submission.entityId,
-          payload: submission.payload,
-          position: position,
-        );
-        break;
-      case TransportKind.mesh:
-        success = await meshPort.broadcastEncodedReport(submission.payload);
-        break;
-    }
+    final success = delivery.status(
+                submission.entityId, submission.transport) ==
+            DeliveryStatus.sent ||
+        await delivery.send(submission.entityId, submission.transport,
+            () async {
+          try {
+            return switch (submission.transport) {
+              TransportKind.lattice => await entityPort.publishEncodedReport(
+                  entityId: submission.entityId,
+                  payload: submission.payload,
+                  position: LatLng(submission.latitude, submission.longitude)),
+              TransportKind.mesh =>
+                await meshPort.broadcastEncodedReport(submission.payload),
+            };
+          } catch (error) {
+            debugPrint('[IvyPulse] Queued send failed: $error');
+            return false;
+          }
+        }, queuedOnFailure: true);
 
     snackBarService.enqueue(
       '${submission.transport.displayName}: '
@@ -197,6 +212,10 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
       toWorker?.send(mainPromptDeferred(submissionId));
       return;
     }
+    if (!send) {
+      delivery.update(
+          submission.entityId, submission.transport, DeliveryStatus.discarded);
+    }
     toWorker?.send(
       mainPromptResponse(submissionId: submissionId, send: send),
     );
@@ -205,6 +224,7 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
   Future<void> handleDelete(int submissionId) async {
     try {
       await repository.deleteById(submissionId);
+      delivery.queueChanged();
     } catch (e) {
       debugPrint(
         '[IvyPulse] QueueWorker: delete failed for $submissionId: $e',

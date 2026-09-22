@@ -38,7 +38,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -62,6 +62,28 @@ class AppDatabase extends _$AppDatabase {
             await m.renameColumn(pmcsReports, 'unit', pmcsReports.uic);
             await m.addColumn(pmcsSessions, pmcsSessions.signatureJson);
             await m.addColumn(pmcsReports, pmcsReports.signatureJson);
+          }
+          if (from < 3) {
+            await transaction(() async {
+              // Preserve the local signed copy where one exists, along with
+              // the read state of any previously duplicated delivery.
+              await customStatement("""
+                UPDATE pmcs_reports SET is_read = (
+                  SELECT MAX(other.is_read) FROM pmcs_reports AS other
+                  WHERE other.entity_id = pmcs_reports.entity_id
+                ) WHERE entity_id <> ''
+              """);
+              await customStatement("""
+                DELETE FROM pmcs_reports WHERE entity_id <> '' AND id <> (
+                  SELECT other.id FROM pmcs_reports AS other
+                  WHERE other.entity_id = pmcs_reports.entity_id
+                  ORDER BY other.is_outgoing DESC,
+                    (other.signature_json IS NOT NULL) DESC,
+                    other.timestamp DESC, other.id DESC LIMIT 1
+                )
+              """);
+              await m.createIndex(pmcsReportsEntityId);
+            });
           }
         },
       );

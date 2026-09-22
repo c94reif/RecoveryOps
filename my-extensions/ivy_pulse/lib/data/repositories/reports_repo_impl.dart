@@ -45,7 +45,11 @@ class ReportsRepoImpl implements ReportsRepository {
       isOutgoing: report.isOutgoing,
       isRead: report.isRead,
     );
-    return report.copyWith(id: id);
+    final stored = toEntity(await dao.getById(id));
+    if (stored == null) {
+      throw StateError('Stored report uses an unknown platform');
+    }
+    return stored;
   }
 
   @override

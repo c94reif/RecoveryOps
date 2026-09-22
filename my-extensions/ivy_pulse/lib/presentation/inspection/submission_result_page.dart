@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+
 import 'package:ivy_pulse/core/di/injection.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
+import 'package:ivy_pulse/domain/entities/transport_kind.dart';
+import 'package:ivy_pulse/domain/services/delivery_coordinator.dart';
 import 'package:ivy_pulse/presentation/common/widgets/custom_button.dart';
 import 'package:ivy_pulse/presentation/home/home_view_model.dart';
 import 'package:ivy_pulse/presentation/inspection/inspection_view_model.dart';
@@ -17,7 +20,8 @@ class SubmissionResultPage extends StatelessWidget {
       builder: (context, _) {
         final report = model.submittedReport;
         if (report == null) return const SizedBox.shrink();
-        final outcome = model.submissionDelivery;
+        final lattice = model.deliveryStatus(TransportKind.lattice);
+        final mesh = model.deliveryStatus(TransportKind.mesh);
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -45,11 +49,12 @@ class SubmissionResultPage extends StatelessWidget {
             if (model.submissionDeliveryFailed)
               const Text(
                   'Delivery status unavailable. Your saved report is available in Reports.',
-                  style: TextStyle(color: circleXAmber))
-            else ...[
-              deliveryRow('Lattice', outcome?.latticeOk),
-              deliveryRow('Mesh', outcome?.meshOk),
-              if (outcome != null && !outcome.allSucceeded)
+                  style: TextStyle(color: circleXAmber)),
+            ...[
+              deliveryRow('Lattice', lattice),
+              deliveryRow('Mesh', mesh),
+              if (lattice == DeliveryStatus.queued ||
+                  mesh == DeliveryStatus.queued)
                 const Padding(
                   padding: EdgeInsets.only(top: 8),
                   child: Text(
@@ -78,28 +83,29 @@ class SubmissionResultPage extends StatelessWidget {
     );
   }
 
-  Widget deliveryRow(String label, bool? sent) {
-    final text = sent == null
-        ? 'Sending…'
-        : sent
-            ? 'Sent'
-            : 'Queued';
-    final color = sent == null
-        ? textSecondary
-        : sent
-            ? serviceableGreen
+  Widget deliveryRow(String label, DeliveryStatus? status) {
+    final text = switch (status) {
+      null || DeliveryStatus.sending => 'Sending…',
+      DeliveryStatus.sent => 'Sent',
+      DeliveryStatus.queued => 'Queued',
+      DeliveryStatus.failed => 'Delivery unavailable',
+      DeliveryStatus.discarded => 'Not sent',
+    };
+    final color = status == DeliveryStatus.sent
+        ? serviceableGreen
+        : status == null || status == DeliveryStatus.sending
+            ? textSecondary
             : circleXAmber;
+    final icon = switch (status) {
+      null || DeliveryStatus.sending => Icons.sync,
+      DeliveryStatus.sent => Icons.check_circle_outline,
+      DeliveryStatus.queued => Icons.schedule,
+      _ => Icons.error_outline,
+    };
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(children: [
-        Icon(
-            sent == null
-                ? Icons.sync
-                : sent
-                    ? Icons.check_circle_outline
-                    : Icons.schedule,
-            color: color,
-            size: 22),
+        Icon(icon, color: color, size: 22),
         const SizedBox(width: 10),
         Expanded(
             child: Text('$label · $text',

@@ -3151,6 +3151,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PmcsReportsTable pmcsReports = $PmcsReportsTable(this);
   late final $QueuedSubmissionsTable queuedSubmissions =
       $QueuedSubmissionsTable(this);
+  late final Index pmcsReportsEntityId = Index('pmcs_reports_entity_id',
+      'CREATE UNIQUE INDEX pmcs_reports_entity_id ON pmcs_reports (entity_id) WHERE entity_id <> \'\'');
   late final ProfileDao profileDao = ProfileDao(this as AppDatabase);
   late final SessionsDao sessionsDao = SessionsDao(this as AppDatabase);
   late final CheckResultsDao checkResultsDao =
@@ -3170,7 +3172,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         checkResults,
         pmcsFaults,
         pmcsReports,
-        queuedSubmissions
+        queuedSubmissions,
+        pmcsReportsEntityId
       ];
 }
 

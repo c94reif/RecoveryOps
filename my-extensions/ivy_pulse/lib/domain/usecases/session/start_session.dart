@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_session.dart';
 import 'package:ivy_pulse/domain/entities/vehicle_type.dart';
 import 'package:ivy_pulse/domain/repositories/location_repo.dart';
@@ -29,8 +31,6 @@ class StartSession {
     required VehicleType vehicleType,
     required String uic,
   }) async {
-    final position = await locationRepository.getCurrentLocation();
-
     final session = PmcsSession(
       sessionId: idGenerator.newId(),
       bumperNumber: bumperNumber.trim().toUpperCase(),
@@ -38,10 +38,21 @@ class StartSession {
       operator: '',
       uic: uic.trim().toUpperCase(),
       startedAt: clock.nowUtc(),
-      latitude: position?.latitude,
-      longitude: position?.longitude,
     );
 
-    return repository.insert(session);
+    final stored = await repository.insert(session);
+    unawaited(captureLocation(stored.sessionId));
+    return stored;
+  }
+
+  Future<void> captureLocation(String sessionId) async {
+    try {
+      final position = await locationRepository.getCurrentLocation();
+      if (position == null) return;
+      await repository.updateLocation(
+          sessionId, position.latitude, position.longitude);
+    } catch (error) {
+      debugPrint('[IvyPulse] Location unavailable for $sessionId: $error');
+    }
   }
 }

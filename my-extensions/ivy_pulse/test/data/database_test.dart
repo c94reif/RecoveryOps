@@ -249,9 +249,9 @@ void main() {
       await db.select(db.queuedSubmissions).get();
     });
 
-    test('schemaVersion is 2 — the UIC-only profile and the signature columns',
+    test('schemaVersion is 3 — report IDs are unique',
         () {
-      expect(db.schemaVersion, 2);
+      expect(db.schemaVersion, 3);
     });
   });
 

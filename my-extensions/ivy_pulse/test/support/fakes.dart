@@ -2,12 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
+
 import 'package:ivy_pulse/domain/entities/cac_identity.dart';
 import 'package:ivy_pulse/domain/entities/cac_scan.dart';
 import 'package:ivy_pulse/domain/entities/check_result.dart';
 import 'package:ivy_pulse/domain/entities/fault_severity.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_fault.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
+import 'package:ivy_pulse/domain/services/transaction_runner.dart';
+
 // PmcsReport comes via the reports_view_model export below.
 import 'package:ivy_pulse/domain/entities/pmcs_session.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_signature.dart';
@@ -35,7 +38,23 @@ import 'package:ivy_pulse/presentation/reports/reports_view_model.dart';
 /// Shared in-memory doubles. Hand-written rather than generated so the tests
 /// break loudly when a domain contract changes.
 
+class FakeTransactionRunner implements TransactionRunner {
+  @override
+  Future<T> run<T>(Future<T> Function() action) => action();
+}
+
 class FakeSessionsRepository implements SessionsRepository {
+  @override
+  Future<void> updateLocation(
+      String sessionId, double latitude, double longitude) async {
+    final index = sessions.indexWhere((s) =>
+        s.sessionId == sessionId && s.status == SessionStatus.inProgress);
+    if (index != -1) {
+      sessions[index] =
+          sessions[index].copyWith(latitude: latitude, longitude: longitude);
+    }
+  }
+
   final List<PmcsSession> sessions = [];
   final List<PmcsSession> updated = [];
   final List<String> deleted = [];
@@ -64,7 +83,11 @@ class FakeSessionsRepository implements SessionsRepository {
   Future<void> update(PmcsSession session) async {
     updated.add(session);
     final index = sessions.indexWhere((s) => s.sessionId == session.sessionId);
-    if (index != -1) sessions[index] = session;
+    if (index != -1) {
+      sessions[index] = session.copyWith(
+          latitude: session.latitude ?? sessions[index].latitude,
+          longitude: session.longitude ?? sessions[index].longitude);
+    }
   }
 
   @override

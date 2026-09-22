@@ -1,6 +1,8 @@
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
+
 import 'package:ivy_pulse/core/di/injection.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
 import 'package:ivy_pulse/data/dao/faults/pmcs_faults_dao.dart';
@@ -12,6 +14,7 @@ import 'package:ivy_pulse/data/repositories/faults_repo_impl.dart';
 import 'package:ivy_pulse/data/repositories/reports_repo_impl.dart';
 import 'package:ivy_pulse/data/repositories/results_repo_impl.dart';
 import 'package:ivy_pulse/data/repositories/sessions_repo_impl.dart';
+import 'package:ivy_pulse/data/services/drift_transaction_runner.dart';
 import 'package:ivy_pulse/data/services/static_pmcs_catalog_source.dart';
 import 'package:ivy_pulse/data/services/tm_fault_classifier.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
@@ -20,6 +23,8 @@ import 'package:ivy_pulse/domain/entities/vehicle_type.dart';
 import 'package:ivy_pulse/domain/services/clock.dart';
 import 'package:ivy_pulse/domain/services/fault_classifier_strategy.dart';
 import 'package:ivy_pulse/domain/services/speech_recognition_strategy.dart';
+import 'package:ivy_pulse/domain/usecases/identity/parse_cac_barcode.dart';
+import 'package:ivy_pulse/domain/usecases/identity/verify_operator_identity.dart';
 import 'package:ivy_pulse/domain/usecases/publishing/publish_pmcs_report.dart';
 import 'package:ivy_pulse/domain/usecases/reporting/build_session_report.dart';
 import 'package:ivy_pulse/domain/usecases/reporting/submit_session.dart';
@@ -31,10 +36,7 @@ import 'package:ivy_pulse/domain/usecases/session/start_session.dart';
 import 'package:ivy_pulse/presentation/common/widgets/custom_snack_bar.dart';
 import 'package:ivy_pulse/presentation/inspection/check_item_card.dart';
 import 'package:ivy_pulse/presentation/inspection/inspection_flow_page.dart';
-import 'package:ivy_pulse/domain/usecases/identity/parse_cac_barcode.dart';
-import 'package:ivy_pulse/domain/usecases/identity/verify_operator_identity.dart';
 import 'package:ivy_pulse/presentation/inspection/inspection_view_model.dart';
-import 'package:latlong2/latlong.dart';
 
 import '../../support/fakes.dart';
 
@@ -88,6 +90,7 @@ void main() {
           faultsRepository: faults,
         ),
         submitSession: SubmitSession(
+          transactionRunner: DriftTransactionRunner(db),
           sessionsRepository: sessions,
           faultsRepository: faults,
           reportsRepository: reports,

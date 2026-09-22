@@ -193,6 +193,7 @@ void main() {
         faultsRepository: faultsRepo,
       ),
       submitSession: SubmitSession(
+        transactionRunner: FakeTransactionRunner(),
         sessionsRepository: sessions,
         faultsRepository: faultsRepo,
         reportsRepository: reportsRepo,
@@ -889,6 +890,7 @@ void main() {
           faultsRepository: faultsRepo,
         ),
         submitSession: SubmitSession(
+          transactionRunner: FakeTransactionRunner(),
           sessionsRepository: repo,
           faultsRepository: faultsRepo,
           reportsRepository: reportsRepo,

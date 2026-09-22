@@ -49,6 +49,26 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('large fleets build visible cards and remain searchable',
+      (tester) async {
+    viewModel.reports.addAll(List.generate(
+        600,
+        (i) => buildReport(
+              entityId: 'fleet-$i',
+              bumperNumber: 'V-${i.toString().padLeft(3, '0')}',
+            )));
+    await tester.pumpWidget(subject());
+    await tester.pumpAndSettle();
+    expect(find.text('V-599 - Stryker'), findsNothing);
+    expect(find.byType(InkWell).evaluate().length, lessThan(40));
+    await tester.enterText(find.byType(TextField), 'V-599');
+    await tester.pumpAndSettle();
+    expect(find.text('V-599 - Stryker'), findsOneWidget);
+    await openVehicle(tester, bumperNumber: 'V-599');
+    expect(find.text('New PMCS'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   group('vehicle search and filters', () {
     testWidgets(
         'search matches bumper numbers and UICs without case sensitivity',
