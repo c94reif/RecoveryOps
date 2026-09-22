@@ -66,6 +66,12 @@ two independent transports.
   card's expiry, and inside thirty days it says so — a card that dies mid-rotation strands
   whoever has been signing the 5988-Es.
 
+## Message models
+
+The [message-model reference](docs/MESSAGE_MODELS.md) describes the report, fault,
+signature, peer envelope, Lattice entity, and withdrawal formats sent and received
+by Ivy Pulse. A [PDF copy](docs/MESSAGE_MODELS.pdf) is included.
+
 ## Architecture
 
 Clean architecture, mirroring `recovery_ops`.
