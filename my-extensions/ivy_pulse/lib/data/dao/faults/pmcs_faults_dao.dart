@@ -11,8 +11,8 @@ class PmcsFaultsDao extends DatabaseAccessor<AppDatabase>
 
   Future<List<PmcsFaultData>> getForSession(String sessionId) {
     return (select(pmcsFaults)
-          ..where((t) => t.sessionId.equals(sessionId))
-          ..orderBy([(t) => OrderingTerm.asc(t.recordedAt)]))
+          ..where((table) => table.sessionId.equals(sessionId))
+          ..orderBy([(table) => OrderingTerm.asc(table.recordedAt)]))
         .get();
   }
 
@@ -23,15 +23,16 @@ class PmcsFaultsDao extends DatabaseAccessor<AppDatabase>
   ) async {
     await transaction(() async {
       await (delete(pmcsFaults)
-            ..where(
-                (t) => t.sessionId.equals(sessionId) & t.phase.equals(phase)))
+            ..where((table) =>
+                table.sessionId.equals(sessionId) & table.phase.equals(phase)))
           .go();
-      await batch((b) => b.insertAll(pmcsFaults, rows));
+      await batch((batchWriter) => batchWriter.insertAll(pmcsFaults, rows));
     });
   }
 
   Future<void> deleteForSession(String sessionId) async {
-    await (delete(pmcsFaults)..where((t) => t.sessionId.equals(sessionId)))
+    await (delete(pmcsFaults)
+          ..where((table) => table.sessionId.equals(sessionId)))
         .go();
   }
 }

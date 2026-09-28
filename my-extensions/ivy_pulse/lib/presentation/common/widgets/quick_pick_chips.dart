@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
 
-/// Tap-to-pick alternative to typing, for a field whose values come off a
-/// fixed roster — an operator in gloves should not have to work a soft
-/// keyboard for something with a known answer.
 class QuickPickChips extends StatelessWidget {
   final List<String> options;
   final String? selected;

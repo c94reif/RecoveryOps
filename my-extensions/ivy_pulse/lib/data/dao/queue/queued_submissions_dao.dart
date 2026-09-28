@@ -9,10 +9,9 @@ class QueuedSubmissionsDao extends DatabaseAccessor<AppDatabase>
     with _$QueuedSubmissionsDaoMixin {
   QueuedSubmissionsDao(super.db);
 
-  /// Oldest first — the queue drains in the order the operator submitted.
   Future<List<QueuedSubmissionData>> getAll() {
     return (select(queuedSubmissions)
-          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+          ..orderBy([(table) => OrderingTerm.asc(table.createdAt)]))
         .get();
   }
 
@@ -45,7 +44,8 @@ class QueuedSubmissionsDao extends DatabaseAccessor<AppDatabase>
   }
 
   Future<void> deleteById(int id) async {
-    await (delete(queuedSubmissions)..where((t) => t.id.equals(id))).go();
+    await (delete(queuedSubmissions)..where((table) => table.id.equals(id)))
+        .go();
   }
 
   Future<int> count() async {

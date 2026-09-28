@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:ivy_pulse/core/di/injection.dart';
+import 'package:ivy_pulse/core/di/service_locator.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
+import 'package:ivy_pulse/presentation/common/display_mode.dart';
+import 'package:ivy_pulse/presentation/common/fullscreen.dart';
 import 'package:ivy_pulse/presentation/common/widgets/custom_button.dart';
 import 'package:ivy_pulse/presentation/common/widgets/custom_text_field.dart';
 import 'package:ivy_pulse/presentation/common/widgets/section_label.dart';
@@ -36,12 +38,34 @@ class ProfilePageState extends State<ProfilePage> {
 
   void onFieldChanged() => viewModel.checkDirty(uicController.text);
 
+  void cycleVertical() {
+    verticalQuarterTurns.value = switch (verticalQuarterTurns.value) {
+      0 => 1,
+      1 => 3,
+      _ => 0,
+    };
+  }
+
+  Future<void> toggleFullScreen() async {
+    if (fullScreenOn.value) {
+      fullScreenWanted.value = false;
+      await leaveFullScreen();
+      return;
+    }
+    fullScreenWanted.value = true;
+    final enteredFullScreen = await enterFullScreen();
+    if (enteredFullScreen || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('The host refused full screen')),
+    );
+  }
+
   void handleSnackBar() {
-    final msg = viewModel.snackBarMessage;
-    if (msg != null && mounted) {
+    final snackBarMessage = viewModel.snackBarMessage;
+    if (snackBarMessage != null && mounted) {
       viewModel.snackBarMessage = null;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg)),
+        SnackBar(content: Text(snackBarMessage)),
       );
     }
   }
@@ -72,14 +96,16 @@ class ProfilePageState extends State<ProfilePage> {
                   mainAxisSize: MainAxisSize.max,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SectionLabel(text: 'UIC'),
-                    const SizedBox(height: 8),
                     CustomTextField(
                       controller: uicController,
                       label: 'UIC',
+                      floatingLabelBehavior: FloatingLabelBehavior.always,
                       icon: Icons.groups_outlined,
                       hint: 'W12ABC',
                       textCapitalization: TextCapitalization.characters,
+                      uppercase: true,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => FocusScope.of(context).unfocus(),
                     ),
                     const SizedBox(height: 12),
                     const Text(
@@ -99,6 +125,67 @@ class ProfilePageState extends State<ProfilePage> {
                             viewModel.hasExistingProfile ? 'Save Edit' : 'Save',
                         onPressed: () => viewModel.save(uicController.text),
                       ),
+                    const SizedBox(height: 32),
+                    const SectionLabel(text: 'DISPLAY'),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Choose full screen or adjust the screen orientation.',
+                      style: TextStyle(
+                        color: textSecondary,
+                        fontSize: 11,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: fullScreenOn,
+                      builder: (context, isFullScreen, _) => SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: toggleFullScreen,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: dashBlue,
+                            side: const BorderSide(color: dashBlue),
+                            minimumSize: const Size.fromHeight(minTouchTarget),
+                          ),
+                          icon: Icon(
+                            isFullScreen
+                                ? Icons.fullscreen_exit
+                                : Icons.fullscreen,
+                            size: 18,
+                          ),
+                          label: Text(isFullScreen
+                              ? 'Exit full screen'
+                              : 'Enter full screen'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ValueListenableBuilder<int>(
+                      valueListenable: verticalQuarterTurns,
+                      builder: (context, turns, _) => SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: cycleVertical,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: dashBlue,
+                            side: const BorderSide(color: dashBlue),
+                            minimumSize: const Size.fromHeight(minTouchTarget),
+                          ),
+                          icon: Icon(
+                            turns == 0
+                                ? Icons.screen_rotation
+                                : Icons.screen_lock_rotation,
+                            size: 18,
+                          ),
+                          label: Text(switch (turns) {
+                            0 => 'Switch to portrait',
+                            1 => 'Flip portrait',
+                            _ => 'Switch to landscape',
+                          }),
+                        ),
+                      ),
+                    ),
                     SizedBox(height: bottomInset),
                   ],
                 ),

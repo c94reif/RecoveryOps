@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:ivy_pulse/core/di/injection.dart';
+import 'package:ivy_pulse/core/di/service_locator.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
+import 'package:ivy_pulse/domain/entities/fault_severity.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
 import 'package:ivy_pulse/presentation/common/widgets/confirm_dialog.dart';
 import 'package:ivy_pulse/presentation/common/widgets/custom_button.dart';
 import 'package:ivy_pulse/presentation/common/widgets/section_label.dart';
 import 'package:ivy_pulse/presentation/inspection/inspection_view_model.dart';
 
-/// The three TM phases. A completed phase stays open for review because the
-/// operator is the one who signs the 5988-E and may want to re-read it.
 class PhaseSelectPage extends StatefulWidget {
   const PhaseSelectPage({super.key});
 
@@ -69,21 +68,30 @@ class PhaseSelectPageState extends State<PhaseSelectPage> {
               style: const TextStyle(color: textSecondary, fontSize: 12),
             ),
             const SizedBox(height: 20),
-            const SectionLabel(text: 'SELECT PHASE'),
+            const SectionLabel(text: 'CHOOSE PMCS TYPE'),
+            const SizedBox(height: 6),
+            const Text(
+              'Choose the inspection you are performing. Submit it when finished.',
+              style: TextStyle(color: textSecondary, fontSize: 12),
+            ),
             const SizedBox(height: 8),
             for (final phase in PmcsPhase.values)
               buildPhaseCard(phase, session.isPhaseComplete(phase)),
             const SizedBox(height: 20),
             if (session.hasStartedAnyPhase)
               CustomButton(
-                text: 'VIEW PMCS SUMMARY',
+                text: 'REVIEW & SUBMIT PMCS',
                 icon: Icons.assignment_outlined,
                 onPressed: viewModel.openSummary,
               ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: discard,
-              child: const Text('DISCARD SESSION'),
+              onPressed: viewModel.isBusy ? null : discard,
+              style: TextButton.styleFrom(
+                foregroundColor: textSecondary,
+                minimumSize: const Size(0, minTouchTarget),
+              ),
+              child: const Text('Discard session'),
             ),
           ],
         );
@@ -93,6 +101,15 @@ class PhaseSelectPageState extends State<PhaseSelectPage> {
 
   Widget buildPhaseCard(PmcsPhase phase, bool isComplete) {
     final itemCount = viewModel.catalog?.itemCountFor(phase) ?? 0;
+    final answered = viewModel.answeredCountFor(phase);
+    final status = isComplete
+        ? 'READY TO SUBMIT'
+        : answered > 0
+            ? 'IN PROGRESS'
+            : null;
+    final progress = isComplete || answered > 0
+        ? '${isComplete ? itemCount : answered} of $itemCount complete'
+        : '$itemCount ${itemCount == 1 ? 'check' : 'checks'}';
     final accent = isComplete ? serviceableGreen : masterChiefGreen;
 
     return Card(
@@ -101,64 +118,80 @@ class PhaseSelectPageState extends State<PhaseSelectPage> {
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(color: accent, width: isComplete ? 1.5 : 1),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () => viewModel.openPhase(phase),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      phase.label,
-                      style: const TextStyle(
-                        color: textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
+      child: Stack(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: viewModel.isBusy
+                ? null
+                : isComplete
+                    ? viewModel.openSummary
+                    : () => viewModel.openPhase(phase),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          phase.label,
+                          style: const TextStyle(
+                            color: textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          progress,
+                          style: const TextStyle(
+                            color: textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (status != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            status,
+                            style: TextStyle(
+                              color:
+                                  isComplete ? serviceableGreen : textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$itemCount ${itemCount == 1 ? 'check' : 'checks'}',
-                      style: const TextStyle(
-                        color: textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (isComplete)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+                  ),
+                  if (isComplete)
                     const Icon(
                       Icons.check_circle,
                       color: serviceableGreen,
                       size: 22,
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'COMPLETE',
-                      style: TextStyle(
-                        color: serviceableGreen,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ],
-                )
-              else
-                Icon(Icons.chevron_right, color: accent, size: 24),
-            ],
+                    )
+                  else
+                    Icon(Icons.chevron_right, color: accent, size: 24),
+                ],
+              ),
+            ),
           ),
-        ),
+          if (hasRedX(phase))
+            const Positioned(
+              top: 6,
+              right: 6,
+              child: Icon(Icons.cancel, color: redXRed, size: 14),
+            ),
+        ],
       ),
     );
   }
+
+  bool hasRedX(PmcsPhase phase) => viewModel.sessionFaults.any(
+        (fault) => fault.phase == phase && fault.severity == FaultSeverity.redX,
+      );
 }

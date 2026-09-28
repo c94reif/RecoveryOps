@@ -15,19 +15,20 @@ class FaultsRepoImpl implements FaultsRepository {
   Future<List<PmcsFault>> getForSession(String sessionId) async {
     final rows = await dao.getForSession(sessionId);
     return rows
-        .map((pmcsfault) => PmcsFault(
-              id: pmcsfault.id,
-              sessionId: pmcsfault.sessionId,
-              itemId: pmcsfault.itemId,
-              phase: PmcsPhase.tryFromWireName(pmcsfault.phase) ?? PmcsPhase.before,
-              category: pmcsfault.category,
-              subcategory: pmcsfault.subcategory,
-              description: pmcsfault.description,
-              condition: pmcsfault.condition,
-              severity: FaultSeverity.tryFromWireName(pmcsfault.severity) ??
+        .map((faultRow) => PmcsFault(
+              id: faultRow.id,
+              sessionId: faultRow.sessionId,
+              itemId: faultRow.itemId,
+              phase:
+                  PmcsPhase.tryFromWireName(faultRow.phase) ?? PmcsPhase.before,
+              category: faultRow.category,
+              subcategory: faultRow.subcategory,
+              description: faultRow.description,
+              condition: faultRow.condition,
+              severity: FaultSeverity.tryFromWireName(faultRow.severity) ??
                   FaultSeverity.dash,
-              note: pmcsfault.note,
-              recordedAt: pmcsfault.recordedAt,
+              note: faultRow.note,
+              recordedAt: faultRow.recordedAt,
             ))
         .toList();
   }
@@ -42,17 +43,17 @@ class FaultsRepoImpl implements FaultsRepository {
       sessionId,
       phaseWireName,
       faults
-          .map((f) => PmcsFaultsCompanion.insert(
+          .map((fault) => PmcsFaultsCompanion.insert(
                 sessionId: sessionId,
-                itemId: f.itemId,
-                phase: f.phase.wireName,
-                category: f.category,
-                subcategory: f.subcategory,
-                description: f.description,
-                condition: f.condition,
-                severity: f.severity.wireName,
-                note: Value(f.note),
-                recordedAt: f.recordedAt,
+                itemId: fault.itemId,
+                phase: fault.phase.wireName,
+                category: fault.category,
+                subcategory: fault.subcategory,
+                description: fault.description,
+                condition: fault.condition,
+                severity: fault.severity.wireName,
+                note: Value(fault.note),
+                recordedAt: fault.recordedAt,
               ))
           .toList(),
     );

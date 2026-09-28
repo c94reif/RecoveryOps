@@ -54,6 +54,7 @@ void main() {
     FakeQueuedSubmissionsRepository? withRepository,
   }) =>
       MainThreadQueueWorker(
+        snackBarService: SnackBarService.instance,
         repository: withRepository ?? repository,
         entityPort: entityPort,
         meshPort: meshPort,
@@ -81,7 +82,8 @@ void main() {
   group('enqueue', () {
     test('parks the submission on disk so a killed app can resume it',
         () async {
-      await worker.enqueue(buildQueuedSubmission(payload: 'encoded:a'));
+      await worker
+          .enqueue(buildQueuedSubmission(entityId: 'a', payload: 'encoded:a'));
 
       expect(repository.submissions, hasLength(1));
       expect(repository.submissions.single.payload, 'encoded:a');
@@ -260,9 +262,12 @@ void main() {
     });
 
     test('keeps draining while the leg holds up', () async {
-      await worker.enqueue(buildQueuedSubmission(payload: 'encoded:a'));
-      await worker.enqueue(buildQueuedSubmission(payload: 'encoded:b'));
-      await worker.enqueue(buildQueuedSubmission(payload: 'encoded:c'));
+      await worker
+          .enqueue(buildQueuedSubmission(entityId: 'a', payload: 'encoded:a'));
+      await worker
+          .enqueue(buildQueuedSubmission(entityId: 'b', payload: 'encoded:b'));
+      await worker
+          .enqueue(buildQueuedSubmission(entityId: 'c', payload: 'encoded:c'));
 
       worker.reportTransportOutcome(
         transport: TransportKind.lattice,
@@ -297,8 +302,10 @@ void main() {
 
     test('a send that fails mid-drain stops that leg and parks the rest',
         () async {
-      await worker.enqueue(buildQueuedSubmission(payload: 'encoded:a'));
-      await worker.enqueue(buildQueuedSubmission(payload: 'encoded:b'));
+      await worker
+          .enqueue(buildQueuedSubmission(entityId: 'a', payload: 'encoded:a'));
+      await worker
+          .enqueue(buildQueuedSubmission(entityId: 'b', payload: 'encoded:b'));
       entityPort.publishSucceeds = false;
 
       worker.reportTransportOutcome(
@@ -315,7 +322,8 @@ void main() {
     });
 
     test('a failed drain leaves the leg ready to be offered again', () async {
-      await worker.enqueue(buildQueuedSubmission(payload: 'encoded:a'));
+      await worker
+          .enqueue(buildQueuedSubmission(entityId: 'a', payload: 'encoded:a'));
       entityPort.publishSucceeds = false;
       worker.reportTransportOutcome(
         transport: TransportKind.lattice,
@@ -385,8 +393,10 @@ void main() {
     test('keeps draining when the row delete fails', () async {
       final failing = DeleteFailsRepository();
       final other = buildWorker(withRepository: failing);
-      await other.enqueue(buildQueuedSubmission(payload: 'encoded:a'));
-      await other.enqueue(buildQueuedSubmission(payload: 'encoded:b'));
+      await other
+          .enqueue(buildQueuedSubmission(entityId: 'a', payload: 'encoded:a'));
+      await other
+          .enqueue(buildQueuedSubmission(entityId: 'b', payload: 'encoded:b'));
 
       other.reportTransportOutcome(
         transport: TransportKind.lattice,
@@ -407,7 +417,8 @@ void main() {
       fakeAsync((async) {
         unawaited(worker.start());
         async.flushMicrotasks();
-        unawaited(worker.enqueue(buildQueuedSubmission(payload: 'encoded:a')));
+        unawaited(worker.enqueue(
+            buildQueuedSubmission(entityId: 'a', payload: 'encoded:a')));
         async.flushMicrotasks();
 
         async.elapse(probeInterval);
@@ -463,7 +474,8 @@ void main() {
       fakeAsync((async) {
         unawaited(worker.start());
         async.flushMicrotasks();
-        unawaited(worker.enqueue(buildQueuedSubmission(payload: 'encoded:a')));
+        unawaited(worker.enqueue(
+            buildQueuedSubmission(entityId: 'a', payload: 'encoded:a')));
         async.flushMicrotasks();
         entityPort.publishSucceeds = false;
 
@@ -486,9 +498,11 @@ void main() {
       fakeAsync((async) {
         unawaited(worker.start());
         async.flushMicrotasks();
-        unawaited(worker.enqueue(buildQueuedSubmission(payload: 'encoded:a')));
+        unawaited(worker.enqueue(
+            buildQueuedSubmission(entityId: 'a', payload: 'encoded:a')));
         async.flushMicrotasks();
-        unawaited(worker.enqueue(buildQueuedSubmission(payload: 'encoded:b')));
+        unawaited(worker.enqueue(
+            buildQueuedSubmission(entityId: 'b', payload: 'encoded:b')));
         async.flushMicrotasks();
 
         async.elapse(probeInterval);
@@ -585,7 +599,8 @@ void main() {
     });
 
     test('stop leaves the rows on disk so a restart can resume them', () async {
-      await worker.enqueue(buildQueuedSubmission(payload: 'encoded:a'));
+      await worker
+          .enqueue(buildQueuedSubmission(entityId: 'a', payload: 'encoded:a'));
 
       await worker.stop();
 

@@ -134,14 +134,94 @@ void main() {
     return db;
   }
 
-  test('a v1 database opens at v2', () async {
+  test('a v1 database opens at v5', () async {
     seedV1();
 
     final db = await openMigrated();
     addTearDown(db.close);
 
     final version = await db.customSelect('PRAGMA user_version').getSingle();
-    expect(version.data.values.first, 2);
+    expect(version.data.values.first, 5);
+  });
+
+  test('a v3 upgrade preserves reports and both transport queues', () async {
+    seedV1();
+    final seeded = await openMigrated();
+    await seeded.close();
+    final raw = sqlite3.open(file.path);
+    raw.execute('DROP TABLE report_withdrawals');
+    raw.execute('DROP TABLE dismissed_fault_suggestions');
+    final before = raw
+        .select('SELECT * FROM queued_submissions')
+        .map((r) => Map<String, Object?>.from(r))
+        .toList();
+    final reportCount = raw
+        .select('SELECT COUNT(*) AS count FROM pmcs_reports')
+        .single['count'];
+    raw.userVersion = 3;
+    raw.close();
+    final upgraded = await openMigrated();
+    addTearDown(upgraded.close);
+    expect(await upgraded.select(upgraded.reportWithdrawals).get(), isEmpty);
+    expect(
+        (await upgraded.customSelect('SELECT * FROM queued_submissions').get())
+            .map((r) => r.data),
+        before);
+    expect((await upgraded.select(upgraded.pmcsReports).get()).length,
+        reportCount);
+  });
+
+  test(
+      'v4 upgrade preserves signed reports and persists suggestion overrides across restart',
+      () async {
+    seedV1();
+    final seeded = await openMigrated();
+    await seeded.close();
+    final raw = sqlite3.open(file.path);
+    raw.execute('DROP TABLE dismissed_fault_suggestions');
+    raw.execute("INSERT INTO report_withdrawals VALUES ('withdrawn')");
+    final before = raw
+        .select('SELECT * FROM pmcs_reports')
+        .map((row) => Map<String, Object?>.from(row))
+        .toList();
+    raw.userVersion = 4;
+    raw.close();
+
+    final upgraded = await openMigrated();
+    final dao = PmcsReportsDao(upgraded);
+    expect(await dao.getDismissedFaultSuggestions(), isEmpty);
+    await dao.setFaultSuggestionDismissed('previous-before-brakes', true);
+    await dao.setFaultSuggestionDismissed('previous-before-brakes', true);
+    expect(
+        (await upgraded.customSelect('SELECT * FROM pmcs_reports').get())
+            .map((row) => row.data),
+        before);
+    expect(await dao.getWithdrawnIds(), {'withdrawn'});
+    await upgraded.close();
+
+    final reopened = await openMigrated();
+    addTearDown(reopened.close);
+    final reopenedDao = PmcsReportsDao(reopened);
+    expect(await reopenedDao.getDismissedFaultSuggestions(),
+        {'previous-before-brakes'});
+    await reopenedDao.setFaultSuggestionDismissed(
+        'previous-before-brakes', false);
+    expect(await reopenedDao.getDismissedFaultSuggestions(), isEmpty);
+  });
+
+  test('withdrawal identities survive closing and reopening the database',
+      () async {
+    final first = await openMigrated();
+    await first.customStatement(
+        "INSERT INTO report_withdrawals (entity_id) VALUES ('withdrawn')");
+    await first.close();
+    final reopened = await openMigrated();
+    addTearDown(reopened.close);
+    expect(
+        (await reopened.select(reopened.reportWithdrawals).get())
+            .single
+            .entityId,
+        'withdrawn');
   });
 
   test('the unit the operator was signed for becomes their UIC', () async {
@@ -163,8 +243,7 @@ void main() {
     final db = await openMigrated();
     addTearDown(db.close);
 
-    final columns =
-        await db.customSelect('PRAGMA table_info(profiles)').get();
+    final columns = await db.customSelect('PRAGMA table_info(profiles)').get();
     final names = columns.map((row) => row.data['name']).toList();
 
     expect(names, containsAll(<Object?>['id', 'uic']));
@@ -202,7 +281,7 @@ void main() {
     expect(reports.single.signatureJson, isNull);
   });
 
-  test('a fresh install creates v2 directly, with no migration to run',
+  test('a fresh install creates v4 directly, with no migration to run',
       () async {
     final db = AppDatabase.test(NativeDatabase(file));
     addTearDown(db.close);

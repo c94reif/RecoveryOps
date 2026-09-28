@@ -18,27 +18,20 @@ enum SessionStatus {
       };
 }
 
-/// One operator's PMCS of one vehicle. Survives app restarts so a Soldier
-/// interrupted mid-walk-around resumes exactly where they stopped.
 class PmcsSession {
   final int? id;
 
-  /// UUID; doubles as the Lattice entity id when the session is published.
   final String sessionId;
   final String bumperNumber;
   final VehicleType vehicleType;
   final String operator;
 
-  /// Unit Identification Code the vehicle is signed for under.
   final String uic;
   final DateTime startedAt;
   final DateTime? submittedAt;
   final List<PmcsPhase> completedPhases;
   final SessionStatus status;
 
-  /// Who signed the PMCS off, stamped at submit. Null while the walk-around
-  /// is still open — a session started by one Soldier can be closed out by
-  /// another, so nobody is assumed until the CAC is read.
   final PmcsSignature? signature;
   final double? latitude;
   final double? longitude;
@@ -60,11 +53,6 @@ class PmcsSession {
   });
 
   bool isPhaseComplete(PmcsPhase phase) => completedPhases.contains(phase);
-
-  List<PmcsPhase> get remainingPhases =>
-      PmcsPhase.values.where((p) => !completedPhases.contains(p)).toList();
-
-  bool get allPhasesComplete => remainingPhases.isEmpty;
 
   bool get hasStartedAnyPhase => completedPhases.isNotEmpty;
 
@@ -104,8 +92,10 @@ class PmcsSession {
     if (completedPhases.contains(phase)) return this;
     return copyWith(
       completedPhases: [
-        for (final p in PmcsPhase.values)
-          if (p == phase || completedPhases.contains(p)) p,
+        for (final completedPhase in PmcsPhase.values)
+          if (completedPhase == phase ||
+              completedPhases.contains(completedPhase))
+            completedPhase,
       ],
     );
   }

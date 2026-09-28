@@ -1,16 +1,9 @@
-// GENERATED FILE — DO NOT EDIT BY HAND.
-//
-// Stryker family PMCS checks transcribed from TM 9-2355-311-10.
-// Regenerate with tool/generate_catalog.sh after editing the TM source data.
-
 import 'package:ivy_pulse/domain/entities/pmcs_catalog.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_category.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_check_item.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
 import 'package:ivy_pulse/domain/entities/vehicle_type.dart';
 
-/// Stryker PMCS catalog — 78 TM checks across before, during,
-/// and after operations.
 const PmcsCatalog strykerPmcsCatalog = PmcsCatalog(
   vehicleType: VehicleType.stryker,
   phases: {

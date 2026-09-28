@@ -1,9 +1,5 @@
 import 'package:ivy_pulse/domain/entities/fault_severity.dart';
 
-/// One operator answer to one TM check.
-///
-/// [severity] is null when [faultIndex] is 0 — the component is serviceable
-/// and no fault is raised.
 class CheckResult {
   final String itemId;
   final int faultIndex;

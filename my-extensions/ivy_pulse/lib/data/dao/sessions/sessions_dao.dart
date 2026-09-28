@@ -12,13 +12,15 @@ class SessionsDao extends DatabaseAccessor<AppDatabase>
 
   Future<List<PmcsSessionData>> getOpenSessions() {
     return (select(pmcsSessions)
-          ..where((t) => t.status.equals(SessionStatus.inProgress.wireName))
-          ..orderBy([(t) => OrderingTerm.desc(t.startedAt)]))
+          ..where(
+              (table) => table.status.equals(SessionStatus.inProgress.wireName))
+          ..orderBy([(table) => OrderingTerm.desc(table.startedAt)]))
         .get();
   }
 
   Future<PmcsSessionData?> getBySessionId(String sessionId) {
-    return (select(pmcsSessions)..where((t) => t.sessionId.equals(sessionId)))
+    return (select(pmcsSessions)
+          ..where((table) => table.sessionId.equals(sessionId)))
         .getSingleOrNull();
   }
 
@@ -67,7 +69,8 @@ class SessionsDao extends DatabaseAccessor<AppDatabase>
     double? latitude,
     double? longitude,
   }) async {
-    await (update(pmcsSessions)..where((t) => t.sessionId.equals(sessionId)))
+    final changed = await (update(pmcsSessions)
+          ..where((table) => table.sessionId.equals(sessionId)))
         .write(
       PmcsSessionsCompanion(
         bumperNumber: Value(bumperNumber),
@@ -78,14 +81,28 @@ class SessionsDao extends DatabaseAccessor<AppDatabase>
         completedPhases: Value(completedPhases),
         status: Value(status),
         signatureJson: Value(signatureJson),
-        latitude: Value(latitude),
-        longitude: Value(longitude),
+        latitude: Value.absentIfNull(latitude),
+        longitude: Value.absentIfNull(longitude),
       ),
+    );
+    if (changed != 1) throw StateError('Inspection no longer exists');
+  }
+
+  Future<void> updateLocation(
+      String sessionId, double latitude, double longitude) async {
+    await (update(pmcsSessions)
+          ..where((table) =>
+              table.sessionId.equals(sessionId) &
+              table.status.equals(SessionStatus.inProgress.wireName)))
+        .write(
+      PmcsSessionsCompanion(
+          latitude: Value(latitude), longitude: Value(longitude)),
     );
   }
 
   Future<void> deleteBySessionId(String sessionId) async {
-    await (delete(pmcsSessions)..where((t) => t.sessionId.equals(sessionId)))
+    await (delete(pmcsSessions)
+          ..where((table) => table.sessionId.equals(sessionId)))
         .go();
   }
 }

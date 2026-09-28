@@ -56,6 +56,7 @@ void main() {
     sessions = FakeSessionsRepository();
     faults = FakeFaultsRepository();
     usecase = CompletePhase(
+      transactionRunner: FakeTransactionRunner(),
       sessionsRepository: sessions,
       faultsRepository: faults,
     );

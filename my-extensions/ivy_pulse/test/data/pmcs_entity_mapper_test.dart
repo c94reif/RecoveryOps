@@ -8,6 +8,9 @@ import 'package:ivy_pulse/data/mappers/pmcs_entity_mapper.dart';
 import 'package:ivy_pulse/data/mappers/pmcs_report_codec.dart';
 import 'package:ivy_pulse/domain/entities/fault_severity.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
+import 'package:ivy_pulse/domain/entities/attested_identity.dart';
+import 'package:ivy_pulse/domain/entities/cac_scan.dart';
+import 'package:ivy_pulse/domain/entities/pmcs_signature.dart';
 import 'package:ivy_pulse/domain/entities/vehicle_type.dart';
 
 import '../support/fakes.dart';
@@ -53,6 +56,95 @@ void main() {
       expect(decoded.phases, [PmcsPhase.before]);
       expect(decoded.faults.single.severity, FaultSeverity.circleX);
       expect(decoded.faults.single.note, 'seeping');
+    });
+
+    test('a signed PMCS carries the name and DoD ID as entity fields', () {
+      final entity = mapper.buildEntity(buildReport(
+        operator: 'SGT SMITH, JOHN A',
+        signature: buildSignature(),
+      ));
+
+      // Top-level, not buried in the description blob: a Lattice operator
+      // clicking the vehicle sees who signed for it without decoding our
+      // report format.
+      expect(entity.extra?['signedBy'], 'SGT SMITH, JOHN A');
+      expect(entity.extra?['dodId'], '1087987498');
+      expect(entity.extra?['signatureVerified'], isTrue);
+      expect(entity.extra?['signedAt'], isA<String>());
+    });
+
+    test('an unverified PMCS says so on the entity and carries no DoD ID',
+        () {
+      final entity = mapper.buildEntity(buildReport(
+        operator: 'UNVERIFIED',
+        signature: buildUnverifiedSignature(),
+      ));
+
+      expect(entity.extra?['signedBy'], 'UNVERIFIED');
+      expect(entity.extra?['signatureVerified'], isFalse);
+      // A number nobody scanned is a number nobody should be shown.
+      expect(entity.extra?.containsKey('dodId'), isFalse);
+    });
+
+    test('a report that predates signatures is never promoted to signed', () {
+      final entity = mapper.buildEntity(buildReport());
+
+      expect(entity.extra?['signatureVerified'], isFalse);
+      expect(entity.extra?.containsKey('dodId'), isFalse);
+      expect(entity.extra?.containsKey('signedAt'), isFalse);
+    });
+
+    test('the signer survives the trip through a queued payload', () {
+      final report = buildReport(
+        entityId: 'queued-1',
+        operator: 'SGT SMITH, JOHN A',
+        signature: buildSignature(),
+      );
+      final payload = const PmcsReportCodec().encodeReport(report);
+
+      final entity = mapper.buildEntityFromPayload(
+        entityId: 'queued-1',
+        payload: payload,
+        position: const LatLng(33.0, -84.0),
+      );
+
+      expect(entity.extra?['dodId'], '1087987498');
+      expect(entity.extra?['signatureVerified'], isTrue);
+    });
+
+    test('a typed name reaches the entity as typed, with its DoD ID and '
+        'without a verified flag', () {
+      final entity = mapper.buildEntity(buildReport(
+        operator: 'SMITH, JOHN',
+        signature: PmcsSignature.unverified(
+          blockedBy: CacRejection.codeUnreadable,
+          signedAt: DateTime.utc(2026, 3, 24, 9),
+          attestedBy: const AttestedIdentity(
+            edipi: '1087987498',
+            firstName: 'JOHN',
+            lastName: 'SMITH',
+          ),
+        ),
+      ));
+
+      expect(entity.extra?['signedBy'], 'SMITH, JOHN');
+      expect(entity.extra?['dodId'], '1087987498');
+      expect(entity.extra?['signatureMethod'], 'typed');
+      expect(entity.extra?['signatureVerified'], isFalse);
+    });
+
+    test('the method field tells cac from typed from none', () {
+      expect(
+        mapper.buildEntity(buildReport(signature: buildSignature()))
+            .extra?['signatureMethod'],
+        'cac',
+      );
+      expect(
+        mapper.buildEntity(buildReport(signature: buildUnverifiedSignature()))
+            .extra?['signatureMethod'],
+        'none',
+      );
+      expect(mapper.buildEntity(buildReport()).extra?['signatureMethod'], 'none');
     });
 
     test('expires after one dispatch day so a stale PMCS leaves the map', () {

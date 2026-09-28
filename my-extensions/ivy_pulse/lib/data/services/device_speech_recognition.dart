@@ -12,9 +12,6 @@ class DeviceSpeechRecognition implements SpeechRecognitionStrategy {
     if (initialized) return;
     try {
       initialized = await speech.initialize(
-        // On some hosts the plugin never fires a final result — it just goes
-        // quiet — so the status transition is the second way out. Either
-        // path fires the callback once, then clears it.
         onStatus: (status) {
           if (status == 'done' || status == 'notListening') {
             listening = false;
@@ -27,10 +24,8 @@ class DeviceSpeechRecognition implements SpeechRecognitionStrategy {
           }
         },
       );
-    } catch (e) {
-      // No microphone permission, or no speech engine behind the WebView —
-      // dictation is optional, the operator can still type the note.
-      debugPrint('[IvyPulse] Speech initialize error: $e');
+    } catch (error) {
+      debugPrint('[IvyPulse] Speech initialize error: $error');
       initialized = false;
     }
   }
@@ -59,8 +54,8 @@ class DeviceSpeechRecognition implements SpeechRecognitionStrategy {
           }
         },
       );
-    } catch (e) {
-      debugPrint('[IvyPulse] Speech listen error: $e');
+    } catch (error) {
+      debugPrint('[IvyPulse] Speech listen error: $error');
       listening = false;
       pendingOnResult = null;
     }
@@ -71,8 +66,8 @@ class DeviceSpeechRecognition implements SpeechRecognitionStrategy {
     listening = false;
     try {
       await speech.stop();
-    } catch (e) {
-      debugPrint('[IvyPulse] Speech stop error: $e');
+    } catch (error) {
+      debugPrint('[IvyPulse] Speech stop error: $error');
     }
   }
 }

@@ -1,19 +1,9 @@
-// GENERATED FILE — DO NOT EDIT BY HAND.
-//
-// JLTV PMCS checks transcribed from TM 9-2320-400-10 PMCS tables.
-// Regenerate with tool/generate_catalog.sh after editing the TM source data.
-
 import 'package:ivy_pulse/domain/entities/pmcs_catalog.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_category.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_check_item.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
 import 'package:ivy_pulse/domain/entities/vehicle_type.dart';
 
-/// JLTV PMCS catalog — 94 TM checks across before, during, and
-/// after operations.
-///
-/// Item ids carrying the `CRIT` marker have a "Not Mission Capable If"
-/// condition in the TM and are graded as critical systems by the classifier.
 const PmcsCatalog jltvPmcsCatalog = PmcsCatalog(
   vehicleType: VehicleType.jltv,
   phases: {

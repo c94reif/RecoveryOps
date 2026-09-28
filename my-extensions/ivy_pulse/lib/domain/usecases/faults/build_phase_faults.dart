@@ -4,12 +4,6 @@ import 'package:ivy_pulse/domain/entities/pmcs_fault.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
 import 'package:ivy_pulse/domain/entities/fault_severity.dart';
 
-/// Turns a phase's non-serviceable answers into faults, pulling the category,
-/// component, and TM instruction off the catalog so the fault stands alone on
-/// the 5988-E.
-///
-/// Pure and synchronous — safe to run on a background isolate for a long
-/// walk-around, and trivially testable.
 class BuildPhaseFaults {
   const BuildPhaseFaults();
 

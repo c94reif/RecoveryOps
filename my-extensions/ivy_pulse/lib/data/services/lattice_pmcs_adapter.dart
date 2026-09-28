@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:ivy_pulse/core/constants/app_constants.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
 import 'package:ivy_pulse/data/mappers/pmcs_entity_mapper.dart';
@@ -46,44 +47,41 @@ class LatticePmcsAdapter implements PmcsEntityPort {
       }
       final tombstone = existing.copyWith(
         isLive: false,
-        expiryTime: DateTime.now().toUtc(),
+        expiryTime: DateTime.now().toUtc().add(AppConstants.entityTtl),
       );
       await _entities.upsertEntity(tombstone);
 
-      // Verified for the same reason a publish is: the host can accept an
-      // upsert and drop it. Telling an operator a deadlined vehicle was
-      // withdrawn while it is still on everyone else's COP is worse than
-      // telling them the withdrawal failed.
       final persisted = await _entities.getEntity(entityId);
-      if (persisted != null && persisted.isLive == true) {
+      if (persisted != null && persisted.isLive != false) {
         debugPrint('[IvyPulse] Deletion lattice: $entityId still live after '
             'tombstone — host did not persist');
         return false;
       }
       debugPrint('[IvyPulse] Deletion lattice: marked $entityId inactive');
       return true;
-    } catch (e) {
-      debugPrint('[IvyPulse] Deletion lattice error: $e');
+    } catch (error) {
+      debugPrint('[IvyPulse] Deletion lattice error: $error');
       return false;
     }
   }
 
-  /// The host reports success on an upsert it then silently drops, so a
-  /// submission is only trusted once it reads back — otherwise the operator
-  /// is told the vehicle is on the COP when nobody can see it.
   Future<bool> _upsertVerified(sdk.Entity entity) async {
     try {
       await _entities.upsertEntity(entity);
       final persisted = await _entities.getEntity(entity.id);
-      if (persisted == null) {
+      if (persisted == null ||
+          persisted.id != entity.id ||
+          persisted.description != entity.description ||
+          persisted.isLive == false ||
+          !_mapper.isOwnedPmcsEntity(persisted)) {
         debugPrint('[IvyPulse] SDK upsertEntity reported success but '
-            'getEntity(${entity.id}) returned null — host did not persist');
+            'getEntity(${entity.id}) did not return the published report');
         return false;
       }
       debugPrint('[IvyPulse] SDK upsertEntity verified: ${entity.id}');
       return true;
-    } catch (e) {
-      debugPrint('[IvyPulse] SDK upsertEntity error: $e');
+    } catch (error) {
+      debugPrint('[IvyPulse] SDK upsertEntity error: $error');
       return false;
     }
   }

@@ -9,14 +9,6 @@ class QueueWorkerSetup {
   const QueueWorkerSetup({required this.toMain, required this.handshake});
 }
 
-/// The queue's rules, run off the UI isolate so a transport that hangs never
-/// stalls an operator mid walk-around.
-///
-/// This side owns no database, no network and no UI: the main isolate performs
-/// every send, prompt and delete and reports the result back. Lattice and mesh
-/// are tracked independently because either leg can be down while the other
-/// carries traffic, and a leg only drains one submission at a time so the
-/// operator is asked about them in the order they were parked.
 void queueWorkerMain(QueueWorkerSetup setup) {
   final fromMain = ReceivePort();
   setup.handshake.send(fromMain.sendPort);
@@ -35,7 +27,7 @@ void queueWorkerMain(QueueWorkerSetup setup) {
   };
   final inFlight = <int, InFlight>{};
 
-  void log(String message) {
+  void sendLogMessage(String message) {
     setup.toMain.send(workerLog(message));
   }
 
@@ -48,31 +40,35 @@ void queueWorkerMain(QueueWorkerSetup setup) {
   void requestNextPrompt(String transport) {
     if (draining[transport] == true) return;
     if (connected[transport] != true) return;
-    final list = pending[transport]!;
-    if (list.isEmpty) return;
-    final next = list.first;
-    final id = next['id'] as int;
+    final transportQueue = pending[transport]!;
+    if (transportQueue.isEmpty) return;
+    final nextSubmission = transportQueue.first;
+    final submissionId = nextSubmission['id'] as int;
     draining[transport] = true;
-    inFlight[id] = InFlight(transport: transport, submission: next);
-    setup.toMain.send(workerPrompt(submissionId: id, submission: next));
+    inFlight[submissionId] =
+        InFlight(transport: transport, submission: nextSubmission);
+    setup.toMain.send(
+        workerPrompt(submissionId: submissionId, submission: nextSubmission));
   }
 
-  /// Retries every leg that has a backlog, using the oldest parked
-  /// submission as the probe — the same rule the main-thread worker follows.
-  /// The operator is not prompted first: they already chose to send this one,
-  /// and if it lands it is delivered rather than merely proven deliverable.
   void onProbe() {
     for (final transport in pending.keys) {
       if (draining[transport] == true) continue;
-      final list = pending[transport]!;
-      if (list.isEmpty) continue;
+      final transportQueue = pending[transport]!;
+      if (transportQueue.isEmpty) continue;
+      if (connected[transport] == true) {
+        requestNextPrompt(transport);
+        continue;
+      }
 
-      final next = list.first;
-      final id = next['id'] as int;
+      final nextSubmission = transportQueue.first;
+      final submissionId = nextSubmission['id'] as int;
       draining[transport] = true;
-      inFlight[id] = InFlight(transport: transport, submission: next)
-        ..answered = true;
-      setup.toMain.send(workerExecute(submissionId: id, submission: next));
+      inFlight[submissionId] =
+          InFlight(transport: transport, submission: nextSubmission)
+            ..answered = true;
+      setup.toMain.send(workerExecute(
+          submissionId: submissionId, submission: nextSubmission));
     }
   }
 
@@ -88,8 +84,6 @@ void queueWorkerMain(QueueWorkerSetup setup) {
   void onPromptResponse(int submissionId, bool send) {
     final entry = inFlight[submissionId];
     if (entry == null) return;
-    // One answer per prompt. Without this a repeated "send" emits a second
-    // execute and the same PMCS goes out twice.
     if (entry.answered) return;
     entry.answered = true;
     if (send) {
@@ -97,8 +91,8 @@ void queueWorkerMain(QueueWorkerSetup setup) {
         workerExecute(submissionId: submissionId, submission: entry.submission),
       );
     } else {
-      pending[entry.transport]!
-          .removeWhere((s) => (s['id'] as int) == submissionId);
+      pending[entry.transport]!.removeWhere(
+          (submission) => (submission['id'] as int) == submissionId);
       inFlight.remove(submissionId);
       draining[entry.transport] = false;
       setup.toMain.send(workerDelete(submissionId));
@@ -106,8 +100,6 @@ void queueWorkerMain(QueueWorkerSetup setup) {
     }
   }
 
-  /// Nobody was on screen to answer. Unwind the prompt and leave the
-  /// submission parked — the next outcome or resume offers it again.
   void onPromptDeferred(int submissionId) {
     final entry = inFlight.remove(submissionId);
     if (entry == null) return;
@@ -120,7 +112,8 @@ void queueWorkerMain(QueueWorkerSetup setup) {
     final transport = entry.transport;
     draining[transport] = false;
     if (success) {
-      pending[transport]!.removeWhere((s) => (s['id'] as int) == submissionId);
+      pending[transport]!.removeWhere(
+          (submission) => (submission['id'] as int) == submissionId);
       connected[transport] = true;
       setup.toMain.send(workerDelete(submissionId));
       requestNextPrompt(transport);
@@ -131,7 +124,7 @@ void queueWorkerMain(QueueWorkerSetup setup) {
 
   fromMain.listen((message) {
     if (message is! Map) {
-      log('worker: unexpected message $message');
+      sendLogMessage('worker: unexpected message $message');
       return;
     }
     final map = Map<String, Object?>.from(message);
@@ -143,7 +136,7 @@ void queueWorkerMain(QueueWorkerSetup setup) {
           final transport = submission['transport'] as String;
           pending[transport]!.add(submission);
         }
-        log('worker: resumed ${resumed.length} pending');
+        sendLogMessage('worker: resumed ${resumed.length} pending');
         break;
       case QueueWireType.mainEnqueue:
         final submission = map['submission'] as Map<String, Object?>;
@@ -169,7 +162,7 @@ void queueWorkerMain(QueueWorkerSetup setup) {
         Isolate.current.kill();
         break;
       default:
-        log('worker: unknown type $type');
+        sendLogMessage('worker: unknown type $type');
     }
   });
 
@@ -180,7 +173,6 @@ class InFlight {
   final String transport;
   final Map<String, Object?> submission;
 
-  /// Guards against a second answer to the same prompt re-sending the PMCS.
   bool answered = false;
 
   InFlight({required this.transport, required this.submission});

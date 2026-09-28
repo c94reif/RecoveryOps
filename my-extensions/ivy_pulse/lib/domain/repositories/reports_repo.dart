@@ -6,4 +6,13 @@ abstract class ReportsRepository {
   Future<void> markAsRead(int id);
   Future<void> markAllAsRead();
   Future<void> deleteReport(int id);
+  Future<Set<String>> getWithdrawnIds();
+  Future<void> withdrawReport(String entityId);
+  Future<Set<String>> getDismissedFaultSuggestions();
+  Future<void> setFaultSuggestionDismissed(String suggestionId, bool dismissed);
+}
+
+class ReportWithdrawn implements Exception {
+  final String entityId;
+  const ReportWithdrawn(this.entityId);
 }

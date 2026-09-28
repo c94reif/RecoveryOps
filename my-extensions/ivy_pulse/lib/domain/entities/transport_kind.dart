@@ -1,5 +1,3 @@
-/// The two independent legs a submission travels on. Either can be down
-/// without the other, so each is queued and drained separately.
 enum TransportKind {
   lattice,
   mesh;

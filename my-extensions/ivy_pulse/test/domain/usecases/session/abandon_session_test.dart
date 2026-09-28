@@ -18,6 +18,7 @@ void main() {
     );
 
     await AbandonSession(
+      transactionRunner: FakeTransactionRunner(),
       sessionsRepository: sessions,
       resultsRepository: results,
       faultsRepository: faults,

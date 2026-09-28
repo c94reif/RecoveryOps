@@ -1,12 +1,11 @@
-import 'package:le_sdk/le_sdk.dart' as sdk;
+import 'package:ivy_pulse/domain/entities/incoming_report_message.dart';
 import 'package:ivy_pulse/domain/services/report_codec.dart';
 
-/// Decodes a mesh withdrawal notice, returning the entity id being pulled.
 class ParseIncomingDeletion {
   final ReportCodec codec;
 
   const ParseIncomingDeletion(this.codec);
 
-  String? call(sdk.IncomingMessage message) =>
+  String? call(IncomingReportMessage message) =>
       codec.decodeDeletion(message.payload);
 }

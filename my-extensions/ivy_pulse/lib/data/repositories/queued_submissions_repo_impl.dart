@@ -42,9 +42,6 @@ class QueuedSubmissionsRepoImpl implements QueuedSubmissionsRepository {
   @override
   Future<void> deleteById(int id) => dao.deleteById(id);
 
-  /// Null when the row names a transport this build cannot send on. It is left
-  /// on disk rather than dropped, but skipped here: one unreadable row must not
-  /// throw on start-up and strand every other PMCS still parked on the queue.
   static QueuedSubmission? toEntity(QueuedSubmissionData row) {
     final transport = TransportKind.tryFromWireName(row.transport);
     if (transport == null) return null;

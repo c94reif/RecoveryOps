@@ -1,3 +1,4 @@
 analyzer:
   exclude:
     - "le_sdk/**"
+    - build/**

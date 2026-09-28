@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+  characters: ^1.4.1
   drift: ^2.32.0
   drift_flutter: ^0.3.0
   sqlite3: ^3.2.0
@@ -31,6 +32,8 @@ dependencies:
   le_sdk:
     path: ../../le_sdk/packages/le_sdk
   flutter_plugin_android_lifecycle: ^2.0.34
+  camera: ^0.12.1
+  google_mlkit_text_recognition: ^0.17.1
 
 dev_dependencies:
   flutter_test:

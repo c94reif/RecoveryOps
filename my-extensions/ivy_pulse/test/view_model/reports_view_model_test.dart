@@ -1,8 +1,13 @@
+import 'package:ivy_pulse/data/services/sdk_report_map_adapter.dart';
+import 'package:ivy_pulse/data/services/sdk_report_message_source.dart';
+import 'package:ivy_pulse/data/mappers/pmcs_report_codec.dart';
 import 'dart:async';
+import 'package:ivy_pulse/domain/services/delivery_coordinator.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
 import 'package:ivy_pulse/domain/entities/fault_severity.dart';
+import 'package:ivy_pulse/domain/entities/profile.dart';
 import 'package:ivy_pulse/domain/usecases/map/show_report_on_map.dart';
 import 'package:ivy_pulse/domain/usecases/publishing/publish_pmcs_deletion.dart';
 import 'package:ivy_pulse/domain/usecases/reporting/parse_incoming_deletion.dart';
@@ -93,22 +98,35 @@ void main() {
   late FakeMapService mapService;
   late ReportsViewModel viewModel;
   late bool disposed;
+  late FakeProfileRepository profileRepository;
+  late FakeQueuedSubmissionsRepository queuedRepository;
 
   /// One turn of the event loop — long enough for the constructor's database
   /// load and every un-awaited follow-up to settle.
   Future<void> settle() => Future<void>.delayed(Duration.zero);
 
-  Future<void> start() async {
+  Future<void> start({bool syncOnStart = false}) async {
     viewModel = ReportsViewModel(
-      messaging,
+      SdkReportMessageSource(messaging),
       repository,
       ParseIncomingReport(codec),
       ParseIncomingDeletion(codec),
       SyncRemoteReports(remoteSource, repository),
       SyncLocalReportsToLattice(remoteSource, entityPort),
-      ShowReportOnMap(mapService),
-      PublishPmcsDeletion(entityPort: entityPort, meshPort: meshPort),
+      ShowReportOnMap(SdkReportMapAdapter(mapService)),
+      PublishPmcsDeletion(
+          codec: const PmcsReportCodec(),
+          entityPort: entityPort,
+          meshPort: meshPort,
+          queueWorker: queueWorker,
+          repository: repository,
+          delivery: DeliveryCoordinator(reportsRepository: repository),
+          queuedRepository: queuedRepository,
+          transaction: FakeTransactionRunner()),
       queueWorker,
+      syncOnStart: syncOnStart,
+      profileRepository: profileRepository,
+      queuedRepository: queuedRepository,
     );
     await settle();
   }
@@ -116,6 +134,8 @@ void main() {
   setUp(() {
     messaging = FakeMessagingService();
     repository = FakeReportsRepository();
+    profileRepository = FakeProfileRepository();
+    queuedRepository = FakeQueuedSubmissionsRepository();
     codec = FakeReportCodec();
     remoteSource = FakeRemoteReportSource();
     entityPort = FakePmcsEntityPort();
@@ -133,6 +153,15 @@ void main() {
   });
 
   group('loading stored reports', () {
+    test('syncs remote reports on startup without waiting for a timer',
+        () async {
+      remoteSource.remote = [
+        buildReport(entityId: 'startup', isOutgoing: false)
+      ];
+      await start(syncOnStart: true);
+      expect(viewModel.reports.single.entityId, 'startup');
+      expect(repository.reports.single.entityId, 'startup');
+    });
     test('reports already in the database are on screen before any traffic',
         () async {
       repository.reports.addAll([
@@ -166,6 +195,16 @@ void main() {
   });
 
   group('inbound mesh traffic', () {
+    test('a withdrawal arriving before its report survives a late broadcast',
+        () async {
+      await start();
+      await viewModel.applyRemoteDeletion('late');
+      await viewModel.storeIncomingReport(
+          buildReport(entityId: 'late', isOutgoing: false));
+      expect(viewModel.reports, isEmpty);
+      expect(repository.reports, isEmpty);
+      expect(repository.withdrawnIds, contains('late'));
+    });
     test(
         'a PMCS from another crew is decoded, stored and raises the unread '
         'count', () async {
@@ -367,7 +406,7 @@ void main() {
 
       final announcement = SnackBarService.instance.queue.single;
       expect(announcement.message, contains('Lattice: sent'));
-      expect(announcement.message, contains('Mesh: FAILED'));
+      expect(announcement.message, contains('Mesh: queued'));
       expect(announcement.isError, isTrue);
     });
 
@@ -454,6 +493,263 @@ void main() {
 
       expect(grouped.values.expand((g) => g), isEmpty);
       expect(viewModel.yourReports.map((r) => r.entityId), ['mine-1']);
+    });
+  });
+
+  group('a PMCS submitted from this device', () {
+    test('lands on the YOURS tab the moment it is stored', () async {
+      await start();
+      expect(viewModel.yourReports, isEmpty);
+
+      await viewModel.addOutgoing(
+        buildReport(id: 7, entityId: 'just-now', isOutgoing: true),
+      );
+
+      expect(viewModel.yourReports.map((r) => r.entityId), ['just-now']);
+      // Our own PMCS is never "unread" — the badge is for other crews.
+      expect(viewModel.unreadCount.value, 0);
+    });
+
+    test('goes to the top, ahead of what was loaded at start', () async {
+      repository.reports.add(
+        buildReport(id: 1, entityId: 'earlier', isOutgoing: true),
+      );
+      await start();
+
+      await viewModel.addOutgoing(
+        buildReport(id: 2, entityId: 'later', isOutgoing: true),
+      );
+
+      expect(
+        viewModel.yourReports.map((r) => r.entityId),
+        ['later', 'earlier'],
+      );
+    });
+
+    test('a resubmission replaces its earlier row instead of stacking',
+        () async {
+      await start();
+      await viewModel.addOutgoing(
+        buildReport(id: 1, entityId: 'same', isOutgoing: true),
+      );
+      await viewModel.addOutgoing(
+        buildReport(id: 2, entityId: 'same', isOutgoing: true),
+      );
+
+      expect(viewModel.yourReports, hasLength(1));
+      expect(viewModel.yourReports.single.id, 2);
+    });
+
+    test('brings the queue along, for a submission that was parked', () async {
+      await start();
+      queuedRepository.submissions.add(buildQueuedSubmission(id: 1));
+      queueWorker.pending = 1;
+
+      await viewModel.addOutgoing(
+        buildReport(id: 1, entityId: 'parked', isOutgoing: true),
+      );
+
+      expect(viewModel.queued, hasLength(1));
+      expect(viewModel.queuedCount.value, 1);
+    });
+  });
+
+  group('splitting reports across the tabs', () {
+    test('the UIC on the profile is what a report is matched against',
+        () async {
+      profileRepository.profile = const Profile(uic: 'WJ8TAA');
+      repository.reports.addAll([
+        buildReport(id: 1, entityId: 'mine', isOutgoing: true),
+        buildReport(
+          id: 2,
+          entityId: 'peer',
+          isOutgoing: false,
+          uic: 'WJ8TAA',
+        ),
+        buildReport(
+          id: 3,
+          entityId: 'attached',
+          isOutgoing: false,
+          uic: 'WAB4C0',
+        ),
+      ]);
+      await start();
+
+      expect(viewModel.myUic, 'WJ8TAA');
+      expect(viewModel.yourReports.map((r) => r.entityId), ['mine']);
+      expect(viewModel.unitReports.map((r) => r.entityId), ['peer']);
+      expect(viewModel.otherUnitReports.map((r) => r.entityId), ['attached']);
+    });
+
+    test('a UIC typed in lower case still matches its own unit', () async {
+      profileRepository.profile = const Profile(uic: 'WJ8TAA');
+      repository.reports.add(buildReport(
+        id: 1,
+        entityId: 'peer',
+        isOutgoing: false,
+        uic: 'wj8taa',
+      ));
+      await start();
+
+      expect(viewModel.unitReports.map((r) => r.entityId), ['peer']);
+      expect(viewModel.otherUnitReports, isEmpty);
+    });
+
+    test('with no profile stored every crew counts as ours rather than none',
+        () async {
+      repository.reports.add(buildReport(
+        id: 1,
+        entityId: 'peer',
+        isOutgoing: false,
+        uic: 'WAB4C0',
+      ));
+      await start();
+
+      expect(viewModel.myUic, '');
+      expect(viewModel.unitReports.map((r) => r.entityId), ['peer']);
+      expect(viewModel.otherUnitReports, isEmpty);
+    });
+  });
+
+  group('grouping by bumper number and UIC', () {
+    test(
+        'matching normalized identities merge, but different UICs stay separate',
+        () async {
+      repository.reports.addAll([
+        buildReport(
+            entityId: 'alpha-old',
+            bumperNumber: ' a-11 ',
+            uic: ' wj8taa ',
+            timestamp: DateTime.utc(2026, 3, 24, 6)),
+        buildReport(
+            entityId: 'alpha-new',
+            bumperNumber: 'A-11',
+            uic: 'WJ8TAA',
+            timestamp: DateTime.utc(2026, 3, 24, 9)),
+        buildReport(entityId: 'bravo', bumperNumber: 'A-11', uic: 'WBBBBB'),
+      ]);
+      await start();
+
+      final groups = viewModel.groupByVehicle(viewModel.yourReports);
+      expect(groups, hasLength(2));
+      expect(
+          groups[(bumperNumber: 'A-11', uic: 'WJ8TAA')]!.map((r) => r.entityId),
+          ['alpha-new', 'alpha-old']);
+      expect(
+          groups[(bumperNumber: 'A-11', uic: 'WBBBBB')]!.map((r) => r.entityId),
+          ['bravo']);
+    });
+
+    test('a vehicle walked twice comes back as one entry, newest first',
+        () async {
+      repository.reports.addAll([
+        buildReport(
+          id: 1,
+          entityId: 'older',
+          bumperNumber: 'A-11',
+          isOutgoing: true,
+          timestamp: DateTime.utc(2026, 3, 24, 6),
+        ),
+        buildReport(
+          id: 2,
+          entityId: 'newer',
+          bumperNumber: 'A-11',
+          isOutgoing: true,
+          timestamp: DateTime.utc(2026, 3, 24, 9),
+        ),
+      ]);
+      await start();
+
+      final groups = viewModel.groupByVehicle(viewModel.yourReports);
+
+      expect(groups.keys, [(bumperNumber: 'A-11', uic: 'WJ8TAA')]);
+      expect(
+          groups[(bumperNumber: 'A-11', uic: 'WJ8TAA')]!.map((r) => r.entityId),
+          ['newer', 'older']);
+    });
+
+    test('vehicles come out in bumper-number order', () async {
+      repository.reports.addAll([
+        buildReport(
+          id: 1,
+          entityId: 'c',
+          bumperNumber: 'C-33',
+          isOutgoing: true,
+        ),
+        buildReport(
+          id: 2,
+          entityId: 'a',
+          bumperNumber: 'a-11',
+          isOutgoing: true,
+        ),
+      ]);
+      await start();
+
+      final groups = viewModel.groupByVehicle(viewModel.yourReports);
+
+      expect(groups.keys.toList(), [
+        (bumperNumber: 'A-11', uic: 'WJ8TAA'),
+        (bumperNumber: 'C-33', uic: 'WJ8TAA'),
+      ]);
+    });
+  });
+
+  group('the queued tab', () {
+    test('parked submissions come back last in first out', () async {
+      queuedRepository.submissions.addAll([
+        buildQueuedSubmission(
+          id: 1,
+          entityId: 'older',
+          bumperNumber: 'A-11',
+          createdAt: DateTime.utc(2026, 3, 24, 6),
+        ),
+        buildQueuedSubmission(
+          id: 2,
+          entityId: 'newest',
+          bumperNumber: 'Z-99',
+          createdAt: DateTime.utc(2026, 3, 24, 9),
+        ),
+      ]);
+      await start();
+
+      expect(viewModel.queued.map((q) => q.entityId), ['newest', 'older']);
+      // The vehicle parked most recently leads, alphabetical order or not.
+      expect(viewModel.queuedByBumperNumber.keys.toList(), ['Z-99', 'A-11']);
+    });
+
+    test('a vehicle parked twice keeps both under one entry, newest first',
+        () async {
+      queuedRepository.submissions.addAll([
+        buildQueuedSubmission(
+          id: 1,
+          entityId: 'first',
+          bumperNumber: 'A-11',
+          createdAt: DateTime.utc(2026, 3, 24, 6),
+        ),
+        buildQueuedSubmission(
+          id: 2,
+          entityId: 'second',
+          bumperNumber: 'A-11',
+          createdAt: DateTime.utc(2026, 3, 24, 9),
+        ),
+      ]);
+      await start();
+
+      final groups = viewModel.queuedByBumperNumber;
+
+      expect(groups.keys.toList(), ['A-11']);
+      expect(groups['A-11']!.map((q) => q.entityId), ['second', 'first']);
+    });
+
+    test('a refresh picks up a submission parked since the tab was opened',
+        () async {
+      await start();
+      expect(viewModel.queued, isEmpty);
+
+      queuedRepository.submissions.add(buildQueuedSubmission(id: 1));
+      await viewModel.refreshQueued();
+
+      expect(viewModel.queued, hasLength(1));
     });
   });
 

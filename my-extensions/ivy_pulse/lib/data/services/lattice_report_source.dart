@@ -21,20 +21,17 @@ class LatticeReportSource implements RemoteReportSource {
       final reports = <PmcsReport>[];
       for (final entity in entities) {
         if (!_entityMapper.isOwnedPmcsEntity(entity)) continue;
-        // A withdrawn PMCS is a tombstone, not a fault list.
         if (entity.isLive == false) continue;
         final report = _entityMapper.parseRemoteEntity(entity);
         if (report != null) reports.add(report);
       }
       return reports;
-    } catch (e) {
-      debugPrint('[IvyPulse] fetchRemotePmcsReports error: $e');
-      return const [];
+    } catch (error) {
+      debugPrint('[IvyPulse] fetchRemotePmcsReports error: $error');
+      rethrow;
     }
   }
 
-  /// Tombstones count here — the id is taken, so re-publishing over it would
-  /// resurrect a report the operator deliberately withdrew.
   @override
   Future<Set<String>> fetchKnownPmcsEntityIds() async {
     try {
@@ -45,9 +42,16 @@ class LatticeReportSource implements RemoteReportSource {
         ids.add(entity.id);
       }
       return ids;
-    } catch (e) {
-      debugPrint('[IvyPulse] fetchKnownPmcsEntityIds error: $e');
-      return const {};
+    } catch (error) {
+      debugPrint('[IvyPulse] fetchKnownPmcsEntityIds error: $error');
+      rethrow;
     }
   }
+
+  @override
+  Future<Set<String>> fetchWithdrawnPmcsEntityIds() async => {
+        for (final entity in await _entities.getEntities())
+          if (_entityMapper.isOwnedPmcsEntity(entity) && entity.isLive == false)
+            entity.id,
+      };
 }

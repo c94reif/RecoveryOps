@@ -1,12 +1,9 @@
-import 'dart:convert';
+import 'package:ivy_pulse/data/mappers/pmcs_storage_codec.dart';
 
 import 'package:flutter/foundation.dart';
 
 import 'package:ivy_pulse/data/dao/reports/pmcs_reports_dao.dart';
-import 'package:ivy_pulse/data/repositories/sessions_repo_impl.dart';
 import 'package:ivy_pulse/data/datasources/local/database.dart';
-import 'package:ivy_pulse/domain/entities/pmcs_fault.dart';
-import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_report.dart';
 import 'package:ivy_pulse/domain/entities/vehicle_type.dart';
 import 'package:ivy_pulse/domain/repositories/reports_repo.dart';
@@ -15,6 +12,14 @@ class ReportsRepoImpl implements ReportsRepository {
   final PmcsReportsDao dao;
 
   ReportsRepoImpl(this.dao);
+
+  @override
+  Future<Set<String>> getDismissedFaultSuggestions() =>
+      dao.getDismissedFaultSuggestions();
+
+  @override
+  Future<void> setFaultSuggestionDismissed(String id, bool dismissed) =>
+      dao.setFaultSuggestionDismissed(id, dismissed);
 
   @override
   Future<List<PmcsReport>> getAllReports() async {
@@ -36,16 +41,20 @@ class ReportsRepoImpl implements ReportsRepository {
       vehicleType: report.vehicleType.wireName,
       operator: report.operator,
       uic: report.uic,
-      phases: encodePhases(report.phases),
-      faultsJson: encodeFaults(report.faults),
-      signatureJson: SessionsRepoImpl.encodeSignature(report.signature),
+      phases: PmcsStorageCodec.encodePhases(report.phases),
+      faultsJson: PmcsStorageCodec.encodeFaults(report.faults),
+      signatureJson: PmcsStorageCodec.encodeSignature(report.signature),
       latitude: report.latitude,
       longitude: report.longitude,
       timestamp: report.timestamp,
       isOutgoing: report.isOutgoing,
       isRead: report.isRead,
     );
-    return report.copyWith(id: id);
+    final stored = toEntity(await dao.getById(id));
+    if (stored == null) {
+      throw StateError('Stored report uses an unknown platform');
+    }
+    return stored;
   }
 
   @override
@@ -57,9 +66,12 @@ class ReportsRepoImpl implements ReportsRepository {
   @override
   Future<void> deleteReport(int id) => dao.deleteReport(id);
 
-  /// Null when the row names a platform this build does not know — the report
-  /// is left on disk, but one unreadable row must not take the whole list with
-  /// it. The rest of the decoding is tolerant for the same reason.
+  @override
+  Future<Set<String>> getWithdrawnIds() => dao.getWithdrawnIds();
+
+  @override
+  Future<void> withdrawReport(String entityId) => dao.withdrawReport(entityId);
+
   static PmcsReport? toEntity(PmcsReportData row) {
     final vehicleType = VehicleType.tryFromWireName(row.vehicleType);
     if (vehicleType == null) return null;
@@ -72,44 +84,14 @@ class ReportsRepoImpl implements ReportsRepository {
       vehicleType: vehicleType,
       operator: row.operator,
       uic: row.uic,
-      phases: decodePhases(row.phases),
-      faults: decodeFaults(row.entityId, row.faultsJson),
-      signature: SessionsRepoImpl.decodeSignature(row.signatureJson),
+      phases: PmcsStorageCodec.decodePhases(row.phases),
+      faults: PmcsStorageCodec.decodeFaults(row.entityId, row.faultsJson),
+      signature: PmcsStorageCodec.decodeSignature(row.signatureJson),
       latitude: row.latitude,
       longitude: row.longitude,
       timestamp: row.timestamp,
       isOutgoing: row.isOutgoing,
       isRead: row.isRead,
     );
-  }
-
-  static String encodePhases(List<PmcsPhase> phases) =>
-      phases.map((p) => p.wireName).join(',');
-
-  static List<PmcsPhase> decodePhases(String value) {
-    if (value.isEmpty) return const [];
-    return value
-        .split(',')
-        .map(PmcsPhase.tryFromWireName)
-        .whereType<PmcsPhase>()
-        .toList();
-  }
-
-  static String encodeFaults(List<PmcsFault> faults) =>
-      jsonEncode(faults.map((f) => f.toMap()).toList());
-
-  /// A received report's faults belong to the *sender's* session, which only
-  /// reaches us as the entity id — so that is what they are re-keyed to.
-  /// A malformed blob costs the fault detail, never the whole report.
-  static List<PmcsFault> decodeFaults(String entityId, String json) {
-    if (json.isEmpty) return const [];
-    try {
-      final list = jsonDecode(json) as List;
-      return list
-          .map((f) => PmcsFault.fromMap(entityId, f as Map<String, Object?>))
-          .toList();
-    } catch (_) {
-      return const [];
-    }
   }
 }

@@ -8,11 +8,6 @@ import 'package:ivy_pulse/domain/entities/pmcs_signature.dart';
 import 'package:ivy_pulse/domain/entities/vehicle_type.dart';
 import 'package:ivy_pulse/domain/services/report_codec.dart';
 
-/// JSON wire format for a PMCS report.
-///
-/// The mesh payload and the Lattice entity description carry the exact same
-/// body — [reportBody] and [reportFromBody] are shared with the entity mapper
-/// so a report received over either transport decodes identically.
 class PmcsReportCodec implements ReportCodec {
   const PmcsReportCodec();
 
@@ -64,11 +59,6 @@ class PmcsReportCodec implements ReportCodec {
     }
   }
 
-  /// Rebuilds a report from a decoded body, whatever carried it.
-  ///
-  /// Identity and position are hard requirements — without them the report
-  /// cannot be matched to a vehicle or plotted. Everything else degrades: a
-  /// body written by an older build is still worth showing a maintainer.
   PmcsReport? reportFromBody(
     Map<String, Object?> body, {
     required String fromCallsign,
@@ -95,8 +85,6 @@ class PmcsReportCodec implements ReportCodec {
         bumperNumber: bumperNumber,
         vehicleType: vehicleType,
         operator: body['operator'] as String? ?? '',
-        // `unit` is what builds before the UIC-only profile put here. A
-        // report from one of those is still worth showing a maintainer.
         uic: body['uic'] as String? ?? body['unit'] as String? ?? '',
         phases: _decodePhases(body['phases']),
         faults: _decodeFaults(entityId, body['faults']),
@@ -125,10 +113,6 @@ List<PmcsPhase> _decodePhases(Object? raw) {
   return phases;
 }
 
-/// A body with no signature block came from a build that predates CAC
-/// verification. It decodes to null, which every reader treats as unverified —
-/// the one thing that must never happen is an unsigned report arriving as a
-/// signed one.
 PmcsSignature? _decodeSignature(Object? raw) {
   if (raw is! Map) return null;
   try {
@@ -138,8 +122,6 @@ PmcsSignature? _decodeSignature(Object? raw) {
   }
 }
 
-/// The sending device's session id never goes on the wire, so the faults are
-/// grouped under the entity id instead — the key both transports share.
 List<PmcsFault> _decodeFaults(String entityId, Object? raw) {
   if (raw is! List) return const [];
   final faults = <PmcsFault>[];

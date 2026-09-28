@@ -1,32 +1,23 @@
 import 'package:ivy_pulse/domain/entities/fault_severity.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
 
-/// A deficiency raised by a non-serviceable [CheckResult], carrying every
-/// field the 5988-E and the maintainer need without re-reading the catalog.
 class PmcsFault {
   final int? id;
 
-  /// UUID of the session this fault was found in.
   final String sessionId;
 
-  /// TM item number, e.g. `B-BRK-01`.
   final String itemId;
   final PmcsPhase phase;
 
-  /// Walk-around station or system, e.g. `BRAKES`.
   final String category;
 
-  /// Component name, e.g. `Brake Fluid`.
   final String subcategory;
 
-  /// The TM instruction that was performed.
   final String description;
 
-  /// The condition the operator selected, e.g. `Low`.
   final String condition;
   final FaultSeverity severity;
 
-  /// Optional dictated or typed detail from the operator.
   final String? note;
   final DateTime recordedAt;
 
@@ -92,7 +83,6 @@ class PmcsFault {
   }
 }
 
-/// Counts of each severity in a set of faults, for headers and badges.
 class FaultTally {
   final int redX;
   final int circleX;
@@ -124,7 +114,6 @@ class FaultTally {
   int get total => redX + circleX + dash;
   bool get isEmpty => total == 0;
 
-  /// A vehicle with any RED X is Not Mission Capable.
   bool get isDeadlined => redX > 0;
 
   FaultSeverity? get worst {
@@ -134,10 +123,6 @@ class FaultTally {
     return null;
   }
 
-  /// The vehicle's mission-capable status, as a maintainer reads it off the
-  /// 5988-E. Lives here rather than on the report so the summary screen an
-  /// operator sees before submitting and the card a maintainer opens after can
-  /// never disagree.
   String get missionCapabilityLabel {
     if (isDeadlined) return 'NMC';
     if (circleX > 0) return 'LIMITED';
@@ -145,7 +130,6 @@ class FaultTally {
     return 'FMC';
   }
 
-  /// The same status spelled out, for the one screen with room for it.
   String get missionCapabilityDetail {
     if (isDeadlined) {
       return 'Not Mission Capable — vehicle is deadlined until maintenance '

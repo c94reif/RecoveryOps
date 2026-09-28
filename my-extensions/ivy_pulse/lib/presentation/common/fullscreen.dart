@@ -1,0 +1,7 @@
+import 'package:ivy_pulse/presentation/common/unavailable_fullscreen.dart'
+    if (dart.library.js_interop) 'package:ivy_pulse/presentation/common/web_fullscreen.dart'
+    as platform;
+
+Future<bool> enterFullScreen() => platform.enterFullScreen();
+
+Future<void> leaveFullScreen() => platform.leaveFullScreen();

@@ -1,8 +1,5 @@
-// GENERATED CODE - DO NOT MODIFY BY HAND
-
 part of 'database.dart';
 
-// ignore_for_file: type=lint
 class $ProfilesTable extends Profiles
     with TableInfo<$ProfilesTable, ProfileData> {
   @override
@@ -69,8 +66,6 @@ class $ProfilesTable extends Profiles
 class ProfileData extends DataClass implements Insertable<ProfileData> {
   final int id;
 
-  /// Unit Identification Code. The only thing the profile holds — the
-  /// operator's identity comes off their CAC when the PMCS is closed out.
   final String uic;
   const ProfileData({required this.id, required this.uic});
   @override
@@ -420,27 +415,20 @@ class $PmcsSessionsTable extends PmcsSessions
 class PmcsSessionData extends DataClass implements Insertable<PmcsSessionData> {
   final int id;
 
-  /// UUID the results, faults and published entity all hang off of.
   final String sessionId;
   final String bumperNumber;
   final String vehicleType;
   final String operator;
 
-  /// Unit Identification Code, carried from the profile.
   final String uic;
   final DateTime startedAt;
   final DateTime? submittedAt;
 
-  /// Comma-joined phase wire names; empty until the first phase is closed.
   final String completedPhases;
   final String status;
 
-  /// `PmcsSignature.toMap()` as JSON — who closed this PMCS out and whether
-  /// a CAC backed it up. Null until the session is submitted.
   final String? signatureJson;
 
-  /// Where the walk-around started. Nullable — the host location bridge is
-  /// allowed to be unavailable rather than block a PMCS.
   final double? latitude;
   final double? longitude;
   const PmcsSessionData(
@@ -1020,7 +1008,6 @@ class CheckResultData extends DataClass implements Insertable<CheckResultData> {
   final int faultIndex;
   final String faultLabel;
 
-  /// Null when the check came back serviceable — no fault, no symbol.
   final String? severity;
   final String? note;
   final DateTime recordedAt;
@@ -2120,26 +2107,18 @@ class $PmcsReportsTable extends PmcsReports
 class PmcsReportData extends DataClass implements Insertable<PmcsReportData> {
   final int id;
 
-  /// Shared with the Lattice entity and the mesh payload, so the same PMCS
-  /// arriving on both transports lands as one report.
   final String entityId;
   final String fromCallsign;
   final String bumperNumber;
   final String vehicleType;
   final String operator;
 
-  /// Unit Identification Code, carried from the profile.
   final String uic;
 
-  /// Comma-joined phase wire names covered by this submission.
   final String phases;
 
-  /// JSON list of `PmcsFault.toMap()` — the fault detail travels with the
-  /// report so a receiving crew never needs the sender's session rows.
   final String faultsJson;
 
-  /// `PmcsSignature.toMap()` as JSON — who signed it off and whether a CAC
-  /// backed it up. Null on a report from a build that predates verification.
   final String? signatureJson;
   final double latitude;
   final double longitude;
@@ -2796,15 +2775,11 @@ class QueuedSubmissionData extends DataClass
   final String bumperNumber;
   final String vehicleType;
 
-  /// Denormalised counts so the queue screen can describe what is parked
-  /// without decoding [payload].
   final int redXCount;
   final int faultCount;
   final double latitude;
   final double longitude;
 
-  /// The already-encoded report body — a retry must send what was approved,
-  /// not whatever the session has since been edited into.
   final String payload;
   final String transport;
   final DateTime createdAt;
@@ -3141,6 +3116,332 @@ class QueuedSubmissionsCompanion extends UpdateCompanion<QueuedSubmissionData> {
   }
 }
 
+class $ReportWithdrawalsTable extends ReportWithdrawals
+    with TableInfo<$ReportWithdrawalsTable, ReportWithdrawal> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ReportWithdrawalsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _entityIdMeta =
+      const VerificationMeta('entityId');
+  @override
+  late final GeneratedColumn<String> entityId = GeneratedColumn<String>(
+      'entity_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [entityId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'report_withdrawals';
+  @override
+  VerificationContext validateIntegrity(Insertable<ReportWithdrawal> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('entity_id')) {
+      context.handle(_entityIdMeta,
+          entityId.isAcceptableOrUnknown(data['entity_id']!, _entityIdMeta));
+    } else if (isInserting) {
+      context.missing(_entityIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {entityId};
+  @override
+  ReportWithdrawal map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ReportWithdrawal(
+      entityId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}entity_id'])!,
+    );
+  }
+
+  @override
+  $ReportWithdrawalsTable createAlias(String alias) {
+    return $ReportWithdrawalsTable(attachedDatabase, alias);
+  }
+}
+
+class ReportWithdrawal extends DataClass
+    implements Insertable<ReportWithdrawal> {
+  final String entityId;
+  const ReportWithdrawal({required this.entityId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['entity_id'] = Variable<String>(entityId);
+    return map;
+  }
+
+  ReportWithdrawalsCompanion toCompanion(bool nullToAbsent) {
+    return ReportWithdrawalsCompanion(
+      entityId: Value(entityId),
+    );
+  }
+
+  factory ReportWithdrawal.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ReportWithdrawal(
+      entityId: serializer.fromJson<String>(json['entityId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'entityId': serializer.toJson<String>(entityId),
+    };
+  }
+
+  ReportWithdrawal copyWith({String? entityId}) => ReportWithdrawal(
+        entityId: entityId ?? this.entityId,
+      );
+  ReportWithdrawal copyWithCompanion(ReportWithdrawalsCompanion data) {
+    return ReportWithdrawal(
+      entityId: data.entityId.present ? data.entityId.value : this.entityId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReportWithdrawal(')
+          ..write('entityId: $entityId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => entityId.hashCode;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ReportWithdrawal && other.entityId == this.entityId);
+}
+
+class ReportWithdrawalsCompanion extends UpdateCompanion<ReportWithdrawal> {
+  final Value<String> entityId;
+  final Value<int> rowid;
+  const ReportWithdrawalsCompanion({
+    this.entityId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ReportWithdrawalsCompanion.insert({
+    required String entityId,
+    this.rowid = const Value.absent(),
+  }) : entityId = Value(entityId);
+  static Insertable<ReportWithdrawal> custom({
+    Expression<String>? entityId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (entityId != null) 'entity_id': entityId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ReportWithdrawalsCompanion copyWith(
+      {Value<String>? entityId, Value<int>? rowid}) {
+    return ReportWithdrawalsCompanion(
+      entityId: entityId ?? this.entityId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (entityId.present) {
+      map['entity_id'] = Variable<String>(entityId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ReportWithdrawalsCompanion(')
+          ..write('entityId: $entityId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DismissedFaultSuggestionsTable extends DismissedFaultSuggestions
+    with TableInfo<$DismissedFaultSuggestionsTable, DismissedFaultSuggestion> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DismissedFaultSuggestionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _suggestionIdMeta =
+      const VerificationMeta('suggestionId');
+  @override
+  late final GeneratedColumn<String> suggestionId = GeneratedColumn<String>(
+      'suggestion_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [suggestionId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'dismissed_fault_suggestions';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<DismissedFaultSuggestion> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('suggestion_id')) {
+      context.handle(
+          _suggestionIdMeta,
+          suggestionId.isAcceptableOrUnknown(
+              data['suggestion_id']!, _suggestionIdMeta));
+    } else if (isInserting) {
+      context.missing(_suggestionIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {suggestionId};
+  @override
+  DismissedFaultSuggestion map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DismissedFaultSuggestion(
+      suggestionId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}suggestion_id'])!,
+    );
+  }
+
+  @override
+  $DismissedFaultSuggestionsTable createAlias(String alias) {
+    return $DismissedFaultSuggestionsTable(attachedDatabase, alias);
+  }
+}
+
+class DismissedFaultSuggestion extends DataClass
+    implements Insertable<DismissedFaultSuggestion> {
+  final String suggestionId;
+  const DismissedFaultSuggestion({required this.suggestionId});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['suggestion_id'] = Variable<String>(suggestionId);
+    return map;
+  }
+
+  DismissedFaultSuggestionsCompanion toCompanion(bool nullToAbsent) {
+    return DismissedFaultSuggestionsCompanion(
+      suggestionId: Value(suggestionId),
+    );
+  }
+
+  factory DismissedFaultSuggestion.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DismissedFaultSuggestion(
+      suggestionId: serializer.fromJson<String>(json['suggestionId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'suggestionId': serializer.toJson<String>(suggestionId),
+    };
+  }
+
+  DismissedFaultSuggestion copyWith({String? suggestionId}) =>
+      DismissedFaultSuggestion(
+        suggestionId: suggestionId ?? this.suggestionId,
+      );
+  DismissedFaultSuggestion copyWithCompanion(
+      DismissedFaultSuggestionsCompanion data) {
+    return DismissedFaultSuggestion(
+      suggestionId: data.suggestionId.present
+          ? data.suggestionId.value
+          : this.suggestionId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DismissedFaultSuggestion(')
+          ..write('suggestionId: $suggestionId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => suggestionId.hashCode;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DismissedFaultSuggestion &&
+          other.suggestionId == this.suggestionId);
+}
+
+class DismissedFaultSuggestionsCompanion
+    extends UpdateCompanion<DismissedFaultSuggestion> {
+  final Value<String> suggestionId;
+  final Value<int> rowid;
+  const DismissedFaultSuggestionsCompanion({
+    this.suggestionId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DismissedFaultSuggestionsCompanion.insert({
+    required String suggestionId,
+    this.rowid = const Value.absent(),
+  }) : suggestionId = Value(suggestionId);
+  static Insertable<DismissedFaultSuggestion> custom({
+    Expression<String>? suggestionId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (suggestionId != null) 'suggestion_id': suggestionId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DismissedFaultSuggestionsCompanion copyWith(
+      {Value<String>? suggestionId, Value<int>? rowid}) {
+    return DismissedFaultSuggestionsCompanion(
+      suggestionId: suggestionId ?? this.suggestionId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (suggestionId.present) {
+      map['suggestion_id'] = Variable<String>(suggestionId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DismissedFaultSuggestionsCompanion(')
+          ..write('suggestionId: $suggestionId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3151,6 +3452,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PmcsReportsTable pmcsReports = $PmcsReportsTable(this);
   late final $QueuedSubmissionsTable queuedSubmissions =
       $QueuedSubmissionsTable(this);
+  late final $ReportWithdrawalsTable reportWithdrawals =
+      $ReportWithdrawalsTable(this);
+  late final $DismissedFaultSuggestionsTable dismissedFaultSuggestions =
+      $DismissedFaultSuggestionsTable(this);
+  late final Index pmcsReportsEntityId = Index('pmcs_reports_entity_id',
+      'CREATE UNIQUE INDEX pmcs_reports_entity_id ON pmcs_reports (entity_id) WHERE entity_id <> \'\'');
   late final ProfileDao profileDao = ProfileDao(this as AppDatabase);
   late final SessionsDao sessionsDao = SessionsDao(this as AppDatabase);
   late final CheckResultsDao checkResultsDao =
@@ -3170,7 +3477,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         checkResults,
         pmcsFaults,
         pmcsReports,
-        queuedSubmissions
+        queuedSubmissions,
+        reportWithdrawals,
+        dismissedFaultSuggestions,
+        pmcsReportsEntityId
       ];
 }
 
@@ -4668,6 +4978,254 @@ typedef $$QueuedSubmissionsTableProcessedTableManager = ProcessedTableManager<
     ),
     QueuedSubmissionData,
     PrefetchHooks Function()>;
+typedef $$ReportWithdrawalsTableCreateCompanionBuilder
+    = ReportWithdrawalsCompanion Function({
+  required String entityId,
+  Value<int> rowid,
+});
+typedef $$ReportWithdrawalsTableUpdateCompanionBuilder
+    = ReportWithdrawalsCompanion Function({
+  Value<String> entityId,
+  Value<int> rowid,
+});
+
+class $$ReportWithdrawalsTableFilterComposer
+    extends Composer<_$AppDatabase, $ReportWithdrawalsTable> {
+  $$ReportWithdrawalsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get entityId => $composableBuilder(
+      column: $table.entityId, builder: (column) => ColumnFilters(column));
+}
+
+class $$ReportWithdrawalsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ReportWithdrawalsTable> {
+  $$ReportWithdrawalsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get entityId => $composableBuilder(
+      column: $table.entityId, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ReportWithdrawalsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ReportWithdrawalsTable> {
+  $$ReportWithdrawalsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get entityId =>
+      $composableBuilder(column: $table.entityId, builder: (column) => column);
+}
+
+class $$ReportWithdrawalsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ReportWithdrawalsTable,
+    ReportWithdrawal,
+    $$ReportWithdrawalsTableFilterComposer,
+    $$ReportWithdrawalsTableOrderingComposer,
+    $$ReportWithdrawalsTableAnnotationComposer,
+    $$ReportWithdrawalsTableCreateCompanionBuilder,
+    $$ReportWithdrawalsTableUpdateCompanionBuilder,
+    (
+      ReportWithdrawal,
+      BaseReferences<_$AppDatabase, $ReportWithdrawalsTable, ReportWithdrawal>
+    ),
+    ReportWithdrawal,
+    PrefetchHooks Function()> {
+  $$ReportWithdrawalsTableTableManager(
+      _$AppDatabase db, $ReportWithdrawalsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ReportWithdrawalsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ReportWithdrawalsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ReportWithdrawalsTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> entityId = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ReportWithdrawalsCompanion(
+            entityId: entityId,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String entityId,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ReportWithdrawalsCompanion.insert(
+            entityId: entityId,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable<$ReportWithdrawalsTable, ReportWithdrawal>(
+                        table),
+                    BaseReferences<_$AppDatabase, $ReportWithdrawalsTable,
+                        ReportWithdrawal>(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$ReportWithdrawalsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $ReportWithdrawalsTable,
+    ReportWithdrawal,
+    $$ReportWithdrawalsTableFilterComposer,
+    $$ReportWithdrawalsTableOrderingComposer,
+    $$ReportWithdrawalsTableAnnotationComposer,
+    $$ReportWithdrawalsTableCreateCompanionBuilder,
+    $$ReportWithdrawalsTableUpdateCompanionBuilder,
+    (
+      ReportWithdrawal,
+      BaseReferences<_$AppDatabase, $ReportWithdrawalsTable, ReportWithdrawal>
+    ),
+    ReportWithdrawal,
+    PrefetchHooks Function()>;
+typedef $$DismissedFaultSuggestionsTableCreateCompanionBuilder
+    = DismissedFaultSuggestionsCompanion Function({
+  required String suggestionId,
+  Value<int> rowid,
+});
+typedef $$DismissedFaultSuggestionsTableUpdateCompanionBuilder
+    = DismissedFaultSuggestionsCompanion Function({
+  Value<String> suggestionId,
+  Value<int> rowid,
+});
+
+class $$DismissedFaultSuggestionsTableFilterComposer
+    extends Composer<_$AppDatabase, $DismissedFaultSuggestionsTable> {
+  $$DismissedFaultSuggestionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get suggestionId => $composableBuilder(
+      column: $table.suggestionId, builder: (column) => ColumnFilters(column));
+}
+
+class $$DismissedFaultSuggestionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DismissedFaultSuggestionsTable> {
+  $$DismissedFaultSuggestionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get suggestionId => $composableBuilder(
+      column: $table.suggestionId,
+      builder: (column) => ColumnOrderings(column));
+}
+
+class $$DismissedFaultSuggestionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DismissedFaultSuggestionsTable> {
+  $$DismissedFaultSuggestionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get suggestionId => $composableBuilder(
+      column: $table.suggestionId, builder: (column) => column);
+}
+
+class $$DismissedFaultSuggestionsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $DismissedFaultSuggestionsTable,
+    DismissedFaultSuggestion,
+    $$DismissedFaultSuggestionsTableFilterComposer,
+    $$DismissedFaultSuggestionsTableOrderingComposer,
+    $$DismissedFaultSuggestionsTableAnnotationComposer,
+    $$DismissedFaultSuggestionsTableCreateCompanionBuilder,
+    $$DismissedFaultSuggestionsTableUpdateCompanionBuilder,
+    (
+      DismissedFaultSuggestion,
+      BaseReferences<_$AppDatabase, $DismissedFaultSuggestionsTable,
+          DismissedFaultSuggestion>
+    ),
+    DismissedFaultSuggestion,
+    PrefetchHooks Function()> {
+  $$DismissedFaultSuggestionsTableTableManager(
+      _$AppDatabase db, $DismissedFaultSuggestionsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DismissedFaultSuggestionsTableFilterComposer(
+                  $db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DismissedFaultSuggestionsTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DismissedFaultSuggestionsTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> suggestionId = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              DismissedFaultSuggestionsCompanion(
+            suggestionId: suggestionId,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String suggestionId,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              DismissedFaultSuggestionsCompanion.insert(
+            suggestionId: suggestionId,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable<$DismissedFaultSuggestionsTable,
+                        DismissedFaultSuggestion>(table),
+                    BaseReferences<
+                        _$AppDatabase,
+                        $DismissedFaultSuggestionsTable,
+                        DismissedFaultSuggestion>(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$DismissedFaultSuggestionsTableProcessedTableManager
+    = ProcessedTableManager<
+        _$AppDatabase,
+        $DismissedFaultSuggestionsTable,
+        DismissedFaultSuggestion,
+        $$DismissedFaultSuggestionsTableFilterComposer,
+        $$DismissedFaultSuggestionsTableOrderingComposer,
+        $$DismissedFaultSuggestionsTableAnnotationComposer,
+        $$DismissedFaultSuggestionsTableCreateCompanionBuilder,
+        $$DismissedFaultSuggestionsTableUpdateCompanionBuilder,
+        (
+          DismissedFaultSuggestion,
+          BaseReferences<_$AppDatabase, $DismissedFaultSuggestionsTable,
+              DismissedFaultSuggestion>
+        ),
+        DismissedFaultSuggestion,
+        PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4684,4 +5242,9 @@ class $AppDatabaseManager {
       $$PmcsReportsTableTableManager(_db, _db.pmcsReports);
   $$QueuedSubmissionsTableTableManager get queuedSubmissions =>
       $$QueuedSubmissionsTableTableManager(_db, _db.queuedSubmissions);
+  $$ReportWithdrawalsTableTableManager get reportWithdrawals =>
+      $$ReportWithdrawalsTableTableManager(_db, _db.reportWithdrawals);
+  $$DismissedFaultSuggestionsTableTableManager get dismissedFaultSuggestions =>
+      $$DismissedFaultSuggestionsTableTableManager(
+          _db, _db.dismissedFaultSuggestions);
 }

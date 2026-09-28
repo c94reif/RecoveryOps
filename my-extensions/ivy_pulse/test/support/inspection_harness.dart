@@ -3,12 +3,14 @@ import 'package:ivy_pulse/domain/entities/pmcs_catalog.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_category.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_check_item.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
+import 'package:ivy_pulse/domain/entities/pmcs_report.dart';
 import 'package:ivy_pulse/domain/entities/profile.dart';
 import 'package:ivy_pulse/domain/entities/vehicle_type.dart';
 import 'package:ivy_pulse/domain/services/cac_scanner_strategy.dart';
 import 'package:ivy_pulse/domain/services/clock.dart';
 import 'package:ivy_pulse/domain/services/fault_classifier_strategy.dart';
 import 'package:ivy_pulse/domain/services/pmcs_catalog_source.dart';
+import 'package:ivy_pulse/domain/services/report_codec.dart';
 import 'package:ivy_pulse/domain/services/speech_recognition_strategy.dart';
 import 'package:ivy_pulse/domain/usecases/identity/parse_cac_barcode.dart';
 import 'package:ivy_pulse/domain/usecases/identity/verify_operator_identity.dart';
@@ -147,14 +149,14 @@ class FakeSpeechRecognition implements SpeechRecognitionStrategy {
 /// Widget tests drive the flow through the view model exactly as the pages do,
 /// so nothing here stubs out behaviour the operator depends on.
 class InspectionHarness {
-  final FakeSessionsRepository sessions = FakeSessionsRepository();
-  final FakeResultsRepository results = FakeResultsRepository();
+  final FakeSessionsRepository sessions;
+  final FakeResultsRepository results;
   final FakeFaultsRepository faults = FakeFaultsRepository();
   final FakeReportsRepository reports = FakeReportsRepository();
   final FakePmcsEntityPort entityPort = FakePmcsEntityPort();
   final FakeMeshBroadcaster meshPort = FakeMeshBroadcaster();
   final FakeQueueWorker queueWorker = FakeQueueWorker();
-  final FakeSpeechRecognition speech = FakeSpeechRecognition();
+  final FakeSpeechRecognition speech;
 
   /// `B-BRK-01` is the one critical item, so its worst condition grades RED X
   /// while every other item's tops out at CIRCLE X.
@@ -181,12 +183,21 @@ class InspectionHarness {
     Profile? profile = testProfile,
     Map<VehicleType, PmcsCatalog>? catalogs,
     CacScannerStrategy? scanner,
-  })  : profiles = FakeProfileRepository(profile),
+    FakeResultsRepository? resultsRepository,
+    FakeSessionsRepository? sessionsRepository,
+    FakeSpeechRecognition? speechRecognition,
+    ReportCodec? reportCodec,
+    void Function(PmcsReport)? onReportSubmitted,
+  })  : sessions = sessionsRepository ?? FakeSessionsRepository(),
+        results = resultsRepository ?? FakeResultsRepository(),
+        speech = speechRecognition ?? FakeSpeechRecognition(),
+        profiles = FakeProfileRepository(profile),
         catalogSource = FakeCatalogSource(catalogs),
         scanner = scanner ?? FakeCacScanner() {
     final fixedClock = FixedClock(DateTime.utc(2026, 3, 24, 7));
 
     viewModel = InspectionViewModel(
+      reportsRepository: reports,
       catalogSource: catalogSource,
       startSession: StartSession(
         repository: sessions,
@@ -201,15 +212,18 @@ class InspectionHarness {
         clock: fixedClock,
       ),
       completePhase: CompletePhase(
+        transactionRunner: FakeTransactionRunner(),
         sessionsRepository: sessions,
         faultsRepository: faults,
       ),
       abandonSession: AbandonSession(
+        transactionRunner: FakeTransactionRunner(),
         sessionsRepository: sessions,
         resultsRepository: results,
         faultsRepository: faults,
       ),
       submitSession: SubmitSession(
+        transactionRunner: FakeTransactionRunner(),
         sessionsRepository: sessions,
         faultsRepository: faults,
         reportsRepository: reports,
@@ -220,7 +234,7 @@ class InspectionHarness {
         entityPort: entityPort,
         meshPort: meshPort,
         queueWorker: queueWorker,
-        codec: FakeReportCodec(),
+        codec: reportCodec ?? FakeReportCodec(),
         clock: fixedClock,
       ),
       resultsRepository: results,
@@ -232,6 +246,7 @@ class InspectionHarness {
       ),
       cacScanner: this.scanner,
       profileRepository: profiles,
+      onReportSubmitted: onReportSubmitted,
     );
   }
 
@@ -259,18 +274,14 @@ class InspectionHarness {
     await viewModel.openPhase(phase);
   }
 
-  /// Walks every phase to the end and lands on the summary, which is where
-  /// the sign-off gate lives. Answers index 0 — serviceable — throughout, so
-  /// the PMCS is clean unless a test says otherwise.
-  Future<void> walkToSummary() async {
-    await begin();
-    for (final phase in PmcsPhase.values) {
-      await viewModel.openPhase(phase);
-      for (final item in viewModel.phaseItems) {
-        await viewModel.answer(item, 0);
-      }
-      await viewModel.completeActivePhase();
+  /// Finishes one independent PMCS and lands on the sign-off summary.
+  /// Answers index 0 — serviceable — throughout.
+  Future<void> walkToSummary({PmcsPhase phase = PmcsPhase.before}) async {
+    await beginPhase(phase);
+    for (final item in viewModel.phaseItems) {
+      await viewModel.answer(item, 0);
     }
+    await viewModel.completeActivePhase();
   }
 }
 

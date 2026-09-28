@@ -1,68 +1,89 @@
-import 'package:flutter/foundation.dart';
+import 'package:ivy_pulse/domain/services/diagnostic_logger.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:ivy_pulse/domain/entities/publish_result.dart';
+
 import 'package:ivy_pulse/domain/entities/pmcs_report.dart';
+import 'package:ivy_pulse/domain/entities/publish_result.dart';
 import 'package:ivy_pulse/domain/entities/queued_submission.dart';
 import 'package:ivy_pulse/domain/entities/transport_kind.dart';
 import 'package:ivy_pulse/domain/services/clock.dart';
+import 'package:ivy_pulse/domain/services/delivery_coordinator.dart';
 import 'package:ivy_pulse/domain/services/mesh_broadcaster_port.dart';
 import 'package:ivy_pulse/domain/services/pmcs_entity_port.dart';
 import 'package:ivy_pulse/domain/services/queue_worker_strategy.dart';
 import 'package:ivy_pulse/domain/services/report_codec.dart';
 
-/// Sends a completed PMCS on both transports at once.
-///
-/// The legs are independent: Lattice can be down while the mesh is up and vice
-/// versa, so each is awaited separately and each failure parks its own copy on
-/// the queue. The operator is never blocked on the net.
 class PublishPmcsReport {
+  final DiagnosticLogger logger;
   final PmcsEntityPort entityPort;
   final MeshBroadcasterPort meshPort;
   final QueueWorkerStrategy queueWorker;
   final ReportCodec codec;
   final Clock clock;
 
-  const PublishPmcsReport({
+  final DeliveryCoordinator delivery;
+  final Map<String, Future<PublishResult>> inFlight = {};
+
+  PublishPmcsReport({
+    this.logger = const SilentDiagnosticLogger(),
     required this.entityPort,
     required this.meshPort,
     required this.queueWorker,
     required this.codec,
     required this.clock,
-  });
+    DeliveryCoordinator? delivery,
+  }) : delivery = delivery ?? DeliveryCoordinator();
 
-  Future<PublishResult> call(PmcsReport report) async {
+  Future<PublishResult> call(PmcsReport report) => inFlight.putIfAbsent(
+      report.entityId,
+      () => publish(report).whenComplete(() {
+            inFlight.remove(report.entityId);
+          }));
+
+  Future<PublishResult> publish(PmcsReport report) async {
     final payload = codec.encodeReport(report);
 
-    Future<bool> latticeLeg() async {
-      final ok = await entityPort.publishPmcsReport(report);
-      await _onLegOutcome(
-        transport: TransportKind.lattice,
-        success: ok,
-        report: report,
-        payload: payload,
-      );
-      return ok;
+    Future<bool> sendViaTransport(
+        TransportKind transport, Future<bool> Function() send) async {
+      final status = delivery.status(report.entityId, transport);
+      if (status == DeliveryStatus.sent) return true;
+      if (status == DeliveryStatus.queued) return false;
+      bool sentSuccessfully;
+      try {
+        sentSuccessfully =
+            await delivery.send(report.entityId, transport, send);
+      } catch (error) {
+        logger.log('[IvyPulse] ${transport.displayName} send failed: $error');
+        sentSuccessfully = false;
+      }
+      try {
+        await _handleTransportOutcome(
+            transport: transport,
+            success: sentSuccessfully,
+            report: report,
+            payload: payload);
+        if (!sentSuccessfully) {
+          delivery.update(report.entityId, transport, DeliveryStatus.queued);
+        }
+      } catch (_) {
+        delivery.update(report.entityId, transport, DeliveryStatus.failed);
+        rethrow;
+      }
+      return sentSuccessfully;
     }
 
-    Future<bool> meshLeg() async {
-      final ok = await meshPort.broadcastPmcsReport(report);
-      await _onLegOutcome(
-        transport: TransportKind.mesh,
-        success: ok,
-        report: report,
-        payload: payload,
-      );
-      return ok;
-    }
-
-    final results = await Future.wait([latticeLeg(), meshLeg()]);
+    final results = await Future.wait([
+      sendViaTransport(
+          TransportKind.lattice, () => entityPort.publishPmcsReport(report)),
+      sendViaTransport(
+          TransportKind.mesh, () => meshPort.broadcastPmcsReport(report)),
+    ]);
     final outcome = PublishResult(latticeOk: results[0], meshOk: results[1]);
-    debugPrint('[IvyPulse] Publish ${report.entityId} — '
+    logger.log('[IvyPulse] Publish ${report.entityId} — '
         'Lattice: ${outcome.latticeOk} | Mesh: ${outcome.meshOk}');
     return outcome;
   }
 
-  Future<void> _onLegOutcome({
+  Future<void> _handleTransportOutcome({
     required TransportKind transport,
     required bool success,
     required PmcsReport report,

@@ -36,8 +36,6 @@ class ProfileViewModel extends ChangeNotifier {
   Future<void> save(String uic) async {
     final value = normalize(uic);
 
-    // The UIC is the only thing routing a 5988-E back to the right motor pool,
-    // so an empty one is refused rather than quietly stored.
     if (value.isEmpty) {
       snackBarMessage = 'UIC is required';
       notifyListeners();
@@ -53,7 +51,5 @@ class ProfileViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// A UIC is six upper-case characters on every form it appears on, so it is
-  /// stored that way no matter how it was typed.
   static String normalize(String uic) => uic.trim().toUpperCase();
 }

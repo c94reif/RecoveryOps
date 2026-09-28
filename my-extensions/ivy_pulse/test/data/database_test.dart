@@ -249,9 +249,8 @@ void main() {
       await db.select(db.queuedSubmissions).get();
     });
 
-    test('schemaVersion is 2 — the UIC-only profile and the signature columns',
-        () {
-      expect(db.schemaVersion, 2);
+    test('schemaVersion is 5 — advisory dismissals persist locally', () {
+      expect(db.schemaVersion, 5);
     });
   });
 

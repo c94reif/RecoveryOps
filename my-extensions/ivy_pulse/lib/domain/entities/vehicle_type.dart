@@ -1,7 +1,3 @@
-/// Vehicle platforms this extension carries a TM PMCS catalog for.
-///
-/// Adding a platform means adding a value here plus registering its catalog
-/// with the catalog source — no existing check logic changes.
 enum VehicleType {
   stryker,
   jltv;
@@ -16,8 +12,6 @@ enum VehicleType {
         VehicleType.jltv => 'JLTV',
       };
 
-  /// Technical manual the catalog was transcribed from, shown on the setup
-  /// screen so the operator can confirm they are on the right checklist.
   String get technicalManual => switch (this) {
         VehicleType.stryker => 'TM 9-2355-311-10',
         VehicleType.jltv => 'TM 9-2320-400-10',

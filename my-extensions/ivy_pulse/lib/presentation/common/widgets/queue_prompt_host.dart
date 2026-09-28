@@ -4,11 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
 import 'package:ivy_pulse/domain/services/queue_prompt_strategy.dart';
 
-/// Wraps the app so the queue can raise a dialog from the data layer, which
-/// has no [BuildContext] of its own.
-///
-/// Prompts are queued rather than stacked: both transports can come back at
-/// once, and an operator holding a dipstick answers one question at a time.
 class QueuePromptHost extends StatefulWidget {
   final QueuePromptStrategy promptStrategy;
   final Widget child;
@@ -55,10 +50,8 @@ class QueuePromptHostState extends State<QueuePromptHost> {
 
     final send = await showDialog<bool>(
       context: context,
-      // Dismissing by tapping outside is too easy in gloves, and the queue is
-      // waiting on an answer either way.
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(
           '${submission.transport.displayName} reconnected',
         ),
@@ -72,14 +65,14 @@ class QueuePromptHostState extends State<QueuePromptHost> {
             style: TextButton.styleFrom(
               minimumSize: const Size(88, minTouchTarget),
             ),
-            onPressed: () => Navigator.of(ctx).pop(false),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Discard'),
           ),
           TextButton(
             style: TextButton.styleFrom(
               minimumSize: const Size(88, minTouchTarget),
             ),
-            onPressed: () => Navigator.of(ctx).pop(true),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Send'),
           ),
         ],

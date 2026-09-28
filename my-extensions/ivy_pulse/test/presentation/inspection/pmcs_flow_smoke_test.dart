@@ -1,6 +1,8 @@
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
+
 import 'package:ivy_pulse/core/di/injection.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
 import 'package:ivy_pulse/data/dao/faults/pmcs_faults_dao.dart';
@@ -12,6 +14,7 @@ import 'package:ivy_pulse/data/repositories/faults_repo_impl.dart';
 import 'package:ivy_pulse/data/repositories/reports_repo_impl.dart';
 import 'package:ivy_pulse/data/repositories/results_repo_impl.dart';
 import 'package:ivy_pulse/data/repositories/sessions_repo_impl.dart';
+import 'package:ivy_pulse/data/services/drift_transaction_runner.dart';
 import 'package:ivy_pulse/data/services/static_pmcs_catalog_source.dart';
 import 'package:ivy_pulse/data/services/tm_fault_classifier.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
@@ -20,6 +23,8 @@ import 'package:ivy_pulse/domain/entities/vehicle_type.dart';
 import 'package:ivy_pulse/domain/services/clock.dart';
 import 'package:ivy_pulse/domain/services/fault_classifier_strategy.dart';
 import 'package:ivy_pulse/domain/services/speech_recognition_strategy.dart';
+import 'package:ivy_pulse/domain/usecases/identity/parse_cac_barcode.dart';
+import 'package:ivy_pulse/domain/usecases/identity/verify_operator_identity.dart';
 import 'package:ivy_pulse/domain/usecases/publishing/publish_pmcs_report.dart';
 import 'package:ivy_pulse/domain/usecases/reporting/build_session_report.dart';
 import 'package:ivy_pulse/domain/usecases/reporting/submit_session.dart';
@@ -31,10 +36,7 @@ import 'package:ivy_pulse/domain/usecases/session/start_session.dart';
 import 'package:ivy_pulse/presentation/common/widgets/custom_snack_bar.dart';
 import 'package:ivy_pulse/presentation/inspection/check_item_card.dart';
 import 'package:ivy_pulse/presentation/inspection/inspection_flow_page.dart';
-import 'package:ivy_pulse/domain/usecases/identity/parse_cac_barcode.dart';
-import 'package:ivy_pulse/domain/usecases/identity/verify_operator_identity.dart';
 import 'package:ivy_pulse/presentation/inspection/inspection_view_model.dart';
-import 'package:latlong2/latlong.dart';
 
 import '../../support/fakes.dart';
 
@@ -65,6 +67,7 @@ void main() {
 
     getIt.registerLazySingleton<InspectionViewModel>(
       () => InspectionViewModel(
+        reportsRepository: reports,
         catalogSource: const StaticPmcsCatalogSource(),
         startSession: StartSession(
           repository: sessions,
@@ -79,15 +82,18 @@ void main() {
           clock: clock,
         ),
         completePhase: CompletePhase(
+          transactionRunner: FakeTransactionRunner(),
           sessionsRepository: sessions,
           faultsRepository: faults,
         ),
         abandonSession: AbandonSession(
+          transactionRunner: FakeTransactionRunner(),
           sessionsRepository: sessions,
           resultsRepository: results,
           faultsRepository: faults,
         ),
         submitSession: SubmitSession(
+          transactionRunner: DriftTransactionRunner(db),
           sessionsRepository: sessions,
           faultsRepository: faults,
           reportsRepository: reports,
@@ -294,7 +300,8 @@ void main() {
         (tester) async {
       await pumpPanel(tester);
 
-      final listHeight = tester.getSize(find.byType(ListView)).height;
+      final listHeight =
+          tester.getSize(find.byType(SingleChildScrollView)).height;
 
       expect(listHeight / panel.height, greaterThan(0.7),
           reason: 'header plus any bottom bar should cost under 30% of the '
@@ -306,9 +313,9 @@ void main() {
       await pumpPanel(tester);
 
       expect(find.text('BACK TO PHASES'), findsNothing);
-      expect(find.byTooltip('Back to phases'), findsOneWidget);
+      expect(find.byTooltip('PMCS types'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Back to phases'));
+      await tester.tap(find.byTooltip('PMCS types'));
       await tester.pumpAndSettle();
 
       expect(getIt<InspectionViewModel>().stage, InspectionStage.phaseSelect);
@@ -394,6 +401,40 @@ void main() {
       expect(tester.getRect(lastOption).bottom, lessThanOrEqualTo(panel.height),
           reason: 'the last condition hangs off the bottom of the panel');
     });
+
+    for (final phase in PmcsPhase.values) {
+      testWidgets(
+          'Resume PMCS opens the saved ${phase.wireName} checklist at the next check',
+          (tester) async {
+        await pumpPanel(tester);
+        final viewModel = getIt<InspectionViewModel>();
+        await viewModel.openPhase(phase);
+        final items = viewModel.phaseItems;
+        final savedCount = phase == PmcsPhase.before ? 36 : 8;
+        for (final item in items.take(savedCount)) {
+          await viewModel.answer(item, 0);
+        }
+        await viewModel.resetToSetup();
+        await tester.pumpAndSettle();
+
+        expect(find.text('RESUME PMCS'), findsOneWidget);
+        await tester.ensureVisible(find.text('A-11 - Stryker'));
+        await tester.tap(find.text('A-11 - Stryker'));
+        await tester.pumpAndSettle();
+
+        expect(viewModel.stage, InspectionStage.inspecting);
+        expect(viewModel.activePhase, phase);
+        expect(viewModel.answeredCount, savedCount);
+        expect(find.text('CHOOSE PMCS TYPE'), findsNothing);
+        final open = expandedCard(tester);
+        expect(open.item.id, items[savedCount].id);
+        expect(open.item.id, viewModel.nextUnansweredItemId);
+        final instruction = tester.getRect(find.text(open.item.check));
+        expect(instruction.top, greaterThanOrEqualTo(0));
+        expect(instruction.bottom, lessThan(panel.height));
+        expect(tester.takeException(), isNull);
+      });
+    }
   });
 }
 

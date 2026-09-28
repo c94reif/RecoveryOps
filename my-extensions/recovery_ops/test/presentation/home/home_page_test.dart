@@ -67,7 +67,10 @@ class FakeMapService implements sdk.MapService {
   Future<sdk.LatLng?> pickLocation() async => null;
   @override
   Future<void> addPolyline(String id, List<sdk.LatLng> points,
-      {String? color}) async {}
+      {String? color,
+      double? width,
+      List<double>? dashPattern,
+      double? opacity}) async {}
   @override
   Future<void> removePolyline(String id) async {}
   @override
@@ -77,6 +80,46 @@ class FakeMapService implements sdk.MapService {
       null;
   @override
   Future<bool> simulateMarkerTap(String entityId) async => false;
+  @override
+  Future<List<sdk.LatLng>?> drawPolygon({
+    String? previewStrokeColor,
+    String? previewFillColor,
+    String? toolbarHint,
+  }) async =>
+      null;
+  @override
+  Future<List<sdk.LatLng>?> drawPolyline({
+    String? previewColor,
+    double? previewWidth,
+    String? toolbarHint,
+  }) async =>
+      null;
+  @override
+  Future<void> addPolygon(String id, List<sdk.LatLng> points,
+      {String? strokeColor, String? fillColor}) async {}
+  @override
+  Future<void> updatePolygon(String id, List<sdk.LatLng> points,
+      {String? strokeColor, String? fillColor}) async {}
+  @override
+  Future<void> removePolygon(String id) async {}
+  @override
+  Future<void> addTacticalGraphic(
+      String id, String sidc, List<sdk.LatLng> points,
+      {Map<String, String>? modifiers}) async {}
+  @override
+  Future<void> updateTacticalGraphic(String id,
+      {String? sidc,
+      List<sdk.LatLng>? points,
+      Map<String, String>? modifiers}) async {}
+  @override
+  Future<void> removeTacticalGraphic(String id) async {}
+  @override
+  Future<Uint8List?> captureMap({
+    List<sdk.LatLng>? quad,
+    List<String>? columnLabels,
+    List<String>? rowLabels,
+  }) async =>
+      null;
 }
 
 class FakeLocationRepository implements LocationRepository {

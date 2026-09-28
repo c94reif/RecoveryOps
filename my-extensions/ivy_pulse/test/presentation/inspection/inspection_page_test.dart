@@ -103,11 +103,53 @@ void main() {
 
       expect(find.byType(CheckItemCard), findsNothing);
       expect(find.byType(PhaseProgressBar), findsNothing);
-      expect(find.byTooltip('Back to phases'), findsNothing);
+      expect(find.byTooltip('PMCS types'), findsNothing);
     });
   });
 
   group('the checklist', () {
+    testWidgets(
+        'a typed note reaches the completed phase without moving the next check',
+        (tester) async {
+      await harness.beginPhase(PmcsPhase.before);
+      await pumpPage(tester);
+      await answer(tester, 'Reservoir Cracked');
+
+      await tester.tap(find.text('Add description'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.byType(TextField), 'Fluid leaking at the lower seam.');
+      await tester.tap(find.text('Save description'));
+      await tester.pumpAndSettle();
+
+      expect(harness.viewModel.expandedItemId, parkingBrake.id);
+      expect(harness.viewModel.results[brakeFluid.id]?.note,
+          'Fluid leaking at the lower seam.');
+      expect(find.text('Edit description'), findsOneWidget);
+      await answer(tester, 'HOLDS FIRM');
+      await tester.tap(find.text('REVIEW & SUBMIT — RED X'));
+      await tester.pumpAndSettle();
+      expect(harness.viewModel.sessionFaults.single.note,
+          'Fluid leaking at the lower seam.');
+    });
+
+    testWidgets(
+        'reviewing a previous answer offers a return to unfinished checks',
+        (tester) async {
+      await harness.beginPhase(PmcsPhase.before);
+      await pumpPage(tester);
+      await answer(tester, 'LEVEL OK');
+      await tester.tap(find.text('Brake Fluid'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Next unanswered check'));
+      await tester.pumpAndSettle();
+
+      expect(harness.viewModel.expandedItemId, parkingBrake.id);
+      expect(harness.viewModel.answeredCount, 1);
+      expect(find.text('HOLDS FIRM'), findsOneWidget);
+    });
+
     testWidgets('renders every walk-around station as its own section',
         (tester) async {
       await harness.beginPhase(PmcsPhase.before);
@@ -196,7 +238,7 @@ void main() {
 
       await answer(tester, 'HOLDS FIRM');
       expect(
-          find.widgetWithText(CustomButton, 'COMPLETE PHASE'), findsOneWidget);
+          find.widgetWithText(CustomButton, 'REVIEW & SUBMIT'), findsOneWidget);
     });
 
     testWidgets('a phase carrying a RED X says so before it is pressed',
@@ -208,10 +250,11 @@ void main() {
       await answer(tester, 'HOLDS FIRM');
 
       expect(
-        find.widgetWithText(CustomButton, 'COMPLETE WITH RED X'),
+        find.widgetWithText(CustomButton, 'REVIEW & SUBMIT — RED X'),
         findsOneWidget,
       );
-      expect(find.widgetWithText(CustomButton, 'COMPLETE PHASE'), findsNothing);
+      expect(
+          find.widgetWithText(CustomButton, 'REVIEW & SUBMIT'), findsNothing);
       expect(find.byIcon(Icons.dangerous_outlined), findsWidgets);
     });
 
@@ -224,9 +267,9 @@ void main() {
       await answer(tester, 'HOLDS FIRM');
 
       expect(
-          find.widgetWithText(CustomButton, 'COMPLETE PHASE'), findsOneWidget);
+          find.widgetWithText(CustomButton, 'REVIEW & SUBMIT'), findsOneWidget);
       expect(
-        find.widgetWithText(CustomButton, 'COMPLETE WITH RED X'),
+        find.widgetWithText(CustomButton, 'REVIEW & SUBMIT — RED X'),
         findsNothing,
       );
     });
@@ -240,7 +283,7 @@ void main() {
       await answer(tester, 'Reservoir Cracked');
       await answer(tester, 'HOLDS FIRM');
       expect(
-        find.widgetWithText(CustomButton, 'COMPLETE WITH RED X'),
+        find.widgetWithText(CustomButton, 'REVIEW & SUBMIT — RED X'),
         findsOneWidget,
       );
 
@@ -250,13 +293,14 @@ void main() {
       await answer(tester, 'Low');
 
       expect(
-          find.widgetWithText(CustomButton, 'COMPLETE PHASE'), findsOneWidget);
+          find.widgetWithText(CustomButton, 'REVIEW & SUBMIT'), findsOneWidget);
       expect(find.text('RED X: 1'), findsNothing);
       expect(find.text('DASH: 1'), findsOneWidget);
       expect(find.text('2/2'), findsOneWidget);
     });
 
-    testWidgets('completing writes the phase faults and returns to the phases',
+    testWidgets(
+        'finishing stores the inspection faults and goes straight to review',
         (tester) async {
       await harness.beginPhase(PmcsPhase.before);
       await pumpPage(tester);
@@ -264,10 +308,10 @@ void main() {
       await answer(tester, 'Reservoir Cracked');
       await answer(tester, 'HOLDS FIRM');
       await tester
-          .tap(find.widgetWithText(CustomButton, 'COMPLETE WITH RED X'));
+          .tap(find.widgetWithText(CustomButton, 'REVIEW & SUBMIT — RED X'));
       await tester.pumpAndSettle();
 
-      expect(harness.viewModel.stage, InspectionStage.phaseSelect);
+      expect(harness.viewModel.stage, InspectionStage.summary);
       expect(
         harness.viewModel.session?.isPhaseComplete(PmcsPhase.before),
         isTrue,
@@ -283,7 +327,7 @@ void main() {
       await pumpPage(tester);
 
       await answer(tester, 'LEVEL OK');
-      await tester.tap(find.byTooltip('Back to phases'));
+      await tester.tap(find.byTooltip('PMCS types'));
       await tester.pumpAndSettle();
 
       expect(harness.viewModel.stage, InspectionStage.phaseSelect);

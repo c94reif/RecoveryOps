@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ivy_pulse/domain/entities/check_result.dart';
 import 'package:ivy_pulse/domain/entities/fault_severity.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_catalog.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_category.dart';
@@ -170,6 +171,7 @@ void main() {
     cacScanner = FakeCacScanner();
 
     viewModel = InspectionViewModel(
+      reportsRepository: reportsRepo,
       catalogSource: FakeCatalogSource(),
       startSession: StartSession(
         repository: sessions,
@@ -184,15 +186,18 @@ void main() {
         clock: clock,
       ),
       completePhase: CompletePhase(
+        transactionRunner: FakeTransactionRunner(),
         sessionsRepository: sessions,
         faultsRepository: faultsRepo,
       ),
       abandonSession: AbandonSession(
+        transactionRunner: FakeTransactionRunner(),
         sessionsRepository: sessions,
         resultsRepository: resultsRepo,
         faultsRepository: faultsRepo,
       ),
       submitSession: SubmitSession(
+        transactionRunner: FakeTransactionRunner(),
         sessionsRepository: sessions,
         faultsRepository: faultsRepo,
         reportsRepository: reportsRepo,
@@ -225,6 +230,55 @@ void main() {
       uic: 'WJ8TAA',
     );
   }
+
+  group('walking a known vehicle again', () {
+    test('a vehicle handed over from a report is queued for the setup fields',
+        () async {
+      await viewModel.load();
+
+      final accepted = viewModel.prefillVehicle(
+        bumperNumber: 'B-22',
+        uic: 'WAB4C0',
+        vehicleType: VehicleType.jltv,
+      );
+
+      expect(accepted, isTrue);
+      expect(viewModel.selectedVehicle, VehicleType.jltv);
+      expect(viewModel.pendingPrefill?.bumperNumber, 'B-22');
+      expect(viewModel.pendingPrefill?.uic, 'WAB4C0');
+    });
+
+    test('the hand-over is consumed once, so an edit is not overwritten',
+        () async {
+      await viewModel.load();
+      viewModel.prefillVehicle(
+        bumperNumber: 'B-22',
+        uic: 'WAB4C0',
+        vehicleType: VehicleType.stryker,
+      );
+
+      expect(viewModel.takePrefill()?.bumperNumber, 'B-22');
+      expect(viewModel.takePrefill(), isNull);
+      expect(viewModel.pendingPrefill, isNull);
+    });
+
+    test('is refused while another walk-around is open', () async {
+      await viewModel.load();
+      await viewModel.beginSession(bumperNumber: 'A-11', uic: 'WJ8TAA');
+      expect(viewModel.stage, isNot(InspectionStage.setup));
+
+      final accepted = viewModel.prefillVehicle(
+        bumperNumber: 'B-22',
+        uic: 'WAB4C0',
+        vehicleType: VehicleType.jltv,
+      );
+
+      expect(accepted, isFalse);
+      expect(viewModel.pendingPrefill, isNull);
+      // The open session's vehicle is left exactly as it was.
+      expect(viewModel.session?.bumperNumber, 'A-11');
+    });
+  });
 
   group('setup', () {
     test('opens on the first supported platform', () {
@@ -282,7 +336,116 @@ void main() {
   });
 
   group('resume', () {
-    test('a resumed session reloads its faults and lands on phase select',
+    test('a draft without saved checks still needs a PMCS type', () async {
+      final draft = await sessions.insert(buildSession());
+      await viewModel.resumeSession(draft);
+
+      expect(viewModel.stage, InspectionStage.phaseSelect);
+      expect(viewModel.workspace, isNull);
+      expect(viewModel.pendingScrollItemId, isNull);
+    });
+
+    test('saved fault answers and notes resume at the next unanswered check',
+        () async {
+      await begin();
+      await viewModel.openPhase(PmcsPhase.before);
+      await viewModel.answer(brakeFluid, 3);
+      await viewModel.saveNote(brakeFluid, 'Crack below reservoir');
+      final draft = viewModel.session!;
+      await viewModel.resetToSetup();
+
+      await viewModel.resumeSession(draft);
+
+      expect(viewModel.stage, InspectionStage.inspecting);
+      expect(viewModel.activePhase, PmcsPhase.before);
+      expect(viewModel.results[brakeFluid.id]!.faultIndex, 3);
+      expect(viewModel.results[brakeFluid.id]!.note, 'Crack below reservoir');
+      expect(viewModel.expandedItemId, parkingBrake.id);
+      expect(viewModel.consumePendingScroll(), parkingBrake.id);
+      expect(viewModel.phaseTally.redX, 1);
+      expect(viewModel.reviewingSummaryFault, isFalse);
+    });
+
+    test('legacy drafts resume the most recently answered unfinished type',
+        () async {
+      final draft = await sessions
+          .insert(buildSession(completedPhases: const [PmcsPhase.after]));
+      for (final (phase, item, hour) in [
+        (PmcsPhase.before, brakeFluid, 7),
+        (PmcsPhase.during, tirePressure, 9),
+        (PmcsPhase.after, coolDown, 10),
+      ]) {
+        await resultsRepo.upsertResult(
+            draft.sessionId,
+            phase,
+            CheckResult(
+              itemId: item.id,
+              faultIndex: 0,
+              faultLabel: item.faults.first,
+              severity: null,
+              recordedAt: DateTime.utc(2026, 3, 24, hour),
+            ));
+      }
+      // A removed catalog item must not redirect the current checklist.
+      await resultsRepo.upsertResult(
+          draft.sessionId,
+          PmcsPhase.before,
+          CheckResult(
+            itemId: 'retired-check',
+            faultIndex: 0,
+            faultLabel: 'Pass',
+            severity: null,
+            recordedAt: DateTime.utc(2026, 3, 24, 11),
+          ));
+
+      await viewModel.resumeSession(draft);
+
+      expect(viewModel.stage, InspectionStage.inspecting);
+      expect(viewModel.activePhase, PmcsPhase.during);
+      expect(viewModel.answeredCountFor(PmcsPhase.before), 1);
+      expect(viewModel.results.keys, [tirePressure.id]);
+      expect(viewModel.session!.completedPhases, [PmcsPhase.after]);
+    });
+
+    test('all answers saved without closeout resumes ready for review',
+        () async {
+      await begin();
+      await viewModel.openPhase(PmcsPhase.before);
+      await viewModel.answer(brakeFluid, 0);
+      await viewModel.answer(parkingBrake, 0);
+      final draft = viewModel.session!;
+      await viewModel.resetToSetup();
+
+      await viewModel.resumeSession(draft);
+
+      expect(viewModel.stage, InspectionStage.inspecting);
+      expect(viewModel.isPhaseComplete, isTrue);
+      expect(viewModel.pendingScrollItemId, isNull);
+      await viewModel.completeActivePhase();
+      expect(viewModel.stage, InspectionStage.summary);
+      expect(viewModel.session!.completedPhases, [PmcsPhase.before]);
+    });
+
+    test('failed resume clears the workspace and allows a retry', () async {
+      await begin();
+      await viewModel.openPhase(PmcsPhase.before);
+      await viewModel.answer(brakeFluid, 0);
+      final draft = viewModel.session!;
+      resultsRepo.failReads = true;
+
+      await viewModel.resumeSession(draft);
+
+      expect(viewModel.stage, InspectionStage.setup);
+      expect(viewModel.isBusy, isFalse);
+      expect(viewModel.workspace, isNull);
+      expect(viewModel.pendingScrollItemId, isNull);
+      resultsRepo.failReads = false;
+      await viewModel.resumeSession(draft);
+      expect(viewModel.stage, InspectionStage.inspecting);
+      expect(viewModel.expandedItemId, parkingBrake.id);
+    });
+
+    test('a completed draft reloads its faults and is ready to submit',
         () async {
       final open = await sessions.insert(
         buildSession(completedPhases: const [PmcsPhase.before]),
@@ -295,7 +458,7 @@ void main() {
 
       await viewModel.resumeSession(open);
 
-      expect(viewModel.stage, InspectionStage.phaseSelect);
+      expect(viewModel.stage, InspectionStage.summary);
       expect(viewModel.sessionFaults, hasLength(1));
       expect(viewModel.sessionTally.isDeadlined, isTrue);
     });
@@ -481,7 +644,8 @@ void main() {
   });
 
   group('completing phases', () {
-    test('completing a phase stores its faults and returns to phase select',
+    test(
+        'finishing one inspection stores its faults and goes straight to summary',
         () async {
       await begin();
       await viewModel.openPhase(PmcsPhase.before);
@@ -490,7 +654,7 @@ void main() {
 
       await viewModel.completeActivePhase();
 
-      expect(viewModel.stage, InspectionStage.phaseSelect);
+      expect(viewModel.stage, InspectionStage.summary);
       expect(viewModel.session!.isPhaseComplete(PmcsPhase.before), isTrue);
       expect(viewModel.sessionFaults, hasLength(1));
       expect(viewModel.sessionTally.redX, 1);
@@ -507,7 +671,7 @@ void main() {
       expect(viewModel.activePhase, isNull);
     });
 
-    test('closing the last phase goes straight to the summary', () async {
+    test('legacy drafts can still include multiple completed types', () async {
       await begin();
       for (final phase in PmcsPhase.values) {
         await viewModel.openPhase(phase);
@@ -518,7 +682,7 @@ void main() {
       }
 
       expect(viewModel.stage, InspectionStage.summary);
-      expect(viewModel.session!.allPhasesComplete, isTrue);
+      expect(viewModel.session!.completedPhases, PmcsPhase.values);
     });
 
     test('faults accumulate across phases', () async {
@@ -582,13 +746,13 @@ void main() {
       expect(reportsRepo.reports.single.isDeadlined, isTrue);
     });
 
-    test('the operator is returned to setup without waiting on the net',
+    test('the operator is shown a receipt without waiting on the net',
         () async {
       await completeAndSign();
 
       await viewModel.submit();
 
-      expect(viewModel.stage, InspectionStage.setup);
+      expect(viewModel.stage, InspectionStage.submitted);
       expect(viewModel.session, isNull);
       expect(viewModel.isBusy, isFalse);
     });
@@ -610,7 +774,7 @@ void main() {
       await viewModel.submit();
       await Future<void>.delayed(Duration.zero);
 
-      expect(viewModel.stage, InspectionStage.setup);
+      expect(viewModel.stage, InspectionStage.submitted);
       expect(queueWorker.enqueued, hasLength(1));
     });
 
@@ -677,7 +841,7 @@ void main() {
       expect(report.isSignatureVerified, isFalse);
       expect(report.signature!.blockedBy, CacRejection.noCamera);
       expect(report.operator, 'UNVERIFIED');
-      expect(viewModel.stage, InspectionStage.setup);
+      expect(viewModel.stage, InspectionStage.submitted);
     });
 
     test('the override is not reachable before a scan has been tried',
@@ -686,6 +850,58 @@ void main() {
 
       expect(viewModel.canSubmitUnverified, isFalse);
       await viewModel.submitUnverified();
+
+      expect(reportsRepo.reports, isEmpty);
+    });
+
+    test(
+        'the typed fallback sends the PMCS unverified, with the name, the '
+        'DoD ID and the reason the scan failed', () async {
+      await completeEverything();
+      cacScanner.willFail(CacRejection.codeUnreadable);
+      await viewModel.scanCac();
+
+      await viewModel.submitAttested(
+        lastName: 'smith',
+        firstName: 'john',
+        edipi: '1087 987 498',
+      );
+
+      final report = reportsRepo.reports.single;
+      expect(report.isSignatureVerified, isFalse);
+      expect(report.operator, 'SMITH, JOHN');
+      expect(report.signature!.method, 'typed');
+      expect(report.signature!.dodId, '1087987498');
+      expect(report.signature!.blockedBy, CacRejection.codeUnreadable);
+      expect(viewModel.stage, InspectionStage.submitted);
+    });
+
+    test(
+        'a typed entry that cannot be a Soldier is refused and nothing is '
+        'stored', () async {
+      await completeEverything();
+      cacScanner.willFail(CacRejection.codeUnreadable);
+      await viewModel.scanCac();
+
+      await viewModel.submitAttested(
+        lastName: 'SMITH',
+        firstName: 'JOHN',
+        edipi: '12345',
+      );
+
+      expect(reportsRepo.reports, isEmpty);
+      expect(viewModel.canSubmitUnverified, isTrue);
+    });
+
+    test('the typed fallback is not reachable before a scan has been tried',
+        () async {
+      await completeEverything();
+
+      await viewModel.submitAttested(
+        lastName: 'SMITH',
+        firstName: 'JOHN',
+        edipi: '1087987498',
+      );
 
       expect(reportsRepo.reports, isEmpty);
     });
@@ -764,6 +980,7 @@ void main() {
     }) {
       final repo = sessionsRepository ?? sessions;
       return InspectionViewModel(
+        reportsRepository: reportsRepo,
         catalogSource: FakeCatalogSource(),
         startSession: StartSession(
           repository: repo,
@@ -779,15 +996,18 @@ void main() {
           clock: clock,
         ),
         completePhase: CompletePhase(
+          transactionRunner: FakeTransactionRunner(),
           sessionsRepository: repo,
           faultsRepository: faultsRepo,
         ),
         abandonSession: AbandonSession(
+          transactionRunner: FakeTransactionRunner(),
           sessionsRepository: repo,
           resultsRepository: resultsRepo,
           faultsRepository: faultsRepo,
         ),
         submitSession: SubmitSession(
+          transactionRunner: FakeTransactionRunner(),
           sessionsRepository: repo,
           faultsRepository: faultsRepo,
           reportsRepository: reportsRepo,

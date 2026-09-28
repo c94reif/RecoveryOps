@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
 
-/// Small uppercase heading above a group of controls, per the SDK style guide.
 class SectionLabel extends StatelessWidget {
   final String text;
 

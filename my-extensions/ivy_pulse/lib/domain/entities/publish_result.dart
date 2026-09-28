@@ -1,4 +1,3 @@
-/// Outcome of a two-leg publish (Lattice entity + mesh broadcast).
 class PublishResult {
   final bool latticeOk;
   final bool meshOk;

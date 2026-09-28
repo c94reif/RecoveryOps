@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Owns which shell tab is showing. Tab state is deliberately separate from
-/// the inspection state so a Soldier can check Reports mid walk-around and
-/// come back to the same TM check.
 class HomeViewModel extends ChangeNotifier {
   int pageIndex = 0;
 

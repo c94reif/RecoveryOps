@@ -4,7 +4,6 @@ import 'package:ivy_pulse/domain/entities/fault_severity.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_fault.dart';
 import 'package:ivy_pulse/presentation/common/widgets/severity_badge.dart';
 
-/// Fault counts for a session, phase or report, worst symbol first.
 class FaultTallyBar extends StatelessWidget {
   final FaultTally tally;
 
@@ -12,8 +11,6 @@ class FaultTallyBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // A clean vehicle gets no badge row at all — absence of faults is the
-    // default state and should not compete with the checks for space.
     if (tally.isEmpty) return const SizedBox.shrink();
 
     return Wrap(

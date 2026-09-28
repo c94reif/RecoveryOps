@@ -3,8 +3,6 @@ import 'package:ivy_pulse/domain/entities/pmcs_report.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_session.dart';
 import 'package:ivy_pulse/domain/services/clock.dart';
 
-/// Folds a finished session and its faults into the report that goes on the
-/// wire. Pure apart from the clock, so the submit path is easy to assert on.
 class BuildSessionReport {
   final Clock clock;
 

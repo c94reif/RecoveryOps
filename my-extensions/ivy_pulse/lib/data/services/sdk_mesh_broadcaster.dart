@@ -30,15 +30,14 @@ class SdkMeshBroadcaster implements MeshBroadcasterPort {
     return _broadcast(_codec.encodeDeletion(entityId), 'deletion');
   }
 
-  /// One peer that heard us is enough — the maintainer's EUD relays the rest.
   Future<bool> _broadcast(String payload, String label) async {
     try {
       final report = await _messaging.broadcast(payload);
       debugPrint('[IvyPulse] Mesh $label: '
           '${report.successCount} delivered, ${report.failureCount} failed');
       return report.successCount > 0;
-    } catch (e) {
-      debugPrint('[IvyPulse] Mesh $label error: $e');
+    } catch (error) {
+      debugPrint('[IvyPulse] Mesh $label error: $error');
       return false;
     }
   }

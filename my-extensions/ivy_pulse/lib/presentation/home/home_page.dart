@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ivy_pulse/core/di/injection.dart';
+import 'package:ivy_pulse/core/di/service_locator.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
 import 'package:ivy_pulse/presentation/common/widgets/custom_snack_bar.dart';
 import 'package:ivy_pulse/presentation/home/home_view_model.dart';
@@ -24,23 +24,66 @@ class HomePageState extends State<HomePage> {
     homeViewModel = getIt<HomeViewModel>();
   }
 
-  Color tabColor(int i) =>
-      homeViewModel.pageIndex == i ? masterChiefGreen : textSecondary;
+  Color tabColor(int tabIndex) =>
+      homeViewModel.pageIndex == tabIndex ? masterChiefGreen : textSecondary;
 
-  Widget tabIcon(int i, IconData icon) {
-    final color = tabColor(i);
-    final iconWidget = Icon(icon, size: 18, color: color);
-    if (i != 1) return iconWidget;
-    return ValueListenableBuilder<int>(
-      valueListenable: getIt<ReportsViewModel>().unreadCount,
-      builder: (_, count, child) {
-        if (count == 0) return child!;
-        return Badge(
-          label: Text('$count', style: const TextStyle(fontSize: 8)),
-          child: child,
-        );
-      },
-      child: iconWidget,
+  Widget buildTab(int tabIndex, IconData icon, String label, int unreadCount) {
+    final selected = homeViewModel.pageIndex == tabIndex;
+    final color = tabColor(tabIndex);
+    final iconWidget = Icon(icon, size: 20, color: color);
+    void selectTab() {
+      FocusManager.instance.primaryFocus?.unfocus();
+      homeViewModel.selectTab(tabIndex);
+    }
+
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        value: tabIndex == 1 && unreadCount > 0 ? '$unreadCount unread' : null,
+        onTap: selectTab,
+        excludeSemantics: true,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: selected ? greenGlow : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: InkWell(
+              onTap: selectTab,
+              borderRadius: BorderRadius.circular(8),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: minTouchTarget),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (tabIndex == 1 && unreadCount > 0)
+                        Badge.count(count: unreadCount, child: iconWidget)
+                      else
+                        iconWidget,
+                      const SizedBox(height: 3),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: color,
+                          fontWeight:
+                              selected ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -64,47 +107,29 @@ class HomePageState extends State<HomePage> {
                     ],
                   ),
                 ),
-                Container(
+                Material(
                   color: bgDark,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      for (final (i, tab) in [
-                        (Icons.checklist_rtl, 'PMCS'),
-                        (Icons.assignment_late_outlined, 'Reports'),
-                        (Icons.person, 'Profile'),
-                      ].indexed)
-                        Expanded(
-                          // Gloved thumbs miss small targets, and a mistap here
-                          // can drop an operator out of an open inspection.
-                          child: SizedBox(
-                            height: minTouchTarget,
-                            child: GestureDetector(
-                              onTap: () {
-                                homeViewModel.selectTab(i);
-                              },
-                              behavior: HitTestBehavior.opaque,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  tabIcon(i, tab.$1),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    tab.$2,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: tabColor(i),
-                                      fontWeight: homeViewModel.pageIndex == i
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
+                      ),
+                      child: ValueListenableBuilder<int>(
+                        valueListenable: getIt<ReportsViewModel>().unreadCount,
+                        builder: (_, count, __) => Row(
+                          children: [
+                            for (final (tabIndex, tab) in [
+                              (Icons.checklist_rtl, 'PMCS'),
+                              (Icons.assignment_late_outlined, 'Reports'),
+                              (Icons.person, 'Profile'),
+                            ].indexed)
+                              buildTab(tabIndex, tab.$1, tab.$2, count),
+                          ],
                         ),
-                    ],
+                      ),
+                    ),
                   ),
                 ),
               ],

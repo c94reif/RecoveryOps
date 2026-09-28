@@ -42,6 +42,31 @@ void main() {
       tester.widget<CustomButton>(beginButton).onPressed != null;
 
   group('starting a PMCS', () {
+    testWidgets(
+        'Next focuses UIC, Done dismisses the keyboard, and input is uppercase',
+        (tester) async {
+      await tester.pumpWidget(createWidgetUnderTest());
+      await tester.enterText(field('Bumper Number'), 'b-22');
+      expect(
+          tester
+              .widget<CustomTextField>(field('Bumper Number'))
+              .controller
+              .text,
+          'B-22');
+      await tester.testTextInput.receiveAction(TextInputAction.next);
+      await tester.pump();
+      expect(tester.widget<CustomTextField>(field('UIC')).focusNode!.hasFocus,
+          isTrue);
+      await tester.enterText(field('UIC'), 'wab4c0');
+      expect(tester.widget<CustomTextField>(field('UIC')).controller.text,
+          'WAB4C0');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      expect(tester.widget<CustomTextField>(field('UIC')).focusNode!.hasFocus,
+          isFalse);
+      expect(tester.testTextInput.isVisible, isFalse);
+    });
+
     testWidgets('BEGIN PMCS stays dead until a bumper number and a UIC are in',
         (tester) async {
       await tester.pumpWidget(createWidgetUnderTest());
@@ -75,6 +100,32 @@ void main() {
       await tester.pump();
 
       expect(isBeginEnabled(tester), isFalse);
+    });
+
+    testWidgets('a vehicle handed over from a report card lands in the fields',
+        (tester) async {
+      await tester.pumpWidget(createWidgetUnderTest());
+      await tester.pumpAndSettle();
+
+      harness.viewModel.prefillVehicle(
+        bumperNumber: 'B-22',
+        uic: 'WAB4C0',
+        vehicleType: VehicleType.jltv,
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<CustomTextField>(field('Bumper Number')).controller.text,
+        'B-22',
+      );
+      expect(
+        tester.widget<CustomTextField>(field('UIC')).controller.text,
+        'WAB4C0',
+      );
+      expect(harness.viewModel.selectedVehicle, VehicleType.jltv);
+      // Consumed on arrival, so a later rebuild cannot put it back over an
+      // edit the operator has since made.
+      expect(harness.viewModel.pendingPrefill, isNull);
     });
 
     testWidgets('the UIC the operator is signed for arrives with the profile',
@@ -193,7 +244,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('3 phase(s) remaining'), findsOneWidget);
+      expect(find.text('Continue inspection'), findsOneWidget);
     });
 
     testWidgets('the phases already closed out are marked off', (tester) async {
@@ -204,11 +255,11 @@ void main() {
       await tester.pumpWidget(createWidgetUnderTest());
 
       expect(find.text('BEFORE'), findsOneWidget);
-      expect(find.text('DURING'), findsOneWidget);
-      expect(find.text('AFTER'), findsOneWidget);
+      expect(find.text('DURING'), findsNothing);
+      expect(find.text('AFTER'), findsNothing);
       // Only the finished phase carries the tick.
       expect(find.byIcon(Icons.check), findsOneWidget);
-      expect(find.text('2 phase(s) remaining'), findsOneWidget);
+      expect(find.text('Ready to submit'), findsOneWidget);
     });
 
     testWidgets('every open PMCS gets its own card', (tester) async {
@@ -235,7 +286,7 @@ void main() {
       await tester.tap(find.text('A-11 - Stryker'));
       await tester.pumpAndSettle();
 
-      expect(harness.viewModel.stage, InspectionStage.phaseSelect);
+      expect(harness.viewModel.stage, InspectionStage.summary);
       expect(harness.viewModel.session?.sessionId, 'session-1');
       expect(harness.viewModel.catalog?.vehicleType, VehicleType.stryker);
       expect(

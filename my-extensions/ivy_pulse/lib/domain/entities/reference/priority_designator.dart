@@ -1,4 +1,3 @@
-/// Military Standard Requisitioning priority designator for a parts order.
 class PriorityDesignator {
   final String code;
   final String label;

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ivy_pulse/core/di/injection.dart';
+import 'package:ivy_pulse/core/di/service_locator.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_session.dart';
@@ -9,8 +9,6 @@ import 'package:ivy_pulse/presentation/common/widgets/custom_text_field.dart';
 import 'package:ivy_pulse/presentation/common/widgets/section_label.dart';
 import 'package:ivy_pulse/presentation/inspection/inspection_view_model.dart';
 
-/// Picks the vehicle to walk. Resumable sessions sit above everything else —
-/// a Soldier who was pulled off a PMCS should not start it over.
 class SetupPage extends StatefulWidget {
   const SetupPage({super.key});
 
@@ -22,6 +20,7 @@ class SetupPageState extends State<SetupPage> {
   late final InspectionViewModel viewModel;
   final bumperNumberController = TextEditingController();
   final uicController = TextEditingController();
+  final uicFocus = FocusNode();
 
   @override
   void initState() {
@@ -29,14 +28,13 @@ class SetupPageState extends State<SetupPage> {
     viewModel = getIt<InspectionViewModel>();
 
     prefillUic();
+    applyPrefill();
     bumperNumberController.addListener(onFieldChanged);
     uicController.addListener(onFieldChanged);
     viewModel.addListener(prefillUic);
+    viewModel.addListener(applyPrefill);
   }
 
-  /// The UIC on the profile is the one the operator is signed for, so it
-  /// lands as soon as the profile does — still overridable for a vehicle
-  /// borrowed from another company.
   void prefillUic() {
     final uic = viewModel.profile?.uic ?? '';
     if (uic.isEmpty || uicController.text.isNotEmpty) return;
@@ -44,6 +42,13 @@ class SetupPageState extends State<SetupPage> {
   }
 
   void onFieldChanged() => setState(() {});
+
+  void applyPrefill() {
+    final prefill = viewModel.takePrefill();
+    if (prefill == null) return;
+    bumperNumberController.text = prefill.bumperNumber;
+    uicController.text = prefill.uic;
+  }
 
   bool get canBegin =>
       bumperNumberController.text.trim().isNotEmpty &&
@@ -60,8 +65,10 @@ class SetupPageState extends State<SetupPage> {
   @override
   void dispose() {
     viewModel.removeListener(prefillUic);
+    viewModel.removeListener(applyPrefill);
     bumperNumberController.dispose();
     uicController.dispose();
+    uicFocus.dispose();
     super.dispose();
   }
 
@@ -88,23 +95,28 @@ class SetupPageState extends State<SetupPage> {
             const SectionLabel(text: 'VEHICLE PLATFORM'),
             const SizedBox(height: 8),
             buildVehicleSelector(),
-            const SizedBox(height: 20),
-            const SectionLabel(text: 'BUMPER NUMBER'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 24),
             CustomTextField(
               controller: bumperNumberController,
               label: 'Bumper Number',
+              floatingLabelBehavior: FloatingLabelBehavior.always,
               icon: Icons.directions_car_outlined,
               textCapitalization: TextCapitalization.characters,
+              uppercase: true,
+              textInputAction: TextInputAction.next,
+              onSubmitted: (_) => uicFocus.requestFocus(),
             ),
-            const SizedBox(height: 20),
-            const SectionLabel(text: 'UIC'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 24),
             CustomTextField(
               controller: uicController,
+              focusNode: uicFocus,
               label: 'UIC',
+              floatingLabelBehavior: FloatingLabelBehavior.always,
               icon: Icons.groups_outlined,
               textCapitalization: TextCapitalization.characters,
+              uppercase: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => FocusScope.of(context).unfocus(),
             ),
             const SizedBox(height: 28),
             CustomButton(
@@ -191,15 +203,18 @@ class SetupPageState extends State<SetupPage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        for (final phase in PmcsPhase.values)
-                          buildPhaseChip(phase, open.isPhaseComplete(phase)),
-                      ],
-                    ),
+                    if (open.completedPhases.isNotEmpty)
+                      Wrap(
+                        children: [
+                          for (final phase in open.completedPhases)
+                            buildPhaseChip(phase),
+                        ],
+                      ),
                     const SizedBox(height: 6),
                     Text(
-                      '${open.remainingPhases.length} phase(s) remaining',
+                      open.hasStartedAnyPhase
+                          ? 'Ready to submit'
+                          : 'Continue inspection',
                       style: const TextStyle(
                         color: circleXAmber,
                         fontSize: 11,
@@ -218,28 +233,25 @@ class SetupPageState extends State<SetupPage> {
     );
   }
 
-  Widget buildPhaseChip(PmcsPhase phase, bool isComplete) {
-    final color = isComplete ? serviceableGreen : textSecondary;
+  Widget buildPhaseChip(PmcsPhase phase) {
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: isComplete ? serviceableGlow : Colors.transparent,
+          color: serviceableGlow,
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: color, width: 1),
+          border: Border.all(color: serviceableGreen, width: 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (isComplete) ...[
-              const Icon(Icons.check, color: serviceableGreen, size: 11),
-              const SizedBox(width: 3),
-            ],
+            const Icon(Icons.check, color: serviceableGreen, size: 11),
+            const SizedBox(width: 3),
             Text(
               phase.shortLabel,
-              style: TextStyle(
-                color: color,
+              style: const TextStyle(
+                color: serviceableGreen,
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.8,

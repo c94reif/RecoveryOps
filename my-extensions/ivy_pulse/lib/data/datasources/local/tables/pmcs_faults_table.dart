@@ -1,8 +1,5 @@
 import 'package:drift/drift.dart';
 
-/// Faults are denormalised from the catalog on purpose: a 5988-E handed to a
-/// maintainer has to read the same months later even if the TM catalog the
-/// extension ships has moved on.
 @DataClassName('PmcsFaultData')
 class PmcsFaults extends Table {
   IntColumn get id => integer().autoIncrement()();

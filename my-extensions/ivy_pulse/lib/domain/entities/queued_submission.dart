@@ -1,10 +1,7 @@
+import 'dart:convert';
+import 'package:ivy_pulse/domain/entities/report_message_type.dart';
 import 'package:ivy_pulse/domain/entities/transport_kind.dart';
 
-/// A PMCS submission that could not reach its transport and is parked in the
-/// database until that leg comes back up.
-///
-/// [payload] is the already-encoded report body, so a resumed submission
-/// never has to be rebuilt from a session that may since have changed.
 class QueuedSubmission {
   final int? id;
   final String entityId;
@@ -74,7 +71,19 @@ class QueuedSubmission {
         createdAt: DateTime.parse(map['createdAt'] as String).toUtc(),
       );
 
-  String get summary => '$bumperNumber - $vehicleType';
+  bool get isWithdrawal {
+    try {
+      final body = jsonDecode(payload);
+      return body is Map &&
+          body['type'] == ReportMessageType.deletion &&
+          body['entityId'] == entityId;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String get summary =>
+      '${isWithdrawal ? 'Withdraw ' : ''}$bumperNumber - $vehicleType';
 
   String get faultSummary {
     if (faultCount == 0) return 'No faults';

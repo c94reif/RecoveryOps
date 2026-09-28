@@ -15,7 +15,8 @@ class ProfileDao extends DatabaseAccessor<AppDatabase> with _$ProfileDaoMixin {
   Future<void> saveProfile({required String uic}) async {
     final existing = await getProfile();
     if (existing != null) {
-      await (update(profiles)..where((t) => t.id.equals(existing.id))).write(
+      await (update(profiles)..where((table) => table.id.equals(existing.id)))
+          .write(
         ProfilesCompanion(uic: Value(uic)),
       );
     } else {

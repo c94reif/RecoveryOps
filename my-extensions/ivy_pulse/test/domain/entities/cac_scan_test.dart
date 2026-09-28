@@ -53,15 +53,15 @@ void main() {
             reason: '${rejection.name} sends the operator to the wrong face');
       }
       expect(CacRejection.notACac.message,
-          contains('your photo and the gold chip'));
+          contains('wide barcode strip'));
     });
 
     test('the wrong-side message names landmarks and the gate strip', () {
       final message = CacRejection.wrongSideOfCard.message;
 
-      expect(message, contains('gate guard'));
-      expect(message, contains('gold chip'));
-      expect(message, contains('bottom left'));
+      expect(message, contains('your photo'));
+      expect(message, contains('DoD ID number'));
+      expect(message, contains('wide barcode strip'));
     });
 
     test('an expired card is told where to go, not just what it is', () {

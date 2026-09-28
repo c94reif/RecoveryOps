@@ -1,11 +1,9 @@
-import 'dart:convert';
+import 'package:ivy_pulse/data/mappers/pmcs_storage_codec.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:ivy_pulse/data/dao/sessions/sessions_dao.dart';
 import 'package:ivy_pulse/data/datasources/local/database.dart';
-import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_session.dart';
-import 'package:ivy_pulse/domain/entities/pmcs_signature.dart';
 import 'package:ivy_pulse/domain/entities/vehicle_type.dart';
 import 'package:ivy_pulse/domain/repositories/sessions_repo.dart';
 
@@ -42,9 +40,9 @@ class SessionsRepoImpl implements SessionsRepository {
       uic: session.uic,
       startedAt: session.startedAt,
       submittedAt: session.submittedAt,
-      completedPhases: encodePhases(session.completedPhases),
+      completedPhases: PmcsStorageCodec.encodePhases(session.completedPhases),
       status: session.status.wireName,
-      signatureJson: encodeSignature(session.signature),
+      signatureJson: PmcsStorageCodec.encodeSignature(session.signature),
       latitude: session.latitude,
       longitude: session.longitude,
     );
@@ -60,25 +58,23 @@ class SessionsRepoImpl implements SessionsRepository {
       operator: session.operator,
       uic: session.uic,
       submittedAt: session.submittedAt,
-      completedPhases: encodePhases(session.completedPhases),
+      completedPhases: PmcsStorageCodec.encodePhases(session.completedPhases),
       status: session.status.wireName,
-      signatureJson: encodeSignature(session.signature),
+      signatureJson: PmcsStorageCodec.encodeSignature(session.signature),
       latitude: session.latitude,
       longitude: session.longitude,
     );
   }
 
   @override
+  Future<void> updateLocation(
+          String sessionId, double latitude, double longitude) =>
+      dao.updateLocation(sessionId, latitude, longitude);
+
+  @override
   Future<void> deleteBySessionId(String sessionId) =>
       dao.deleteBySessionId(sessionId);
 
-  /// Null when the row names a platform this build has no catalog for.
-  ///
-  /// The row is left on disk rather than deleted — a later build that carries
-  /// the platform can still resume it — but it is not offered now, because a
-  /// PMCS with no checklist behind it is not walkable. Decoding is tolerant
-  /// throughout for the same reason: a row written by a newer build must not
-  /// throw and take the operator's whole resume list with it.
   static PmcsSession? toEntity(PmcsSessionData row) {
     final vehicleType = VehicleType.tryFromWireName(row.vehicleType);
     if (vehicleType == null) return null;
@@ -92,11 +88,9 @@ class SessionsRepoImpl implements SessionsRepository {
       uic: row.uic,
       startedAt: row.startedAt,
       submittedAt: row.submittedAt,
-      completedPhases: decodePhases(row.completedPhases),
-      // An unreadable status reads as still in progress: showing a Soldier a
-      // PMCS they may have already sent beats hiding one they have not.
+      completedPhases: PmcsStorageCodec.decodePhases(row.completedPhases),
       status: tryStatus(row.status) ?? SessionStatus.inProgress,
-      signature: decodeSignature(row.signatureJson),
+      signature: PmcsStorageCodec.decodeSignature(row.signatureJson),
       latitude: row.latitude,
       longitude: row.longitude,
     );
@@ -107,33 +101,5 @@ class SessionsRepoImpl implements SessionsRepository {
       if (status.wireName == value) return status;
     }
     return null;
-  }
-
-  static String encodePhases(List<PmcsPhase> phases) =>
-      phases.map((p) => p.wireName).join(',');
-
-  static String? encodeSignature(PmcsSignature? signature) =>
-      signature == null ? null : jsonEncode(signature.toMap());
-
-  /// A garbled signature blob reads as no signature, which reads as
-  /// unverified — never as a scan that happened.
-  static PmcsSignature? decodeSignature(String? json) {
-    if (json == null || json.isEmpty) return null;
-    try {
-      return PmcsSignature.fromMap(jsonDecode(json) as Map<String, Object?>);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// Unknown wire names are dropped rather than thrown on — a row written by a
-  /// newer build must not lock the operator out of resuming their PMCS.
-  static List<PmcsPhase> decodePhases(String value) {
-    if (value.isEmpty) return const [];
-    return value
-        .split(',')
-        .map(PmcsPhase.tryFromWireName)
-        .whereType<PmcsPhase>()
-        .toList();
   }
 }

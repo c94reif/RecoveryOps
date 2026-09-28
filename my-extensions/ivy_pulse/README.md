@@ -19,10 +19,10 @@ Lattice Edge. Companion application for **Convoy Ops** / **Recovery Ops**.
 
 ## What it does
 
-A Soldier picks a platform and bumper number, walks the **BEFORE / DURING / AFTER**
-phases, and taps a condition for each TM check. Faults are graded automatically, the
-Soldier signs the finished PMCS by scanning their CAC, and it goes out to maintainers on
-two independent transports.
+A Soldier picks a platform, bumper number, and **BEFORE, DURING, or AFTER** PMCS,
+then taps a condition for each TM check. Finishing that checklist goes straight to
+review and CAC sign-off, followed by submission to maintainers on two independent
+transports. Each PMCS stands on its own; the other inspection types are not required.
 
 - **Two platforms, from the TM.** Stryker (78 checks, TM 9-2355-311-10) and
   JLTV (94 checks, TM 9-2320-400-10).
@@ -33,10 +33,43 @@ two independent transports.
   "Not Mission Capable If" are treated as critical systems.
 - **Nothing is lost.** Every answer is written to SQLite on tap. Kill the app, hand the
   EUD off, lose power — the walk-around resumes exactly where it stopped.
+- **Submit each PMCS independently.** Finish the selected checklist, review, sign,
+  and submit immediately. Resume PMCS reopens an unfinished checklist at its next
+  unanswered check; a finished draft returns directly to sign-off.
 - **Nothing blocks on the net.** Submission is stored locally first, then pushed on
   Lattice and the mesh in parallel. Either leg failing parks its own copy on a queue that
-  drains when that transport comes back, asking before it sends.
-- **Voice notes.** A faulted check can take a dictated note — no typing in gloves.
+  retries independently when that transport comes back. Withdrawals are saved with
+  both retry messages, so reconnects and delayed broadcasts cannot restore them.
+- **Optional fault descriptions.** Add, edit, remove, or dictate up to 155 characters
+  on a faulted check. The description is saved with the fault and included in both
+  Lattice and mesh messages, including queued retries. A failed save keeps the draft.
+- **Review before signing.** The summary shows the inspection being submitted.
+  Review its checks or tap a fault to edit its description, then return to the summary.
+  Older drafts with saved checks from other types keep a link to that work.
+- **A saved-report receipt.** Submission shows local save confirmation and delivery
+  status, with a View report action, without waiting for the network.
+- **One report entry per vehicle.** Reports with the same bumper number and UIC
+  share a vehicle card showing the latest report's status. Open the card to see
+  the individual PMCS reports, newest first, with their notes and signatures.
+- **Find a vehicle quickly.** Search bumper numbers or UICs, filter vehicles whose latest
+  report has faults or visible earlier-fault suggestions, and filter received vehicles
+  with unread reports.
+- **Previous faults are suggestions.** A newer AFTER checklist does not hide a BEFORE
+  finding. Earlier faults remain suggested for review until a newer PMCS covers that
+  inspection type. Dismiss or restore any suggestion; the preference survives restart
+  on this device and does not change a signed report, readiness status, or submission
+  eligibility. A new report of the same fault produces a fresh suggestion.
+- **See what changed.** The summary and expanded reports compare each inspection type
+  with its previous PMCS for the same platform, bumper number, and UIC. New, recurring,
+  changed, and no-longer-reported faults are shown with the comparison date. Missing
+  history is identified explicitly; absence from a report is not maintenance clearance.
+  During the checklist, previous findings and notes appear beside the matching check.
+  Select today's condition or explicitly choose Still present to reuse the previous
+  condition and note. No answers are filled automatically.
+- **Start again from a vehicle.** Each grouped vehicle card in Reports has one New
+  PMCS action. It reuses the vehicle platform, bumper number, and UIC and opens PMCS
+  type selection. A starting indicator stays visible while the session saves; an
+  existing inspection offers Continue PMCS to return to that work.
 - **Signed by the Soldier who walked it.** Submitting is gated behind a CAC scan. The
   PDF417 on the front of the card decodes to a name, rank, service and DoD ID, and those
   ride the report to the maintainer. A scan that cannot happen can be overridden, but the
@@ -49,6 +82,12 @@ two independent transports.
 - **A card about to expire warns before it strands anyone.** The signature block shows the
   card's expiry, and inside thirty days it says so — a card that dies mid-rotation strands
   whoever has been signing the 5988-Es.
+
+## Message models
+
+The [message-model reference](docs/MESSAGE_MODELS.md) describes the report, fault,
+signature, peer envelope, Lattice entity, and withdrawal formats sent and received
+by Ivy Pulse. A [PDF copy](docs/MESSAGE_MODELS.pdf) is included.
 
 ## Architecture
 

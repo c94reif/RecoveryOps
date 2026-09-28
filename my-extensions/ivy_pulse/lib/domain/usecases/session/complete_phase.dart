@@ -1,3 +1,4 @@
+import 'package:ivy_pulse/domain/services/transaction_runner.dart';
 import 'package:ivy_pulse/domain/entities/check_result.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_catalog.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_fault.dart';
@@ -16,14 +17,14 @@ class CompletePhaseOutcome {
   FaultTally get tally => FaultTally.from(faults);
 }
 
-/// Closes out a phase: derives its faults, replaces any stored from an earlier
-/// pass, and marks the phase done on the session.
 class CompletePhase {
+  final TransactionRunner transactionRunner;
   final SessionsRepository sessionsRepository;
   final FaultsRepository faultsRepository;
   final BuildPhaseFaults buildPhaseFaults;
 
   const CompletePhase({
+    required this.transactionRunner,
     required this.sessionsRepository,
     required this.faultsRepository,
     this.buildPhaseFaults = const BuildPhaseFaults(),
@@ -34,23 +35,24 @@ class CompletePhase {
     required PmcsPhase phase,
     required PmcsCatalog catalog,
     required Map<String, CheckResult> results,
-  }) async {
-    final faults = buildPhaseFaults(
-      sessionId: session.sessionId,
-      phase: phase,
-      catalog: catalog,
-      results: results,
-    );
+  }) =>
+      transactionRunner.run(() async {
+        final faults = buildPhaseFaults(
+          sessionId: session.sessionId,
+          phase: phase,
+          catalog: catalog,
+          results: results,
+        );
 
-    await faultsRepository.replacePhaseFaults(
-      session.sessionId,
-      faults,
-      phaseWireName: phase.wireName,
-    );
+        await faultsRepository.replacePhaseFaults(
+          session.sessionId,
+          faults,
+          phaseWireName: phase.wireName,
+        );
 
-    final updated = session.withPhaseCompleted(phase);
-    await sessionsRepository.update(updated);
+        final updated = session.withPhaseCompleted(phase);
+        await sessionsRepository.update(updated);
 
-    return CompletePhaseOutcome(session: updated, faults: faults);
-  }
+        return CompletePhaseOutcome(session: updated, faults: faults);
+      });
 }

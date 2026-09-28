@@ -63,7 +63,10 @@ class FakeMapService implements sdk.MapService {
 
   @override
   Future<void> addPolyline(String id, List<sdk.LatLng> points,
-      {String? color}) async {
+      {String? color,
+      double? width,
+      List<double>? dashPattern,
+      double? opacity}) async {
     addedPolylineIds.add(id);
   }
 

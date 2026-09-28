@@ -65,6 +65,26 @@ void main() {
   });
 
   group('fetchRemotePmcsReports', () {
+    test('skips a report whose body disagrees with its entity identity',
+        () async {
+      entities.entities = [
+        makePmcsEntity(
+            id: 'outer',
+            bodyOverride: const PmcsReportCodec()
+                .reportBody(buildReport(entityId: 'inner')))
+      ];
+      expect(await source.fetchRemotePmcsReports(), isEmpty);
+    });
+
+    test('exposes explicit withdrawals separately from active reports',
+        () async {
+      entities.entities = [
+        makePmcsEntity(id: 'live'),
+        makePmcsEntity(id: 'gone', isLive: false),
+        makePmcsEntity(id: 'unrelated', integrationName: 'other', isLive: false)
+      ];
+      expect(await source.fetchWithdrawnPmcsEntityIds(), {'gone'});
+    });
     test('returns nothing when the host holds no entities', () async {
       expect(await source.fetchRemotePmcsReports(), isEmpty);
     });
@@ -207,10 +227,11 @@ void main() {
       expect(report.isRead, isFalse);
     });
 
-    test('returns nothing rather than throwing when the host fails', () async {
+    test('propagates a host failure so repair cannot treat it as an empty host',
+        () async {
       entities.throwsOnGetEntities = true;
 
-      await expectLater(source.fetchRemotePmcsReports(), completion(isEmpty));
+      await expectLater(source.fetchRemotePmcsReports(), throwsException);
     });
   });
 
@@ -243,10 +264,11 @@ void main() {
       expect(await source.fetchKnownPmcsEntityIds(), {'garbage'});
     });
 
-    test('returns nothing rather than throwing when the host fails', () async {
+    test('propagates a host failure so repair cannot treat it as an empty host',
+        () async {
       entities.throwsOnGetEntities = true;
 
-      await expectLater(source.fetchKnownPmcsEntityIds(), completion(isEmpty));
+      await expectLater(source.fetchKnownPmcsEntityIds(), throwsException);
     });
   });
 }

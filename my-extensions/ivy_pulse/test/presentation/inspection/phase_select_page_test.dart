@@ -54,7 +54,8 @@ void main() {
     await harness.viewModel.resumeSession(harness.viewModel.openSessions.first);
   }
 
-  final summaryButton = find.widgetWithText(CustomButton, 'VIEW PMCS SUMMARY');
+  final summaryButton =
+      find.widgetWithText(CustomButton, 'REVIEW & SUBMIT PMCS');
 
   group('the phase list', () {
     testWidgets('shows nothing at all until a walk-around is open',
@@ -62,7 +63,7 @@ void main() {
       await harness.load();
       await pumpPage(tester);
 
-      expect(find.text('SELECT PHASE'), findsNothing);
+      expect(find.text('CHOOSE PMCS TYPE'), findsNothing);
       expect(find.text('Before Operations'), findsNothing);
       expect(find.byType(Card), findsNothing);
     });
@@ -86,7 +87,7 @@ void main() {
       expect(find.byType(Card), findsNWidgets(PmcsPhase.values.length));
     });
 
-    testWidgets('each card carries the number of checks that phase owes',
+    testWidgets('each type shows its check count without a lifecycle status',
         (tester) async {
       await harness.begin();
       await pumpPage(tester);
@@ -94,6 +95,7 @@ void main() {
       // BEFORE carries both brake checks; DURING and AFTER carry one each.
       expect(find.text('2 checks'), findsOneWidget);
       expect(find.text('1 check'), findsNWidgets(2));
+      expect(find.text('NOT STARTED'), findsNothing);
     });
 
     testWidgets('a phase the catalog has nothing for reads as zero checks',
@@ -120,14 +122,75 @@ void main() {
     });
   });
 
+  group('saved phase progress', () {
+    testWidgets('returning to phases shows answers without closing the phase',
+        (tester) async {
+      await harness.beginPhase(PmcsPhase.before);
+      await harness.viewModel.answer(brakeFluid, 1);
+      harness.viewModel.backToPhases();
+      await pumpPage(tester);
+
+      expect(find.text('1 of 2 complete'), findsOneWidget);
+      expect(find.text('IN PROGRESS'), findsOneWidget);
+      expect(find.text('NOT STARTED'), findsNothing);
+
+      await harness.viewModel.openPhase(PmcsPhase.before);
+      await harness.viewModel.answer(parkingBrake, 0);
+      harness.viewModel.backToPhases();
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 of 2 complete'), findsOneWidget);
+      expect(find.text('IN PROGRESS'), findsOneWidget);
+      expect(find.text('READY TO SUBMIT'), findsNothing);
+
+      await harness.viewModel.openPhase(PmcsPhase.before);
+      await harness.viewModel.completeActivePhase();
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 of 2 complete'), findsOneWidget);
+      expect(find.text('READY TO SUBMIT'), findsOneWidget);
+      expect(find.text('IN PROGRESS'), findsNothing);
+    });
+
+    testWidgets('resuming restores progress across multiple unfinished phases',
+        (tester) async {
+      await harness.beginPhase(PmcsPhase.before);
+      await harness.viewModel.answer(brakeFluid, 0);
+      await harness.viewModel.openPhase(PmcsPhase.during);
+      await harness.viewModel.answer(tirePressure, 1);
+      final session = harness.viewModel.session!;
+      await harness.viewModel.resetToSetup();
+      await harness.viewModel.resumeSession(session);
+      await pumpPage(tester);
+
+      expect(find.text('1 of 2 complete'), findsOneWidget);
+      expect(find.text('1 of 1 complete'), findsOneWidget);
+      expect(find.text('IN PROGRESS'), findsNWidgets(2));
+      expect(find.text('NOT STARTED'), findsNothing);
+    });
+
+    testWidgets('discarding a session clears progress for the next vehicle',
+        (tester) async {
+      await harness.beginPhase(PmcsPhase.before);
+      await harness.viewModel.answer(brakeFluid, 0);
+      await harness.viewModel.discardSession();
+      await harness.viewModel.beginSession(bumperNumber: 'B-22', uic: 'WAB4C0');
+      await pumpPage(tester);
+
+      expect(find.text('NOT STARTED'), findsNothing);
+      expect(find.text('IN PROGRESS'), findsNothing);
+      expect(find.text('2 checks'), findsOneWidget);
+    });
+  });
+
   group('a phase already closed out', () {
     testWidgets('is marked complete and the others are not', (tester) async {
       await resumeWith(const [PmcsPhase.before]);
       await pumpPage(tester);
 
-      expect(find.text('COMPLETE'), findsOneWidget);
+      expect(find.text('READY TO SUBMIT'), findsOneWidget);
       expect(find.byIcon(Icons.check_circle), findsOneWidget);
-      // The two phases still owed keep their chevron.
+      // The other inspection types keep their chevron.
       expect(find.byIcon(Icons.chevron_right), findsNWidgets(2));
     });
 
@@ -136,11 +199,12 @@ void main() {
       await resumeWith(PmcsPhase.values);
       await pumpPage(tester);
 
-      expect(find.text('COMPLETE'), findsNWidgets(PmcsPhase.values.length));
+      expect(
+          find.text('READY TO SUBMIT'), findsNWidgets(PmcsPhase.values.length));
       expect(find.byIcon(Icons.chevron_right), findsNothing);
     });
 
-    testWidgets('stays open so the operator can re-read what they signed for',
+    testWidgets('opens the ready inspection for review and submission',
         (tester) async {
       await resumeWith(const [PmcsPhase.before]);
       await pumpPage(tester);
@@ -148,8 +212,8 @@ void main() {
       await tester.tap(find.text('Before Operations'));
       await tester.pumpAndSettle();
 
-      expect(harness.viewModel.stage, InspectionStage.inspecting);
-      expect(harness.viewModel.activePhase, PmcsPhase.before);
+      expect(harness.viewModel.stage, InspectionStage.summary);
+      expect(harness.viewModel.session!.completedPhases, [PmcsPhase.before]);
     });
 
     testWidgets('reopens with the answers already recorded on it',
@@ -171,8 +235,48 @@ void main() {
       await tester.tap(find.text('Before Operations'));
       await tester.pumpAndSettle();
 
+      expect(harness.viewModel.stage, InspectionStage.summary);
+      await harness.viewModel.reviewPhase(PmcsPhase.before);
       expect(harness.viewModel.answeredCount, 1);
       expect(harness.viewModel.results[brakeFluid.id]?.faultLabel, 'Low');
+    });
+  });
+
+  group('the RED X badge', () {
+    void deadline(PmcsPhase phase) {
+      harness.faults.byPhase['session-1|${phase.wireName}'] = [
+        buildFault(severity: FaultSeverity.redX, phase: phase),
+      ];
+    }
+
+    testWidgets('marks the phase holding a RED X, and only that phase',
+        (tester) async {
+      deadline(PmcsPhase.before);
+      await resumeWith([]);
+      await pumpPage(tester);
+
+      expect(find.byIcon(Icons.cancel), findsOneWidget);
+    });
+
+    testWidgets('a CIRCLE X does not earn it — the vehicle can still roll',
+        (tester) async {
+      harness.faults.byPhase['session-1|${PmcsPhase.before.wireName}'] = [
+        buildFault(severity: FaultSeverity.circleX, phase: PmcsPhase.before),
+      ];
+      await resumeWith([]);
+      await pumpPage(tester);
+
+      expect(find.byIcon(Icons.cancel), findsNothing);
+    });
+
+    testWidgets('stays on the card once the phase is closed out',
+        (tester) async {
+      deadline(PmcsPhase.after);
+      await resumeWith([PmcsPhase.after]);
+      await pumpPage(tester);
+
+      expect(find.byIcon(Icons.cancel), findsOneWidget);
+      expect(find.text('READY TO SUBMIT'), findsOneWidget);
     });
   });
 
@@ -208,7 +312,7 @@ void main() {
       await harness.begin();
       await pumpPage(tester);
 
-      await tester.tap(find.text('DISCARD SESSION'));
+      await tester.tap(find.text('Discard session'));
       await tester.pumpAndSettle();
 
       expect(find.text('Discard PMCS?'), findsOneWidget);
@@ -220,7 +324,7 @@ void main() {
       await harness.begin();
       await pumpPage(tester);
 
-      await tester.tap(find.text('DISCARD SESSION'));
+      await tester.tap(find.text('Discard session'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
@@ -235,7 +339,7 @@ void main() {
       await harness.begin();
       await pumpPage(tester);
 
-      await tester.tap(find.text('DISCARD SESSION'));
+      await tester.tap(find.text('Discard session'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('DISCARD'));
       await tester.pumpAndSettle();

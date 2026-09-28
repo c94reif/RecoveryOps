@@ -204,7 +204,8 @@ void main() {
     testWidgets('invites a note while it has none', (tester) async {
       await tester.pumpWidget(createWidgetUnderTest(result: resultFor(1)));
 
-      expect(find.text('Tap to dictate a note'), findsOneWidget);
+      expect(find.text('Optional description · up to 155 characters'),
+          findsOneWidget);
       expect(find.byIcon(Icons.mic_none), findsOneWidget);
       expect(find.byTooltip('Tap to record'), findsOneWidget);
     });

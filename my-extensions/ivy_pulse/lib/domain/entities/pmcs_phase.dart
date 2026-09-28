@@ -1,4 +1,3 @@
-/// The three PMCS phases an operator walks a vehicle through, in TM order.
 enum PmcsPhase {
   before,
   during,
@@ -10,14 +9,12 @@ enum PmcsPhase {
         PmcsPhase.after => 'AFTER',
       };
 
-  /// Full label used on phase selection cards.
   String get label => switch (this) {
         PmcsPhase.before => 'Before Operations',
         PmcsPhase.during => 'During Operations',
         PmcsPhase.after => 'After Operations',
       };
 
-  /// Short, all-caps label for chips and headers where width is tight.
   String get shortLabel => switch (this) {
         PmcsPhase.before => 'BEFORE',
         PmcsPhase.during => 'DURING',

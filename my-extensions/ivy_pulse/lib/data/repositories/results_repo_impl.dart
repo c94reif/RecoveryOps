@@ -16,14 +16,14 @@ class ResultsRepoImpl implements ResultsRepository {
   ) async {
     final rows = await dao.getResults(sessionId, phase.wireName);
     return {
-      for (final r in rows)
-        r.itemId: CheckResult(
-          itemId: r.itemId,
-          faultIndex: r.faultIndex,
-          faultLabel: r.faultLabel,
-          severity: FaultSeverity.tryFromWireName(r.severity),
-          note: r.note,
-          recordedAt: r.recordedAt,
+      for (final row in rows)
+        row.itemId: CheckResult(
+          itemId: row.itemId,
+          faultIndex: row.faultIndex,
+          faultLabel: row.faultLabel,
+          severity: FaultSeverity.tryFromWireName(row.severity),
+          note: row.note,
+          recordedAt: row.recordedAt,
         ),
     };
   }

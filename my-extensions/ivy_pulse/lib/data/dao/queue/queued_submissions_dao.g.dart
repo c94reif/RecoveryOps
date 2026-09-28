@@ -1,8 +1,5 @@
-// GENERATED CODE - DO NOT MODIFY BY HAND
-
 part of 'queued_submissions_dao.dart';
 
-// ignore_for_file: type=lint
 mixin _$QueuedSubmissionsDaoMixin on DatabaseAccessor<AppDatabase> {
   $QueuedSubmissionsTable get queuedSubmissions =>
       attachedDatabase.queuedSubmissions;

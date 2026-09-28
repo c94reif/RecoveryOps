@@ -48,6 +48,22 @@ void main() {
   });
 
   group('publishPmcsReport', () {
+    test('an old body under the same id does not acknowledge an update',
+        () async {
+      await adapter.publishPmcsReport(buildReport(bumperNumber: 'OLD'));
+      entities.silentlyDropsUpserts = true;
+      expect(await adapter.publishPmcsReport(buildReport(bumperNumber: 'NEW')),
+          isFalse);
+    });
+
+    test('an inactive entity does not acknowledge a dropped publication',
+        () async {
+      await adapter.publishPmcsReport(buildReport());
+      entities.stored['session-1'] =
+          entities.stored['session-1']!.copyWith(isLive: false);
+      entities.silentlyDropsUpserts = true;
+      expect(await adapter.publishPmcsReport(buildReport()), isFalse);
+    });
     test('reports success once the entity reads back from the host', () async {
       final ok = await adapter.publishPmcsReport(buildReport());
 
@@ -150,6 +166,8 @@ void main() {
       expect(tombstone.id, 'live-1');
       expect(tombstone.isLive, isFalse);
       expect(tombstone.expiryTime, isNotNull);
+      expect(tombstone.expiryTime!.isAfter(DateTime.now().toUtc()), isTrue,
+          reason: 'Offline receivers need time to discover the tombstone');
     });
 
     test('an entity already gone from the host counts as deleted', () async {

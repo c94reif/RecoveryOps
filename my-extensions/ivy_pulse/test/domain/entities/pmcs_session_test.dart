@@ -5,12 +5,10 @@ import 'package:ivy_pulse/domain/entities/pmcs_session.dart';
 import '../../support/fakes.dart';
 
 void main() {
-  test('a fresh session has every phase remaining', () {
+  test('a fresh session has no completed inspection', () {
     final session = buildSession();
 
     expect(session.completedPhases, isEmpty);
-    expect(session.remainingPhases, PmcsPhase.values);
-    expect(session.allPhasesComplete, isFalse);
     expect(session.hasStartedAnyPhase, isFalse);
   });
 
@@ -19,7 +17,8 @@ void main() {
 
     expect(session.isPhaseComplete(PmcsPhase.before), isTrue);
     expect(session.isPhaseComplete(PmcsPhase.during), isFalse);
-    expect(session.remainingPhases, [PmcsPhase.during, PmcsPhase.after]);
+    expect(session.completedPhases, [PmcsPhase.before]);
+    expect(session.hasStartedAnyPhase, isTrue);
   });
 
   test('completing the same phase twice does not duplicate it', () {
@@ -38,14 +37,14 @@ void main() {
     expect(session.completedPhases, [PmcsPhase.before, PmcsPhase.after]);
   });
 
-  test('all three phases complete the session', () {
+  test('legacy sessions retain multiple completed inspection types', () {
     var session = buildSession();
     for (final phase in PmcsPhase.values) {
       session = session.withPhaseCompleted(phase);
     }
 
-    expect(session.allPhasesComplete, isTrue);
-    expect(session.remainingPhases, isEmpty);
+    expect(session.completedPhases, PmcsPhase.values);
+    expect(session.status, SessionStatus.inProgress);
   });
 
   test('copyWith preserves identity fields', () {

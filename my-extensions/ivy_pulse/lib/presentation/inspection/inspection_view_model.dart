@@ -1,10 +1,19 @@
+import 'package:ivy_pulse/presentation/inspection/controllers/cac_scan_controller.dart';
+import 'package:ivy_pulse/presentation/inspection/controllers/fault_dictation_controller.dart';
+import 'dart:async';
+
+import 'package:characters/characters.dart';
 import 'package:flutter/foundation.dart';
+
+import 'package:ivy_pulse/domain/entities/attested_identity.dart';
 import 'package:ivy_pulse/domain/entities/cac_scan.dart';
 import 'package:ivy_pulse/domain/entities/check_result.dart';
+import 'package:ivy_pulse/domain/entities/fault_description.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_catalog.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_category.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_check_item.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_fault.dart';
+import 'package:ivy_pulse/domain/entities/pmcs_history.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_report.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_session.dart';
@@ -15,8 +24,11 @@ import 'package:ivy_pulse/domain/entities/transport_kind.dart';
 import 'package:ivy_pulse/domain/entities/vehicle_type.dart';
 import 'package:ivy_pulse/domain/repositories/faults_repo.dart';
 import 'package:ivy_pulse/domain/repositories/profile_repo.dart';
+import 'package:ivy_pulse/domain/repositories/reports_repo.dart';
 import 'package:ivy_pulse/domain/repositories/results_repo.dart';
+import 'package:ivy_pulse/domain/services/clock.dart';
 import 'package:ivy_pulse/domain/services/cac_scanner_strategy.dart';
+import 'package:ivy_pulse/domain/services/delivery_coordinator.dart';
 import 'package:ivy_pulse/domain/services/pmcs_catalog_source.dart';
 import 'package:ivy_pulse/domain/services/speech_recognition_strategy.dart';
 import 'package:ivy_pulse/domain/usecases/identity/verify_operator_identity.dart';
@@ -27,16 +39,17 @@ import 'package:ivy_pulse/domain/usecases/session/complete_phase.dart';
 import 'package:ivy_pulse/domain/usecases/session/load_open_sessions.dart';
 import 'package:ivy_pulse/domain/usecases/session/record_check_result.dart';
 import 'package:ivy_pulse/domain/usecases/session/start_session.dart';
-import 'package:ivy_pulse/presentation/common/widgets/custom_snack_bar.dart';
+import 'package:ivy_pulse/presentation/common/services/snack_bar_service.dart';
+import 'package:ivy_pulse/domain/services/user_notification_sink.dart';
+import 'package:ivy_pulse/presentation/common/services/fault_suggestion_controller.dart';
 import 'package:ivy_pulse/presentation/inspection/phase_workspace.dart';
 
-/// Where the operator is in the walk-around. One view model drives all four
-/// screens so an interrupted PMCS never loses the session it is holding.
 enum InspectionStage {
   setup,
   phaseSelect,
   inspecting,
   summary,
+  submitted,
 }
 
 class InspectionViewModel extends ChangeNotifier {
@@ -54,7 +67,15 @@ class InspectionViewModel extends ChangeNotifier {
   final VerifyOperatorIdentity verifyOperatorIdentity;
   final CacScannerStrategy cacScanner;
   final ProfileRepository profileRepository;
-  final SnackBarService snackBarService;
+  final ReportsRepository reportsRepository;
+  final Clock clock;
+  final FaultSuggestionController suggestions;
+  final bool _ownsSuggestions;
+  PmcsHistory? history;
+  bool historyUnavailable = false;
+
+  final void Function(PmcsReport report)? onReportSubmitted;
+  final UserNotificationSink snackBarService;
 
   InspectionViewModel({
     required this.catalogSource,
@@ -71,10 +92,48 @@ class InspectionViewModel extends ChangeNotifier {
     required this.verifyOperatorIdentity,
     required this.cacScanner,
     required this.profileRepository,
-    SnackBarService? snackBarService,
-  }) : snackBarService = snackBarService ?? SnackBarService.instance {
+    required this.reportsRepository,
+    this.clock = const SystemClock(),
+    this.onReportSubmitted,
+    FaultSuggestionController? suggestions,
+    UserNotificationSink? snackBarService,
+  })  : suggestions = suggestions ??
+            FaultSuggestionController(reportsRepository,
+                notifications: snackBarService),
+        _ownsSuggestions = suggestions == null,
+        snackBarService = snackBarService ?? SnackBarService.instance {
+    identityScan = CacScanController(
+      cacScanner: cacScanner,
+      verifyOperatorIdentity: verifyOperatorIdentity,
+    )..addListener(notifyListeners);
+    dictation = FaultDictationController(
+      speech: speechStrategy,
+      notifications: this.snackBarService,
+    )..addListener(notifyListeners);
+    deliverySubscription = publishPmcsReport.delivery.changes.listen((_) {
+      if (submittedReport != null) notifyListeners();
+    });
     final vehicles = catalogSource.supportedVehicles;
     if (vehicles.isNotEmpty) selectedVehicle = vehicles.first;
+  }
+
+  late final StreamSubscription<void> deliverySubscription;
+
+  DeliveryStatus? deliveryStatus(TransportKind transport) => submittedReport ==
+          null
+      ? null
+      : publishPmcsReport.delivery.status(submittedReport!.entityId, transport);
+
+  @override
+  void dispose() {
+    if (_ownsSuggestions) suggestions.dispose();
+    deliverySubscription.cancel();
+    identityScan.removeListener(notifyListeners);
+    identityScan.dispose();
+    dictation.removeListener(notifyListeners);
+    dictation.dispose();
+    submittedReport = null;
+    super.dispose();
   }
 
   InspectionStage stage = InspectionStage.setup;
@@ -82,43 +141,28 @@ class InspectionViewModel extends ChangeNotifier {
   PmcsCatalog? catalog;
   VehicleType selectedVehicle = VehicleType.stryker;
   PhaseWorkspace? workspace;
+  bool reviewingSummaryFault = false;
+  PmcsReport? submittedReport;
+  PublishResult? submissionDelivery;
+  bool submissionDeliveryFailed = false;
   Profile? profile;
   List<PmcsFault> sessionFaults = [];
   List<PmcsSession> openSessions = [];
+  final Map<PmcsPhase, int> phaseAnswerCounts = {};
   String? pendingScrollItemId;
   bool isBusy = false;
-  bool isListening = false;
-  String? listeningItemId;
+  late final FaultDictationController dictation;
+  bool get isListening => dictation.isListening;
+  String? get listeningItemId => dictation.listeningItemId;
 
-  /// The most recent CAC read, or the reason it did not happen. Null means
-  /// the operator has not tried yet.
-  CacScan? lastScan;
+  late final CacScanController identityScan;
 
-  /// True while the camera is open or the frame is being decoded. Separate
-  /// from [isBusy] so the sign-off card can show its own progress without
-  /// greying out the rest of the summary.
-  bool isScanning = false;
-
-  /// Whether this build can reach a camera at all. Resolved once at [load],
-  /// so a Soldier on a device without one is told at the summary rather than
-  /// after they have tapped scan.
+  CacScan? get lastScan => identityScan.lastScan;
+  set lastScan(CacScan? value) => identityScan.lastScan = value;
+  bool get isScanning => identityScan.isScanning;
+  int get scanAttempts => identityScan.scanAttempts;
+  set scanAttempts(int value) => identityScan.scanAttempts = value;
   bool cacScannerAvailable = true;
-
-  /// How many scans have been tried since the last CAC actually read. Zeroed
-  /// on a verified read, not on a rejection — the escalating advice under the
-  /// refused card is counting misses in a row, and a Soldier who finally got
-  /// the card in frame should not be lectured about glare on the next one.
-  int scanAttempts = 0;
-
-  /// Serial number of the scan currently owed an answer.
-  ///
-  /// Every path that walks away from a scan bumps this — [cancelScan],
-  /// [backToPhases], [resetToSetup] — and [scanCac] refuses to write anything
-  /// once its own number is stale. Without it the realistic sequence is a
-  /// latch: the operator cancels a camera that never came back, taps SCAN
-  /// AGAIN, and the abandoned capture finally lands and overwrites the live
-  /// scan with an answer nobody is waiting for.
-  int scanGeneration = 0;
 
   Future<void> load() async {
     isBusy = true;
@@ -127,8 +171,8 @@ class InspectionViewModel extends ChangeNotifier {
       profile = await profileRepository.getProfile();
       openSessions = await loadOpenSessions();
       cacScannerAvailable = await cacScanner.isAvailable();
-    } catch (e) {
-      debugPrint('[IvyPulse] load error: $e');
+    } catch (error) {
+      debugPrint('[IvyPulse] load error: $error');
     }
     isBusy = false;
     notifyListeners();
@@ -137,6 +181,28 @@ class InspectionViewModel extends ChangeNotifier {
   void selectVehicle(VehicleType vehicleType) {
     selectedVehicle = vehicleType;
     notifyListeners();
+  }
+
+  ({String bumperNumber, String uic})? pendingPrefill;
+
+  bool prefillVehicle({
+    required String bumperNumber,
+    required String uic,
+    required VehicleType vehicleType,
+  }) {
+    if (stage != InspectionStage.setup && stage != InspectionStage.submitted) {
+      return false;
+    }
+    selectedVehicle = vehicleType;
+    pendingPrefill = (bumperNumber: bumperNumber, uic: uic);
+    notifyListeners();
+    return true;
+  }
+
+  ({String bumperNumber, String uic})? takePrefill() {
+    final prefill = pendingPrefill;
+    pendingPrefill = null;
+    return prefill;
   }
 
   Future<bool> beginSession({
@@ -161,17 +227,20 @@ class InspectionViewModel extends ChangeNotifier {
         uic: uic,
       );
       catalog = catalogSource.catalogFor(selectedVehicle);
+      await loadHistory();
       sessionFaults = [];
       workspace = null;
+      phaseAnswerCounts.clear();
+      submittedReport = null;
+      submissionDelivery = null;
+      submissionDeliveryFailed = false;
+      reviewingSummaryFault = false;
       stage = InspectionStage.phaseSelect;
-    } catch (e) {
-      debugPrint('[IvyPulse] beginSession failed: $e');
-      snackBarService.enqueue('Could not start PMCS — $e', isError: true);
+    } catch (error) {
+      debugPrint('[IvyPulse] beginSession failed: $error');
+      snackBarService.enqueue('Could not start PMCS — $error', isError: true);
       return false;
     } finally {
-      // Cleared in a finally throughout this class: a latched isBusy disables
-      // the very button that would let the operator try again, and there is no
-      // way out of that short of restarting the extension.
       isBusy = false;
       notifyListeners();
     }
@@ -182,15 +251,14 @@ class InspectionViewModel extends ChangeNotifier {
   }
 
   Future<void> resumeSession(PmcsSession open) async {
+    if (isBusy) return;
     isBusy = true;
     notifyListeners();
 
     try {
       catalog = catalogSource.catalogFor(open.vehicleType);
-    } on StateError catch (e) {
-      // A session stored by a build that carried a platform this one does not
-      // cannot be walked — say so rather than opening an empty checklist.
-      debugPrint('[IvyPulse] resumeSession — no catalog: $e');
+    } on StateError catch (error) {
+      debugPrint('[IvyPulse] resumeSession — no catalog: $error');
       snackBarService.enqueue(
         'No PMCS catalog for ${open.vehicleType.displayName}',
         isError: true,
@@ -202,18 +270,56 @@ class InspectionViewModel extends ChangeNotifier {
 
     try {
       session = open;
+      await loadHistory();
       selectedVehicle = open.vehicleType;
       sessionFaults = await faultsRepository.getForSession(open.sessionId);
+      final savedWorkspaces =
+          await Future.wait(PmcsPhase.values.map((phase) async {
+        final saved = await resultsRepository.getResults(open.sessionId, phase);
+        return PhaseWorkspace(
+          phase: phase,
+          categories: catalog!.categoriesFor(phase),
+          results: saved,
+        );
+      }));
+      phaseAnswerCounts
+        ..clear()
+        ..addEntries(savedWorkspaces
+            .map((saved) => MapEntry(saved.phase, saved.answeredCount)));
+
       workspace = null;
-      stage = InspectionStage.phaseSelect;
+      DateTime? latestAnswerAt;
+      for (final saved in savedWorkspaces) {
+        if (open.isPhaseComplete(saved.phase)) continue;
+        for (final item in saved.items) {
+          final answer = saved.resultFor(item.id);
+          if (answer == null) continue;
+          if (latestAnswerAt == null ||
+              answer.recordedAt.isAfter(latestAnswerAt)) {
+            latestAnswerAt = answer.recordedAt;
+            workspace = saved;
+          }
+        }
+      }
+      pendingScrollItemId = workspace?.nextUnansweredItemId;
+      reviewingSummaryFault = false;
+      stage = workspace != null
+          ? InspectionStage.inspecting
+          : open.hasStartedAnyPhase
+              ? InspectionStage.summary
+              : InspectionStage.phaseSelect;
 
       debugPrint('[IvyPulse] resumeSession — ${open.sessionId}, '
-          '${open.remainingPhases.length} phase(s) remaining');
-    } catch (e) {
-      debugPrint('[IvyPulse] resumeSession failed: $e');
-      snackBarService.enqueue('Could not resume PMCS — $e', isError: true);
+          '${workspace?.phase.wireName ?? stage.name}');
+    } catch (error) {
+      debugPrint('[IvyPulse] resumeSession failed: $error');
+      snackBarService.enqueue('Could not resume PMCS — $error', isError: true);
       session = null;
       catalog = null;
+      workspace = null;
+      pendingScrollItemId = null;
+      reviewingSummaryFault = false;
+      phaseAnswerCounts.clear();
       stage = InspectionStage.setup;
     } finally {
       isBusy = false;
@@ -223,24 +329,23 @@ class InspectionViewModel extends ChangeNotifier {
 
   Future<void> openPhase(PmcsPhase phase) async {
     final current = session;
-    if (current == null) return;
+    if (current == null || isBusy) return;
 
     isBusy = true;
     notifyListeners();
 
     try {
-      // Anything already answered arrives folded away, so a resumed phase
-      // opens on the first check still owed, not a wall of finished ones.
       workspace = PhaseWorkspace(
         phase: phase,
         categories: catalog?.categoriesFor(phase) ?? const [],
         results: await resultsRepository.getResults(current.sessionId, phase),
       );
+      phaseAnswerCounts[phase] = workspace!.answeredCount;
       pendingScrollItemId = nextUnansweredItemId;
       stage = InspectionStage.inspecting;
-    } catch (e) {
-      debugPrint('[IvyPulse] openPhase failed: $e');
-      snackBarService.enqueue('Could not open ${phase.label} — $e',
+    } catch (error) {
+      debugPrint('[IvyPulse] openPhase failed: $error');
+      snackBarService.enqueue('Could not open ${phase.label} — $error',
           isError: true);
       workspace = null;
       stage = InspectionStage.phaseSelect;
@@ -250,85 +355,121 @@ class InspectionViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> answer(PmcsCheckItem item, int faultIndex) async {
+  Future<void> answer(PmcsCheckItem item, int faultIndex,
+      {String? suggestedNote}) async {
     final current = session;
     final open = workspace;
-    if (current == null || open == null) return;
+    if (current == null || open == null || isBusy) return;
 
-    final result = await recordCheckResult(
-      sessionId: current.sessionId,
-      phase: open.phase,
-      item: item,
-      faultIndex: faultIndex,
-      // A note describes the deficiency that was there; calling the component
-      // serviceable retires it.
-      note: faultIndex == 0 ? null : open.resultFor(item.id)?.note,
-    );
-
-    open.record(result);
-    pendingScrollItemId = open.expandedItemId;
+    isBusy = true;
     notifyListeners();
+    try {
+      if (isListening) await stopNoteDictation(discardResult: true);
+      final result = await recordCheckResult(
+        sessionId: current.sessionId,
+        phase: open.phase,
+        item: item,
+        faultIndex: faultIndex,
+        note: faultIndex == 0
+            ? null
+            : (suggestedNote ?? open.resultFor(item.id)?.note),
+      );
+      open.record(result);
+      phaseAnswerCounts[open.phase] = open.answeredCount;
+      pendingScrollItemId = open.expandedItemId;
+    } catch (error) {
+      debugPrint('[IvyPulse] answer failed: $error');
+      snackBarService.enqueue(
+        'Could not save ${item.item}. Your previous answers are kept. '
+        'Tap the condition again to retry.',
+        isError: true,
+      );
+    } finally {
+      isBusy = false;
+      notifyListeners();
+    }
   }
 
   void expandItem(String itemId) {
+    if (isBusy) return;
     workspace?.expand(itemId);
     notifyListeners();
   }
 
   void collapseItem(String itemId) {
+    if (isBusy) return;
     workspace?.collapse(itemId);
     notifyListeners();
   }
 
+  void continueToNextCheck() {
+    final next = nextUnansweredItemId;
+    if (next == null || isBusy) return;
+    workspace?.expand(next);
+    pendingScrollItemId = next;
+    notifyListeners();
+  }
+
   Future<void> toggleNoteDictation(PmcsCheckItem item) async {
-    if (isListening && listeningItemId == item.id) {
-      await stopNoteDictation();
+    final open = workspace;
+    if (open == null || open.resultFor(item.id)?.isFault != true || isBusy) {
       return;
     }
-    if (isListening) await stopNoteDictation();
-
-    isListening = true;
-    listeningItemId = item.id;
-    notifyListeners();
-
-    await speechStrategy.startListening(
-      onResult: (text) async {
-        isListening = false;
-        listeningItemId = null;
-        notifyListeners();
-        await attachNote(item, text);
-      },
+    await dictation.toggle(
+      itemId: item.id,
+      isCurrent: () => identical(workspace, open),
+      onResult: (text) => attachNote(item, text),
     );
   }
 
-  Future<void> stopNoteDictation() async {
-    await speechStrategy.stopListening();
-    isListening = false;
-    listeningItemId = null;
-    notifyListeners();
+  Future<void> stopNoteDictation({bool discardResult = false}) =>
+      dictation.stop(discardResult: discardResult);
+
+  Future<void> attachNote(PmcsCheckItem item, String note) async {
+    if (note.trim().isEmpty) return;
+    final description = note.trim().characters;
+    if (!await saveNote(
+        item, description.take(maxFaultDescriptionLength).toString())) {
+      snackBarService.enqueue(
+          'Could not save the description. Try typing it again.',
+          isError: true);
+    } else if (description.length > maxFaultDescriptionLength) {
+      snackBarService.enqueue(
+          'Description limited to 155 characters. Use Edit description to review it.');
+    }
   }
 
-  /// Re-records the existing answer with [note] attached — the note rides the
-  /// fault onto the 5988-E, so it has to live on the stored result.
-  Future<void> attachNote(PmcsCheckItem item, String note) async {
+  Future<bool> saveNote(PmcsCheckItem item, String note) async {
     final current = session;
     final open = workspace;
     final existing = open?.resultFor(item.id);
-    if (current == null || open == null || existing == null) return;
-    if (note.trim().isEmpty) return;
-
-    open.record(await recordCheckResult(
-      sessionId: current.sessionId,
-      phase: open.phase,
-      item: item,
-      faultIndex: existing.faultIndex,
-      note: note.trim(),
-    ));
+    if (current == null ||
+        open == null ||
+        existing?.isFault != true ||
+        isBusy) {
+      return false;
+    }
+    isBusy = true;
     notifyListeners();
+    try {
+      final trimmed = note.trim();
+      open.results[item.id] = await recordCheckResult(
+        sessionId: current.sessionId,
+        phase: open.phase,
+        item: item,
+        faultIndex: existing!.faultIndex,
+        note: trimmed.isEmpty ? null : trimmed,
+      );
+      return true;
+    } catch (error) {
+      debugPrint('[IvyPulse] saveNote failed: $error');
+      return false;
+    } finally {
+      isBusy = false;
+      notifyListeners();
+    }
   }
 
-  /// Hands the page the item it should scroll to, once. Scrolling needs a
-  /// [BuildContext] the view model must never hold.
   String? consumePendingScroll() {
     final itemId = pendingScrollItemId;
     pendingScrollItemId = null;
@@ -339,13 +480,14 @@ class InspectionViewModel extends ChangeNotifier {
     final current = session;
     final open = workspace;
     final loaded = catalog;
-    if (current == null || open == null || loaded == null) return;
+    if (current == null || open == null || loaded == null || isBusy) return;
     final phase = open.phase;
 
     isBusy = true;
     notifyListeners();
 
     try {
+      if (isListening) await stopNoteDictation(discardResult: true);
       final outcome = await completePhase(
         session: current,
         phase: phase,
@@ -357,17 +499,14 @@ class InspectionViewModel extends ChangeNotifier {
       sessionFaults = await faultsRepository.getForSession(current.sessionId);
       workspace = null;
       pendingScrollItemId = null;
-      stage = outcome.session.allPhasesComplete
-          ? InspectionStage.summary
-          : InspectionStage.phaseSelect;
+      stage = InspectionStage.summary;
+      reviewingSummaryFault = false;
 
       debugPrint('[IvyPulse] completeActivePhase — ${phase.wireName}, '
           '${outcome.faults.length} fault(s)');
-    } catch (e) {
-      // The answers are already on disk, so the phase is not lost — the
-      // operator stays on it and can close it out again.
-      debugPrint('[IvyPulse] completeActivePhase failed: $e');
-      snackBarService.enqueue('Could not close out ${phase.label} — $e',
+    } catch (error) {
+      debugPrint('[IvyPulse] completeActivePhase failed: $error');
+      snackBarService.enqueue('Could not close out ${phase.label} — $error',
           isError: true);
     } finally {
       isBusy = false;
@@ -380,118 +519,56 @@ class InspectionViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> reviewFault(PmcsFault fault) async {
+    if (isBusy || session == null) return;
+    await reviewPhase(fault.phase);
+    final open = workspace;
+    if (!reviewingSummaryFault || open == null) return;
+    if (!open.items.any((item) => item.id == fault.itemId)) return;
+    open.expand(fault.itemId);
+    pendingScrollItemId = fault.itemId;
+    notifyListeners();
+  }
+
+  Future<void> reviewPhase(PmcsPhase phase) async {
+    if (isBusy || session == null) return;
+    await openPhase(phase);
+    final open = workspace;
+    if (stage != InspectionStage.inspecting || open == null) return;
+    reviewingSummaryFault = true;
+    notifyListeners();
+  }
+
+  Future<void> returnToSummary() async {
+    if (isBusy) return;
+    if (workspace?.isComplete == true) {
+      await completeActivePhase();
+    } else {
+      backToPhases();
+    }
+  }
+
   void backToPhases() {
+    if (isBusy) return;
+    if (isListening) stopNoteDictation(discardResult: true);
     workspace = null;
+    reviewingSummaryFault = false;
     pendingScrollItemId = null;
-    lastScan = null;
-    // Every scan-shaped field goes together. Leaving isScanning set here was
-    // an unrecoverable latch: scanCac's own guard then refused every retry,
-    // the scanning card renders no buttons, and the view model is a lazy
-    // singleton — the only way out was killing the extension with a walked
-    // PMCS inside it.
-    isScanning = false;
-    scanAttempts = 0;
-    scanGeneration++;
+    identityScan.reset();
     stage = InspectionStage.phaseSelect;
     notifyListeners();
   }
 
-  /// Reads the operator's CAC. Leaves the result on [lastScan] for the
-  /// sign-off card to render — a rejection is information the operator acts
-  /// on, not an error to swallow.
-  Future<void> scanCac() async {
-    if (isScanning) return;
+  Future<void> scanCac() => identityScan.scan();
 
-    final generation = ++scanGeneration;
-    isScanning = true;
-    scanAttempts++;
-    lastScan = null;
-    notifyListeners();
+  void untallyAttempt() => identityScan.untallyAttempt();
 
-    CacScan outcome;
-    try {
-      outcome = await verifyOperatorIdentity();
-      debugPrint('[IvyPulse] scanCac — attempt $scanAttempts, '
-          '${outcome.isVerified ? 'verified' : outcome.rejection!.name}');
-    } catch (e) {
-      // A thrown scanner is still just a scan that did not happen; the
-      // operator keeps every way out they had before.
-      debugPrint('[IvyPulse] scanCac failed: $e');
-      outcome = const CacScan.rejected(CacRejection.noCodeFound);
-    }
+  void cancelScan() => identityScan.cancelScan();
 
-    // The operator gave up on this scan while it was still open — cancelled
-    // it, or backed out to the phases. The camera is a separate activity that
-    // can deliver its photo long afterwards, and writing it here would drag
-    // them back onto a scan they have already left, or re-latch isScanning
-    // over a capture that has since been replaced by a live one.
-    if (generation != scanGeneration) {
-      debugPrint('[IvyPulse] scanCac — result for abandoned scan, dropped');
-      return;
-    }
-
-    lastScan = outcome;
-    if (outcome.isVerified) {
-      scanAttempts = 0;
-    } else if (outcome.rejection == CacRejection.cameraTimedOut) {
-      // The camera never came back, so no frame was ever judged. Counting it
-      // would spend one of the operator's attempts on advice about how they
-      // held the card — see [cancelScan] for why that is worse than useless.
-      untallyAttempt();
-    }
-    isScanning = false;
-    notifyListeners();
-  }
-
-  /// Takes back the attempt [scanCac] optimistically counted when a scan ends
-  /// without the camera ever judging a frame.
-  ///
-  /// [scanAttempts] drives two things that must only ever answer to frames the
-  /// decoder actually looked at: the escalating retry hint, and whether SCAN
-  /// AGAIN or SUBMIT UNVERIFIED leads the refused card. A Soldier who backs out
-  /// of the chooser twice has photographed nothing, so telling them to turn the
-  /// card sideways to kill glare is a confident instruction about a frame that
-  /// does not exist — and steering them to an unverified 5988-E because the
-  /// camera was fumbled, rather than because the card would not read, is worse.
-  void untallyAttempt() {
-    if (scanAttempts > 0) scanAttempts--;
-  }
-
-  /// Gives up on a scan the operator is tired of waiting for.
-  ///
-  /// Deliberately not routed through [scanCac]: that method's
-  /// `if (isScanning) return` guard is what stops a double tap opening two
-  /// cameras, and it would swallow this too.
-  ///
-  /// Lands the operator on the refused card — SCAN AGAIN and SUBMIT
-  /// UNVERIFIED, the two things they can actually do — rather than inventing
-  /// a fifth sign-off state that would say the same thing with no controls on
-  /// it. The scanner is told as well, but nothing waits on it: the camera is
-  /// a full-screen activity the WebView does not own, so [CacScannerStrategy]
-  /// cannot close it and only promises to drop whatever lands later.
-  void cancelScan() {
-    if (!isScanning) return;
-
-    scanGeneration++;
-    isScanning = false;
-    untallyAttempt();
-    lastScan = const CacScan.rejected(CacRejection.cancelled);
-    notifyListeners();
-
-    cacScanner.cancel().catchError((Object e) {
-      debugPrint('[IvyPulse] cancelScan — scanner refused the cancel: $e');
-    });
-  }
-
-  /// True once a CAC has been read and accepted — the only state from which
-  /// an ordinary submit is allowed.
   bool get isSignedOff => lastScan?.isVerified ?? false;
 
-  /// True when the operator has tried and been refused, which is the only
-  /// state that may be overridden.
   bool get canSubmitUnverified => lastScan != null && !lastScan!.isVerified;
 
-  /// Submits under the scanned CAC.
   Future<void> submit() async {
     if (session == null) return;
 
@@ -510,12 +587,6 @@ class InspectionViewModel extends ChangeNotifier {
     ));
   }
 
-  /// Submits with the signature block explicitly marked unverified, carrying
-  /// the reason the scan could not happen.
-  ///
-  /// The report still goes to the maintainer — a deadlining fault nobody can
-  /// see is worse than one signed by a name the app could not check — but it
-  /// goes out saying so, on disk and on both transports.
   Future<void> submitUnverified() async {
     if (session == null) return;
 
@@ -527,20 +598,48 @@ class InspectionViewModel extends ChangeNotifier {
 
     await submitWith(PmcsSignature.unverified(
       blockedBy: rejection,
-      signedAt: DateTime.now().toUtc(),
+      signedAt: clock.nowUtc(),
+    ));
+  }
+
+  Future<void> submitAttested({
+    required String lastName,
+    required String firstName,
+    required String edipi,
+  }) async {
+    if (session == null) return;
+
+    final rejection = lastScan?.rejection;
+    if (rejection == null) {
+      snackBarService.enqueue('Scan a CAC before submitting', isError: true);
+      return;
+    }
+
+    final parsed = AttestedIdentity.parse(
+      lastName: lastName,
+      firstName: firstName,
+      edipi: edipi,
+    );
+    final identity = parsed.identity;
+    if (identity == null) {
+      snackBarService.enqueue(parsed.error!, isError: true);
+      return;
+    }
+
+    await submitWith(PmcsSignature.unverified(
+      blockedBy: rejection,
+      signedAt: clock.nowUtc(),
+      attestedBy: identity,
     ));
   }
 
   Future<void> submitWith(PmcsSignature signature) async {
     final current = session;
-    if (current == null) return;
+    if (current == null || isBusy) return;
 
     isBusy = true;
     notifyListeners();
 
-    // Stamped on the session before it is closed out, so the signature lands
-    // on the stored report, the session row, and both wire payloads from the
-    // single object all three are built from.
     final signed = current.copyWith(
       signature: signature,
       operator: signature.displayName,
@@ -550,10 +649,9 @@ class InspectionViewModel extends ChangeNotifier {
     final PmcsReport report;
     try {
       report = await submitSession(signed);
-    } catch (e) {
-      // Nothing was stored, so the session is intact and still submittable.
-      debugPrint('[IvyPulse] submit failed: $e');
-      snackBarService.enqueue('Could not submit PMCS — $e', isError: true);
+    } catch (error) {
+      debugPrint('[IvyPulse] submit failed: $error');
+      snackBarService.enqueue('Could not submit PMCS — $error', isError: true);
       isBusy = false;
       notifyListeners();
       return;
@@ -561,12 +659,22 @@ class InspectionViewModel extends ChangeNotifier {
     debugPrint('[IvyPulse] submit — ${report.entityId} '
         '${report.statusLabel}, ${report.faults.length} fault(s)');
 
-    // The report is on disk before a packet leaves the device, so the operator
-    // is released the moment it is stored — the two transports report in on
-    // their own time and park themselves on the queue if they cannot.
-    publishPmcsReport(report).then(announceLegOutcomes).catchError((e) {
-      debugPrint('[IvyPulse] Publish error: $e');
-      snackBarService.enqueue('Publish error: $e', isError: true);
+    onReportSubmitted?.call(report);
+
+    await resetToSetup();
+    submittedReport = report;
+    stage = InspectionStage.submitted;
+    notifyListeners();
+
+    publishPmcsReport(report).then((outcome) {
+      if (!identical(submittedReport, report)) return;
+      submissionDelivery = outcome;
+      notifyListeners();
+    }).catchError((error) {
+      debugPrint('[IvyPulse] Publish error: $error');
+      if (!identical(submittedReport, report)) return;
+      submissionDeliveryFailed = true;
+      notifyListeners();
     });
 
     snackBarService.enqueue(
@@ -575,7 +683,6 @@ class InspectionViewModel extends ChangeNotifier {
           : 'PMCS submitted UNVERIFIED — ${report.statusLabel}',
       isError: !signature.isVerified,
     );
-    await resetToSetup();
   }
 
   void announceLegOutcomes(PublishResult outcome) {
@@ -603,9 +710,9 @@ class InspectionViewModel extends ChangeNotifier {
     try {
       await abandonSession(current.sessionId);
       debugPrint('[IvyPulse] discardSession — ${current.sessionId}');
-    } catch (e) {
-      debugPrint('[IvyPulse] discardSession failed: $e');
-      snackBarService.enqueue('Could not discard PMCS — $e', isError: true);
+    } catch (error) {
+      debugPrint('[IvyPulse] discardSession failed: $error');
+      snackBarService.enqueue('Could not discard PMCS — $error', isError: true);
       isBusy = false;
       notifyListeners();
       return;
@@ -614,23 +721,24 @@ class InspectionViewModel extends ChangeNotifier {
   }
 
   Future<void> resetToSetup() async {
+    history = null;
+    historyUnavailable = false;
     session = null;
     catalog = null;
     workspace = null;
+    reviewingSummaryFault = false;
+    submittedReport = null;
+    submissionDelivery = null;
+    submissionDeliveryFailed = false;
     sessionFaults = [];
+    phaseAnswerCounts.clear();
     pendingScrollItemId = null;
-    lastScan = null;
-    // Same three as backToPhases, for the same reason, and because this runs
-    // after every submit: a scan state left standing here bleeds one vehicle's
-    // sign-off into the next vehicle's PMCS.
-    isScanning = false;
-    scanAttempts = 0;
-    scanGeneration++;
+    identityScan.reset();
     stage = InspectionStage.setup;
     try {
       openSessions = await loadOpenSessions();
-    } catch (e) {
-      debugPrint('[IvyPulse] resetToSetup: could not reload sessions: $e');
+    } catch (error) {
+      debugPrint('[IvyPulse] resetToSetup: could not reload sessions: $error');
       openSessions = [];
     } finally {
       isBusy = false;
@@ -640,11 +748,46 @@ class InspectionViewModel extends ChangeNotifier {
 
   PmcsPhase? get activePhase => workspace?.phase;
 
+  Future<void> loadHistory() async {
+    final current = session;
+    history = null;
+    historyUnavailable = false;
+    if (current == null) return;
+    try {
+      final reports = await reportsRepository.getAllReports();
+      final withdrawn = await reportsRepository.getWithdrawnIds();
+      if (session?.sessionId != current.sessionId) return;
+      history = PmcsHistory.forVehicle(
+        reports.where((report) => !withdrawn.contains(report.entityId)),
+        bumperNumber: current.bumperNumber,
+        uic: current.uic,
+        vehicleType: current.vehicleType,
+        before: current.startedAt,
+        excluding: current.sessionId,
+      );
+    } catch (_) {
+      historyUnavailable = true;
+    }
+    await suggestions.load();
+  }
+
+  List<HistoricalFault> get summarySuggestions =>
+      history?.suggestedUnresolved
+          .where((suggestion) =>
+              session?.completedPhases.contains(suggestion.fault.phase) != true)
+          .toList() ??
+      const [];
+
+  List<PhaseComparison> get comparisons => [
+        if (history != null)
+          for (final phase in session?.completedPhases ?? <PmcsPhase>[])
+            history!.compare(phase, sessionFaults),
+      ];
+
   Map<String, CheckResult> get results => workspace?.results ?? const {};
 
   Set<String> get collapsedItemIds => workspace?.collapsedItemIds ?? const {};
 
-  /// The one check open at full size, if any.
   String? get expandedItemId => workspace?.expandedItemId;
 
   bool isItemExpanded(String itemId) => workspace?.isExpanded(itemId) ?? false;
@@ -654,6 +797,8 @@ class InspectionViewModel extends ChangeNotifier {
   List<PmcsCheckItem> get phaseItems => workspace?.items ?? const [];
 
   int get answeredCount => workspace?.answeredCount ?? 0;
+
+  int answeredCountFor(PmcsPhase phase) => phaseAnswerCounts[phase] ?? 0;
 
   int get totalCount => workspace?.totalCount ?? 0;
 

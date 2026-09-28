@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:ivy_pulse/data/datasources/local/database.dart';
 import 'package:ivy_pulse/data/datasources/local/tables/pmcs_reports_table.dart';
+import 'package:ivy_pulse/domain/repositories/reports_repo.dart';
 
 part 'pmcs_reports_dao.g.dart';
 
@@ -9,9 +10,31 @@ class PmcsReportsDao extends DatabaseAccessor<AppDatabase>
     with _$PmcsReportsDaoMixin {
   PmcsReportsDao(super.db);
 
+  Future<Set<String>> getDismissedFaultSuggestions() async => {
+        for (final row
+            in await select(attachedDatabase.dismissedFaultSuggestions).get())
+          row.suggestionId,
+      };
+
+  Future<void> setFaultSuggestionDismissed(String id, bool dismissed) async {
+    final table = attachedDatabase.dismissedFaultSuggestions;
+    if (dismissed) {
+      await into(table).insert(
+        DismissedFaultSuggestionsCompanion.insert(suggestionId: id),
+        mode: InsertMode.insertOrIgnore,
+      );
+    } else {
+      await (delete(table)
+            ..where(
+                (suggestionTable) => suggestionTable.suggestionId.equals(id)))
+          .go();
+    }
+  }
+
   Future<List<PmcsReportData>> getAllReports() {
     return (select(pmcsReports)
-          ..orderBy([(t) => OrderingTerm.desc(t.timestamp)]))
+          ..orderBy(
+              [(reportTable) => OrderingTerm.desc(reportTable.timestamp)]))
         .get();
   }
 
@@ -30,35 +53,70 @@ class PmcsReportsDao extends DatabaseAccessor<AppDatabase>
     required DateTime timestamp,
     required bool isOutgoing,
     required bool isRead,
-  }) async {
-    return into(pmcsReports).insert(
-      PmcsReportsCompanion.insert(
-        entityId: entityId,
-        fromCallsign: fromCallsign,
-        bumperNumber: bumperNumber,
-        vehicleType: vehicleType,
-        operator: operator,
-        uic: uic,
-        phases: phases,
-        faultsJson: faultsJson,
-        signatureJson: Value(signatureJson),
-        latitude: latitude,
-        longitude: longitude,
-        timestamp: timestamp,
-        isOutgoing: Value(isOutgoing),
-        isRead: Value(isRead),
-      ),
-    );
-  }
+  }) =>
+      transaction(() async {
+        if ((await getWithdrawnIds()).contains(entityId)) {
+          throw ReportWithdrawn(entityId);
+        }
+        await into(pmcsReports).insert(
+          PmcsReportsCompanion.insert(
+            entityId: entityId,
+            fromCallsign: fromCallsign,
+            bumperNumber: bumperNumber,
+            vehicleType: vehicleType,
+            operator: operator,
+            uic: uic,
+            phases: phases,
+            faultsJson: faultsJson,
+            signatureJson: Value(signatureJson),
+            latitude: latitude,
+            longitude: longitude,
+            timestamp: timestamp,
+            isOutgoing: Value(isOutgoing),
+            isRead: Value(isRead),
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
+        final row = await (select(pmcsReports)
+              ..where((reportTable) => reportTable.entityId.equals(entityId))
+              ..orderBy([(reportTable) => OrderingTerm.desc(reportTable.id)])
+              ..limit(1))
+            .getSingle();
+        return row.id;
+      });
+
+  Future<Set<String>> getWithdrawnIds() async => {
+        for (final row
+            in await select(attachedDatabase.reportWithdrawals).get())
+          row.entityId,
+      };
+
+  Future<void> withdrawReport(String entityId) => transaction(() async {
+        await into(attachedDatabase.reportWithdrawals).insert(
+          ReportWithdrawalsCompanion.insert(entityId: entityId),
+          mode: InsertMode.insertOrIgnore,
+        );
+        await (delete(pmcsReports)
+              ..where((reportTable) => reportTable.entityId.equals(entityId)))
+            .go();
+      });
+
+  Future<PmcsReportData> getById(int id) =>
+      (select(pmcsReports)..where((reportTable) => reportTable.id.equals(id)))
+          .getSingle();
 
   Future<void> markAsRead(int id) async {
-    await (update(pmcsReports)..where((t) => t.id.equals(id))).write(
+    await (update(pmcsReports)
+          ..where((reportTable) => reportTable.id.equals(id)))
+        .write(
       const PmcsReportsCompanion(isRead: Value(true)),
     );
   }
 
   Future<void> markAllAsRead() async {
-    await (update(pmcsReports)..where((t) => t.isRead.equals(false))).write(
+    await (update(pmcsReports)
+          ..where((reportTable) => reportTable.isRead.equals(false)))
+        .write(
       const PmcsReportsCompanion(isRead: Value(true)),
     );
   }

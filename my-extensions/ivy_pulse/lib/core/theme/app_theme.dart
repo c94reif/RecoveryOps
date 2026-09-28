@@ -12,58 +12,38 @@ const Color textPrimary = Color(0xFFE8EAED);
 const Color textSecondary = Color(0xFF9AA0A8);
 const Color greenGlow = Color(0x264A7820);
 
-// ── PMCS status palette ──────────────────────────────────────────────────
-// Fault symbols must read at arm's length in sunlight and stay distinguishable
-// to the red-green colour blind, so severity is carried by shape and label in
-// the UI as well as by these colours.
-
-/// Serviceable — the operator found nothing wrong.
 const Color serviceableGreen = Color(0xFF3FA34D);
 const Color serviceableGlow = Color(0x263FA34D);
 
-/// RED X — Not Mission Capable, the vehicle is deadlined.
 const Color redXRed = Color(0xFFD64545);
 const Color redXGlow = Color(0x26D64545);
 
-/// CIRCLE X — operable only on a commander-approved mission-essential run.
 const Color circleXAmber = Color(0xFFD9A125);
 const Color circleXGlow = Color(0x26D9A125);
 
-/// DASH — a minor deficiency that may be deferred.
 const Color dashBlue = Color(0xFF4A90D9);
 const Color dashGlow = Color(0x264A90D9);
 
-/// Colour for a fault symbol.
 Color severityColor(FaultSeverity severity) => switch (severity) {
       FaultSeverity.redX => redXRed,
       FaultSeverity.circleX => circleXAmber,
       FaultSeverity.dash => dashBlue,
     };
 
-/// Translucent fill matching [severityColor], for chips and card backgrounds.
 Color severityGlow(FaultSeverity severity) => switch (severity) {
       FaultSeverity.redX => redXGlow,
       FaultSeverity.circleX => circleXGlow,
       FaultSeverity.dash => dashGlow,
     };
 
-/// Redundant glyph so severity is never conveyed by colour alone.
 IconData severityIcon(FaultSeverity severity) => switch (severity) {
       FaultSeverity.redX => Icons.dangerous_outlined,
       FaultSeverity.circleX => Icons.error_outline,
       FaultSeverity.dash => Icons.remove_circle_outline,
     };
 
-// ── Touch targets ────────────────────────────────────────────────────────
-// Lattice Edge is operated in gloves. Nothing tappable goes below these.
-
-/// Minimum height for any tappable control.
 const double minTouchTarget = 48;
 
-/// Height for the fault-selection buttons. Above the 48px minimum so a
-/// two-line condition still reads, but no taller — the panel the host gives
-/// this extension is barely 370 logical pixels high in landscape, and a whole
-/// TM check has to fit inside it.
 const double faultButtonHeight = 52;
 
 final ThemeData appTheme = ThemeData(

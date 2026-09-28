@@ -54,11 +54,32 @@ void main() {
 
   test('a readable barcode is judged by the parser, not the scanner',
       () async {
-    // The Code 39 off the back of a CAC. The scanner read it perfectly well;
-    // only the parser knows it is the wrong face of the right card.
+    // The Code 39 off the back of a CAC: the parser, not the scanner, turns
+    // it into a Soldier by DoD ID.
     scanner.willRead('1TPBOMMS10DINPAEDL');
 
-    expect((await verify()).rejection, CacRejection.wrongSideOfCard);
+    final scan = await verify();
+    expect(scan.isVerified, isTrue);
+    expect(scan.identity!.edipi, '1087987498');
+  });
+
+  test('ten digits read as text is a DoD ID, judged by the number parser',
+      () async {
+    // What the Android scanner hands over: the printed number, OCR'd off the
+    // back. No barcode record is ten characters, so shape alone routes it.
+    scanner.willRead('1087987498');
+
+    final scan = await verify();
+    expect(scan.isVerified, isTrue);
+    expect(scan.identity!.edipi, '1087987498');
+    expect(scan.identity!.displayName, 'DoD ID 1087987498');
+  });
+
+  test('ten digits outside the DEERS range are a misread, not a Soldier',
+      () async {
+    scanner.willRead('0000000001');
+
+    expect((await verify()).rejection, CacRejection.notACac);
   });
 
   test('the scanner is asked exactly once per attempt', () async {

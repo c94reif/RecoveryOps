@@ -1,11 +1,6 @@
 import 'package:ivy_pulse/domain/entities/pmcs_fault.dart';
 import 'package:ivy_pulse/domain/entities/reference/common_part.dart';
 
-/// Ranks the common-parts list against a fault so the operator gets the right
-/// NSN in one tap instead of scrolling twenty of them under a vehicle.
-///
-/// Matching is keyword overlap between the fault's component and condition and
-/// the part's name — deliberately simple and offline.
 class SuggestPartsForFault {
   final List<CommonPart> catalog;
 
@@ -32,33 +27,34 @@ class SuggestPartsForFault {
   };
 
   List<CommonPart> call(PmcsFault fault, {int limit = 4}) {
-    final terms = _terms('${fault.subcategory} ${fault.condition}');
+    final terms =
+        _extractSearchTerms('${fault.subcategory} ${fault.condition}');
     if (terms.isEmpty) return const [];
 
-    final scored = <(int, CommonPart)>[];
+    final scoredParts = <(int, CommonPart)>[];
     for (final part in catalog) {
-      final partTerms = _terms(part.name);
+      final partTerms = _extractSearchTerms(part.name);
       var score = 0;
       for (final term in terms) {
         if (partTerms.contains(term)) {
           score += 2;
-        } else if (partTerms
-            .any((p) => p.startsWith(term) || term.startsWith(p))) {
+        } else if (partTerms.any((partTerm) =>
+            partTerm.startsWith(term) || term.startsWith(partTerm))) {
           score += 1;
         }
       }
-      if (score > 0) scored.add((score, part));
+      if (score > 0) scoredParts.add((score, part));
     }
 
-    scored.sort((a, b) => b.$1.compareTo(a.$1));
-    return [for (final entry in scored.take(limit)) entry.$2];
+    scoredParts.sort((first, second) => second.$1.compareTo(first.$1));
+    return [for (final entry in scoredParts.take(limit)) entry.$2];
   }
 
-  static Set<String> _terms(String source) {
+  static Set<String> _extractSearchTerms(String source) {
     return source
         .toLowerCase()
         .split(RegExp(r'[^a-z0-9]+'))
-        .where((t) => t.length > 2 && !_stopWords.contains(t))
+        .where((term) => term.length > 2 && !_stopWords.contains(term))
         .toSet();
   }
 }

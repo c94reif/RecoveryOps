@@ -1,13 +1,11 @@
 import 'package:ivy_pulse/domain/entities/reference/priority_designator.dart';
 
-/// A part an operator or maintainer wants ordered against a specific fault.
 class PartRequest {
   final String nsn;
   final String name;
   final int quantity;
   final PriorityDesignator priority;
 
-  /// TM item number of the fault that drove the request.
   final String? faultItemId;
 
   const PartRequest({

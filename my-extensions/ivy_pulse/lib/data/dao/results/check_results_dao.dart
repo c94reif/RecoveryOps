@@ -11,7 +11,8 @@ class CheckResultsDao extends DatabaseAccessor<AppDatabase>
 
   Future<List<CheckResultData>> getResults(String sessionId, String phase) {
     return (select(checkResults)
-          ..where((t) => t.sessionId.equals(sessionId) & t.phase.equals(phase)))
+          ..where((table) =>
+              table.sessionId.equals(sessionId) & table.phase.equals(phase)))
         .get();
   }
 
@@ -36,8 +37,6 @@ class CheckResultsDao extends DatabaseAccessor<AppDatabase>
       recordedAt: recordedAt,
     );
 
-    // Conflict is resolved on the natural key rather than the row id: the
-    // operator re-answering a check is correcting it, not adding a second one.
     await into(checkResults).insert(
       row,
       onConflict: DoUpdate(
@@ -52,7 +51,8 @@ class CheckResultsDao extends DatabaseAccessor<AppDatabase>
   }
 
   Future<void> deleteForSession(String sessionId) async {
-    await (delete(checkResults)..where((t) => t.sessionId.equals(sessionId)))
+    await (delete(checkResults)
+          ..where((table) => table.sessionId.equals(sessionId)))
         .go();
   }
 }

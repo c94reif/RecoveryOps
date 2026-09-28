@@ -1,14 +1,8 @@
-// GENERATED FILE — DO NOT EDIT BY HAND.
-//
-// Unit, parts, and dispatch reference data used by the PMCS flow.
-// Regenerate with tool/generate_catalog.sh after editing the TM source data.
-
 import 'package:ivy_pulse/domain/entities/fault_severity.dart';
 import 'package:ivy_pulse/domain/entities/reference/common_part.dart';
 import 'package:ivy_pulse/domain/entities/reference/mission.dart';
 import 'package:ivy_pulse/domain/entities/reference/priority_designator.dart';
 
-/// Actions a maintainer can record against a corrected fault.
 const List<String> correctiveActions = [
   'Repaired On-Site',
   'Adjusted / Tightened',
@@ -22,7 +16,6 @@ const List<String> correctiveActions = [
   'Operator Error — Retrained',
 ];
 
-/// Enlisted, warrant, and officer ranks, in order of precedence.
 const List<String> ranks = [
   'PVT',
   'PV2',
@@ -50,7 +43,6 @@ const List<String> ranks = [
   'CW5',
 ];
 
-/// Dispatch profiles and how many days each is normally good for.
 const List<Mission> missions = [
   Mission(
     type: 'Convoy',
@@ -84,7 +76,6 @@ const List<Mission> missions = [
   ),
 ];
 
-/// Frequently demanded parts, for one-tap ordering against a fault.
 const List<CommonPart> commonParts = [
   CommonPart(nsn: '2530-01-562-1743', name: 'Tire, Pneumatic (Stryker)'),
   CommonPart(nsn: '2530-01-529-2264', name: 'Runflat Insert'),
@@ -108,7 +99,6 @@ const List<CommonPart> commonParts = [
   CommonPart(nsn: '9150-01-053-6607', name: 'CLP (Weapon Lubricant)'),
 ];
 
-/// Requisition priority designators, most urgent first.
 const List<PriorityDesignator> priorityDesignators = [
   PriorityDesignator(code: '02', label: 'NMCS (Not Mission Capable Supply)'),
   PriorityDesignator(code: '03', label: 'PMCS Priority'),
@@ -116,7 +106,6 @@ const List<PriorityDesignator> priorityDesignators = [
   PriorityDesignator(code: '09', label: 'Routine'),
 ];
 
-/// Fault status symbols an operator or maintainer can assign.
 const List<FaultSeverity> severityOptions = [
   FaultSeverity.redX,
   FaultSeverity.circleX,

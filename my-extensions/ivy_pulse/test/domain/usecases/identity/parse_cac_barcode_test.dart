@@ -203,9 +203,13 @@ void main() {
       // than to go and find a different card.
       final scan = parse('1TPBOMMS10DINPAEDL');
 
-      expect(scan.isVerified, isFalse);
-      expect(scan.rejection, CacRejection.wrongSideOfCard);
-      expect(scan.identity, isNull);
+      // The back is now the side asked for, and its strip carries the DoD ID
+      // — so this is a signature by number, the same identity an OCR read of
+      // the printed number produces, with no name to put beside it.
+      expect(scan.isVerified, isTrue);
+      expect(scan.identity!.edipi, '1087987498');
+      expect(scan.identity!.lastName, isEmpty);
+      expect(scan.identity!.displayName, 'DoD ID 1087987498');
     });
 
     test('the same strip with the sentinels a reader tacks on', () {
@@ -215,7 +219,8 @@ void main() {
       // looking for a different card.
       final scan = parse('*1TPBOMMS10DINPAEDL*');
 
-      expect(scan.rejection, CacRejection.wrongSideOfCard);
+      expect(scan.isVerified, isTrue);
+      expect(scan.identity!.edipi, '1087987498');
     });
 
     group('an 18-character barcode that is not a CAC Code 39', () {

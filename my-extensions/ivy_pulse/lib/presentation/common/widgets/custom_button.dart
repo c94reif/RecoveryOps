@@ -4,7 +4,6 @@ import 'package:ivy_pulse/core/theme/app_theme.dart';
 class CustomButton extends StatelessWidget {
   final String text;
 
-  /// Null disables the button, the same as any Material control.
   final VoidCallback? onPressed;
   final IconData? icon;
   final Color? color;
@@ -31,7 +30,6 @@ class CustomButton extends StatelessWidget {
           side: BorderSide(color: tint, width: 1),
           disabledForegroundColor: textSecondary,
           disabledBackgroundColor: surface,
-          // Gloved fingers on a jolting vehicle miss anything shorter.
           minimumSize: const Size.fromHeight(minTouchTarget),
         ),
         child: Row(

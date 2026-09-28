@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ivy_pulse/domain/entities/cac_identity.dart';
 import 'package:ivy_pulse/domain/entities/cac_scan.dart';
+import 'package:ivy_pulse/domain/entities/attested_identity.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_signature.dart';
 
 import '../../support/fakes.dart';
@@ -51,6 +52,86 @@ void main() {
       // The 2012 barcode spec predates the Space Force; an unknown letter is
       // still worth putting in front of a maintainer.
       expect(buildIdentity(branchCode: 'S').branch, 'S');
+    });
+  });
+
+  group('the typed fallback', () {
+    const typed = AttestedIdentity(
+      edipi: '1087987498',
+      firstName: 'JOHN',
+      lastName: 'SMITH',
+    );
+    final signature = PmcsSignature.unverified(
+      blockedBy: CacRejection.codeUnreadable,
+      signedAt: DateTime.utc(2026, 3, 24, 9),
+      attestedBy: typed,
+    );
+
+    test('puts the typed name in the operator column', () {
+      expect(signature.displayName, 'SMITH, JOHN');
+    });
+
+    test('is never verified, however complete the entry', () {
+      expect(signature.isVerified, isFalse);
+      expect(signature.identity, isNull);
+      expect(signature.method, 'typed');
+      expect(signature.blockedReason, isNotEmpty);
+    });
+
+    test('carries the DoD ID so the maintainer has a number to chase', () {
+      expect(signature.dodId, '1087987498');
+      expect(buildUnverifiedSignature().dodId, isNull);
+      expect(buildSignature().dodId, '1087987498');
+    });
+
+    test('a scanned signature reports cac, an unsigned one none', () {
+      expect(buildSignature().method, 'cac');
+      expect(buildUnverifiedSignature().method, 'none');
+    });
+
+    test('round-trips through the wire without being promoted', () {
+      final back = PmcsSignature.fromMap(signature.toMap());
+
+      expect(back, isNotNull);
+      expect(back!.isVerified, isFalse);
+      expect(back.attestedBy?.displayName, 'SMITH, JOHN');
+      expect(back.attestedBy?.edipi, '1087987498');
+      expect(back.blockedBy, CacRejection.codeUnreadable);
+    });
+
+    test('a build that does not know the field reads it as plain unverified',
+        () {
+      final map = signature.toMap()..remove('attestedBy');
+      final back = PmcsSignature.fromMap(map);
+
+      expect(back!.isVerified, isFalse);
+      expect(back.attestedBy, isNull);
+      expect(back.displayName, 'UNVERIFIED');
+    });
+
+    test('what the operator typed is normalised the way the card prints it',
+        () {
+      final parsed = AttestedIdentity.parse(
+        lastName: '  smith ',
+        firstName: 'john',
+        edipi: '1087 987 498',
+      );
+
+      expect(parsed.error, isNull);
+      expect(parsed.identity!.lastName, 'SMITH');
+      expect(parsed.identity!.firstName, 'JOHN');
+      expect(parsed.identity!.edipi, '1087987498');
+    });
+
+    test('refuses the entries that cannot be a Soldier', () {
+      String? errorFor({String last = 'SMITH', String first = 'JOHN', String id = '1087987498'}) =>
+          AttestedIdentity.parse(lastName: last, firstName: first, edipi: id).error;
+
+      expect(errorFor(last: ' '), 'Last name is required');
+      expect(errorFor(first: ''), 'First name is required');
+      expect(errorFor(id: '12345'), 'DoD ID is the 10-digit number on the card');
+      expect(errorFor(id: '0000000001'), 'That is not a DoD ID number');
+      expect(errorFor(), isNull);
     });
   });
 

@@ -1,18 +1,22 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:ivy_pulse/presentation/common/services/fault_suggestion_controller.dart';
 import 'package:latlong2/latlong.dart';
+
 import 'package:ivy_pulse/domain/entities/cac_identity.dart';
 import 'package:ivy_pulse/domain/entities/cac_scan.dart';
 import 'package:ivy_pulse/domain/entities/check_result.dart';
 import 'package:ivy_pulse/domain/entities/fault_severity.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_fault.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
+import 'package:ivy_pulse/domain/services/transaction_runner.dart';
+
 // PmcsReport comes via the reports_view_model export below.
 import 'package:ivy_pulse/domain/entities/pmcs_session.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_signature.dart';
 import 'package:ivy_pulse/domain/entities/profile.dart';
-import 'package:ivy_pulse/domain/entities/queued_submission.dart';
+// QueuedSubmission comes via the reports_view_model export below.
 import 'package:ivy_pulse/domain/entities/transport_kind.dart';
 import 'package:ivy_pulse/domain/entities/vehicle_type.dart';
 import 'package:ivy_pulse/domain/repositories/faults_repo.dart';
@@ -35,7 +39,23 @@ import 'package:ivy_pulse/presentation/reports/reports_view_model.dart';
 /// Shared in-memory doubles. Hand-written rather than generated so the tests
 /// break loudly when a domain contract changes.
 
+class FakeTransactionRunner implements TransactionRunner {
+  @override
+  Future<T> run<T>(Future<T> Function() action) => action();
+}
+
 class FakeSessionsRepository implements SessionsRepository {
+  @override
+  Future<void> updateLocation(
+      String sessionId, double latitude, double longitude) async {
+    final index = sessions.indexWhere((s) =>
+        s.sessionId == sessionId && s.status == SessionStatus.inProgress);
+    if (index != -1) {
+      sessions[index] =
+          sessions[index].copyWith(latitude: latitude, longitude: longitude);
+    }
+  }
+
   final List<PmcsSession> sessions = [];
   final List<PmcsSession> updated = [];
   final List<String> deleted = [];
@@ -64,7 +84,11 @@ class FakeSessionsRepository implements SessionsRepository {
   Future<void> update(PmcsSession session) async {
     updated.add(session);
     final index = sessions.indexWhere((s) => s.sessionId == session.sessionId);
-    if (index != -1) sessions[index] = session;
+    if (index != -1) {
+      sessions[index] = session.copyWith(
+          latitude: session.latitude ?? sessions[index].latitude,
+          longitude: session.longitude ?? sessions[index].longitude);
+    }
   }
 
   @override
@@ -135,6 +159,35 @@ class FakeFaultsRepository implements FaultsRepository {
 }
 
 class FakeReportsRepository implements ReportsRepository {
+  final Set<String> dismissedSuggestions = {};
+  bool failSuggestionSave = false;
+  bool failHistoryRead = false;
+
+  @override
+  Future<Set<String>> getDismissedFaultSuggestions() async =>
+      Set.of(dismissedSuggestions);
+
+  @override
+  Future<void> setFaultSuggestionDismissed(String id, bool dismissed) async {
+    if (failSuggestionSave) throw StateError('database unavailable');
+    dismissed ? dismissedSuggestions.add(id) : dismissedSuggestions.remove(id);
+  }
+
+  final Set<String> withdrawnIds = {};
+
+  @override
+  Future<Set<String>> getWithdrawnIds() async => Set.of(withdrawnIds);
+
+  @override
+  Future<void> withdrawReport(String entityId) async {
+    withdrawnIds.add(entityId);
+    for (final report
+        in reports.where((r) => r.entityId == entityId).toList()) {
+      if (report.id != null) deletedIds.add(report.id!);
+    }
+    reports.removeWhere((r) => r.entityId == entityId);
+  }
+
   /// Set to simulate the database going away mid-submit.
   bool failInsert = false;
   final List<PmcsReport> reports = [];
@@ -144,10 +197,16 @@ class FakeReportsRepository implements ReportsRepository {
   int nextId = 1;
 
   @override
-  Future<List<PmcsReport>> getAllReports() async => List.of(reports);
+  Future<List<PmcsReport>> getAllReports() async {
+    if (failHistoryRead) throw StateError('history unavailable');
+    return List.of(reports);
+  }
 
   @override
   Future<PmcsReport> insertReport(PmcsReport report) async {
+    if (withdrawnIds.contains(report.entityId)) {
+      throw ReportWithdrawn(report.entityId);
+    }
     if (failInsert) throw StateError('database unavailable');
     final stored = report.copyWith(id: nextId++);
     reports.add(stored);
@@ -311,6 +370,7 @@ class FakeFaultClassifier implements FaultClassifierStrategy {
 
 class FakePmcsEntityPort implements PmcsEntityPort {
   bool publishSucceeds = true;
+  Completer<bool>? publishGate;
   bool deleteSucceeds = true;
   final List<PmcsReport> published = [];
   final List<String> publishedPayloads = [];
@@ -319,6 +379,7 @@ class FakePmcsEntityPort implements PmcsEntityPort {
   @override
   Future<bool> publishPmcsReport(PmcsReport report) async {
     published.add(report);
+    if (publishGate != null) return publishGate!.future;
     return publishSucceeds;
   }
 
@@ -366,6 +427,9 @@ class FakeMeshBroadcaster implements MeshBroadcasterPort {
 }
 
 class FakeQueueWorker implements QueueWorkerStrategy {
+  @override
+  void trackPersisted(QueuedSubmission submission) => enqueued.add(submission);
+
   final List<QueuedSubmission> enqueued = [];
   final List<(TransportKind, bool)> outcomes = [];
   bool started = false;
@@ -395,6 +459,13 @@ class FakeQueueWorker implements QueueWorkerStrategy {
 }
 
 class FakeRemoteReportSource implements RemoteReportSource {
+  Set<String> withdrawnIds = {};
+  @override
+  Future<Set<String>> fetchWithdrawnPmcsEntityIds() async {
+    if (throwOnFetch != null) throw throwOnFetch!;
+    return withdrawnIds;
+  }
+
   List<PmcsReport> remote = [];
   Set<String> knownIds = {};
   Object? throwOnFetch;
@@ -500,9 +571,11 @@ PmcsReport buildReport({
   String operator = 'SGT SMITH',
   String uic = 'WJ8TAA',
   List<PmcsFault> faults = const [],
+  List<PmcsPhase> phases = const [PmcsPhase.before],
   PmcsSignature? signature,
   bool isOutgoing = true,
   bool isRead = true,
+  DateTime? timestamp,
 }) {
   return PmcsReport(
     id: id,
@@ -512,12 +585,12 @@ PmcsReport buildReport({
     vehicleType: vehicleType,
     operator: operator,
     uic: uic,
-    phases: const [PmcsPhase.before],
+    phases: phases,
     faults: faults,
     signature: signature,
     latitude: 33.0,
     longitude: -84.0,
-    timestamp: DateTime.utc(2026, 3, 24, 8),
+    timestamp: timestamp ?? DateTime.utc(2026, 3, 24, 8),
     isOutgoing: isOutgoing,
     isRead: isRead,
   );
@@ -561,6 +634,16 @@ QueuedSubmission buildQueuedSubmission({
 /// report stops landing under NOT MISSION CAPABLE.
 class FakeReportsViewModel extends ChangeNotifier implements ReportsViewModel {
   @override
+  final FaultSuggestionController suggestions =
+      FaultSuggestionController(FakeReportsRepository());
+
+  FakeReportsViewModel() {
+    unawaited(suggestions.load());
+  }
+  @override
+  final ValueNotifier<PmcsReport?> reportToOpen = ValueNotifier(null);
+
+  @override
   final List<PmcsReport> reports = [];
 
   @override
@@ -591,6 +674,62 @@ class FakeReportsViewModel extends ChangeNotifier implements ReportsViewModel {
   }
 
   @override
+  String myUic = '';
+
+  @override
+  final List<QueuedSubmission> queued = [];
+
+  @override
+  bool isSameUnit(PmcsReport report) =>
+      myUic.isEmpty || report.uic.trim().toUpperCase() == myUic;
+
+  @override
+  List<PmcsReport> get unitReports =>
+      externalReports.where(isSameUnit).toList();
+
+  @override
+  List<PmcsReport> get otherUnitReports =>
+      externalReports.where((r) => !isSameUnit(r)).toList();
+
+  @override
+  Map<ReportVehicleKey, List<PmcsReport>> groupByVehicle(
+      List<PmcsReport> source) {
+    final groups = <ReportVehicleKey, List<PmcsReport>>{};
+    for (final report in source) {
+      groups.putIfAbsent((
+        bumperNumber: report.bumperNumber.trim().toUpperCase(),
+        uic: report.uic.trim().toUpperCase(),
+      ), () => []).add(report);
+    }
+    for (final list in groups.values) {
+      list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    }
+    final keys = groups.keys.toList()
+      ..sort((a, b) {
+        final bumperOrder = a.bumperNumber.compareTo(b.bumperNumber);
+        return bumperOrder != 0 ? bumperOrder : a.uic.compareTo(b.uic);
+      });
+    return {for (final key in keys) key: groups[key]!};
+  }
+
+  @override
+  Map<String, List<QueuedSubmission>> get queuedByBumperNumber {
+    final groups = <String, List<QueuedSubmission>>{};
+    for (final submission in queued) {
+      groups
+          .putIfAbsent(submission.bumperNumber.trim().toUpperCase(), () => [])
+          .add(submission);
+    }
+    for (final list in groups.values) {
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+    final keys = groups.keys.toList()
+      ..sort((a, b) =>
+          groups[b]!.first.createdAt.compareTo(groups[a]!.first.createdAt));
+    return {for (final key in keys) key: groups[key]!};
+  }
+
+  @override
   Map<String, List<PmcsReport>> get groupedByStatus {
     final result = {
       for (final bucket in ReportsViewModel.statusBuckets)
@@ -603,8 +742,20 @@ class FakeReportsViewModel extends ChangeNotifier implements ReportsViewModel {
   }
 
   @override
+  Future<void> addOutgoing(PmcsReport stored) async {
+    reports.removeWhere((r) => r.entityId == stored.entityId);
+    reports.insert(0, stored);
+    notifyListeners();
+  }
+
+  @override
   Future<void> markReportAsRead(PmcsReport report) async {
     markedRead.add(report);
+    final index = reports.indexOf(report);
+    if (index < 0 || report.isRead) return;
+    reports[index] = report.copyWith(isRead: true);
+    unreadCount.value = reports.where((r) => !r.isOutgoing && !r.isRead).length;
+    notifyListeners();
   }
 
   @override
