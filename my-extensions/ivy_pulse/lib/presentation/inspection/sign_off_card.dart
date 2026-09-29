@@ -21,6 +21,8 @@ class SignOffCard extends StatelessWidget {
 
   static const double cardHeight = cardWidth / 1.587;
 
+  bool get scansBothSides => scansBothCacSides(viewModel.cacScanner);
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -44,10 +46,15 @@ class SignOffCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'A PMCS is signed by the Soldier who walked it. Show the camera '
-          'the back of your CAC — it reads your DoD ID number.',
-          style: TextStyle(color: textSecondary, fontSize: 12, height: 1.4),
+        Text(
+          scansBothSides
+              ? 'A PMCS is signed by the Soldier who walked it. Scan the front '
+                  'of your CAC for your name, then flip it when asked to read '
+                  'the DoD ID number on the back.'
+              : 'A PMCS is signed by the Soldier who walked it. Show the camera '
+                  'the back of your CAC — it reads your DoD ID number.',
+          style:
+              const TextStyle(color: textSecondary, fontSize: 12, height: 1.4),
         ),
         if (viewModel.cacScannerAvailable) ...[
           const SizedBox(height: 10),
@@ -131,8 +138,8 @@ class SignOffCard extends StatelessWidget {
           ),
         ),
         const Text(
-          'Nothing is saved — the camera reads the number and the frames are '
-          'gone. Cancelling closes the camera and leaves the PMCS unsigned.',
+          'Camera frames are discarded after reading. Cancelling closes the '
+          'camera and leaves the PMCS unsigned.',
           textAlign: TextAlign.center,
           style: TextStyle(color: textSecondary, fontSize: 11, height: 1.4),
         ),
@@ -228,7 +235,7 @@ class SignOffCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        buildGalleryAdvisory(),
+        if (!scansBothSides) buildGalleryAdvisory(),
       ],
     );
   }
@@ -273,8 +280,9 @@ class SignOffCard extends StatelessWidget {
     final rejection = viewModel.lastScan!.rejection!;
     final retryLeads = rejection.isWorthRetrying &&
         viewModel.scanAttempts <= maxLeadingRetries;
-    final hint =
-        rejection.isWorthRetrying ? cacRetryHint(viewModel.scanAttempts) : null;
+    final hint = rejection.isWorthRetrying
+        ? cacRetryHint(viewModel.scanAttempts, bothSides: scansBothSides)
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -350,7 +358,7 @@ class SignOffCard extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(color: textSecondary, fontSize: 11, height: 1.4),
         ),
-        if (rejection != CacRejection.noCamera) ...[
+        if (!scansBothSides && rejection != CacRejection.noCamera) ...[
           const SizedBox(height: 8),
           buildGalleryAdvisory(),
         ],
@@ -423,16 +431,19 @@ class SignOffCard extends StatelessWidget {
       children: [
         buildCardSchematic(),
         const SizedBox(width: 10),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AimGuideLine('Turn the card over — the side the gate scans'),
-              SizedBox(height: 5),
-              AimGuideLine('Fill the box; the DoD ID number sits above the '
-                  'wide strip'),
-              SizedBox(height: 5),
-              AimGuideLine('It reads by itself — no button to press'),
+              AimGuideLine(scansBothSides
+                  ? '1. Show the front — your name below the photo'
+                  : 'Turn the card over — the side the gate scans'),
+              const SizedBox(height: 5),
+              AimGuideLine(scansBothSides
+                  ? '2. Flip when asked — DoD ID above the wide strip'
+                  : 'Fill the box; the DoD ID number sits above the wide strip'),
+              const SizedBox(height: 5),
+              const AimGuideLine('It reads by itself — no button to press'),
             ],
           ),
         ),
@@ -441,9 +452,11 @@ class SignOffCard extends StatelessWidget {
   }
 
   Widget buildCardSchematic() {
+    final width = scansBothSides ? cardHeight : cardWidth;
+    final height = scansBothSides ? cardWidth : cardHeight;
     return SizedBox(
-      width: cardWidth,
-      height: cardHeight,
+      width: width,
+      height: height,
       child: Stack(
         children: [
           Positioned.fill(
@@ -458,10 +471,10 @@ class SignOffCard extends StatelessWidget {
           buildPrintedRule(top: 0.10, width: 0.40),
           buildPrintedRule(top: 0.20, width: 0.30),
           Positioned(
-            left: cardWidth * 0.08,
-            top: cardHeight * 0.32,
-            width: cardWidth * 0.62,
-            height: cardHeight * 0.09,
+            left: width * 0.08,
+            top: height * (scansBothSides ? 0.65 : 0.32),
+            width: width * 0.62,
+            height: height * 0.09,
             child: Container(
               decoration: BoxDecoration(
                 color: serviceableGreen,
@@ -471,10 +484,10 @@ class SignOffCard extends StatelessWidget {
             ),
           ),
           Positioned(
-            left: cardWidth * 0.08,
-            top: cardHeight * 0.58,
-            width: cardWidth * 0.84,
-            height: cardHeight * 0.14,
+            left: width * 0.08,
+            top: height * (scansBothSides ? 0.30 : 0.58),
+            width: width * (scansBothSides ? 0.44 : 0.84),
+            height: height * (scansBothSides ? 0.28 : 0.14),
             child: Container(
               decoration: BoxDecoration(
                 color: border,
@@ -490,9 +503,9 @@ class SignOffCard extends StatelessWidget {
 
   Widget buildPrintedRule({required double top, required double width}) {
     return Positioned(
-      left: cardWidth * 0.08,
-      top: cardHeight * top,
-      width: cardWidth * width,
+      left: (scansBothSides ? cardHeight : cardWidth) * 0.08,
+      top: (scansBothSides ? cardWidth : cardHeight) * top,
+      width: (scansBothSides ? cardHeight : cardWidth) * width,
       height: 2,
       child: Container(color: border),
     );

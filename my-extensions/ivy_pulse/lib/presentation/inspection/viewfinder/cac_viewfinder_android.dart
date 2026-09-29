@@ -2,12 +2,16 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
 import 'package:ivy_pulse/core/platform/cac_camera_preview.dart';
+import 'package:ivy_pulse/domain/entities/cac_scan.dart';
 import 'package:ivy_pulse/domain/services/cac_scanner_strategy.dart';
 
 Widget? buildCacViewfinder(CacScannerStrategy scanner) => switch (scanner) {
       CacCameraPreview preview => CacViewfinder(scanner: preview),
       _ => null,
     };
+
+bool scansBothCacSides(CacScannerStrategy scanner) =>
+    scanner is CacCameraPreview;
 
 class CacViewfinder extends StatelessWidget {
   final CacCameraPreview scanner;
@@ -18,12 +22,31 @@ class CacViewfinder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<CacScanSide>(
+      valueListenable: scanner.side,
+      builder: (context, side, _) => buildPreview(side),
+    );
+  }
+
+  Widget buildPreview(CacScanSide side) {
     return ValueListenableBuilder<CameraController?>(
       valueListenable: scanner.preview,
       builder: (context, controller, _) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Text(
+              side == CacScanSide.front
+                  ? 'STEP 1 OF 2 — FRONT · NAME'
+                  : 'STEP 2 OF 2 — BACK · DoD ID',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: AspectRatio(
@@ -51,7 +74,7 @@ class CacViewfinder extends StatelessWidget {
                               child: CameraPreview(controller),
                             ),
                           ),
-                          const CardGuide(),
+                          CardGuide(side: side),
                         ],
                       ),
               ),
@@ -59,14 +82,17 @@ class CacViewfinder extends StatelessWidget {
             const SizedBox(height: 8),
             ValueListenableBuilder<String>(
               valueListenable: scanner.guidance,
-              builder: (_, text, __) => Text(
-                text,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: text == 'Read' ? serviceableGreen : textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  height: 1.35,
+              builder: (_, text, __) => Semantics(
+                liveRegion: true,
+                child: Text(
+                  text,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: text == 'Read' ? serviceableGreen : textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
                 ),
               ),
             ),
@@ -78,14 +104,21 @@ class CacViewfinder extends StatelessWidget {
 }
 
 class CardGuide extends StatelessWidget {
-  const CardGuide({super.key});
+  final CacScanSide side;
+
+  const CardGuide({super.key, required this.side});
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth * 0.86;
-        final height = width / CacViewfinder.cardAspect;
+        final front = side == CacScanSide.front;
+        final width = front
+            ? constraints.maxHeight * 0.78 / CacViewfinder.cardAspect
+            : constraints.maxWidth * 0.86;
+        final height = front
+            ? width * CacViewfinder.cardAspect
+            : width / CacViewfinder.cardAspect;
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -123,11 +156,13 @@ class CardGuide extends StatelessWidget {
               ),
             ),
             Positioned(
-              left: 0,
-              right: 0,
+              left: 8,
+              right: 8,
               bottom: 10,
               child: Text(
-                'BACK OF CARD — DoD ID NUMBER ABOVE THE STRIP',
+                front
+                    ? 'FRONT — NAME BELOW YOUR PHOTO'
+                    : 'BACK — DoD ID NUMBER ABOVE THE STRIP',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.9),

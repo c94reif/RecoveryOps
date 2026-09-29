@@ -45,14 +45,9 @@ class IvyPulseExtension extends LatticeEdgeExtension {
     }
     return Theme(
       data: appTheme,
-      child: ValueListenableBuilder<int>(
-        valueListenable: verticalQuarterTurns,
-        builder: (context, turns, child) =>
-            RotatedBox(quarterTurns: turns, child: child),
-        child: QueuePromptHost(
-          promptStrategy: getIt<QueuePromptStrategy>(),
-          child: IvyPulseExtensionUI(extensionContext: extensionContext),
-        ),
+      child: QueuePromptHost(
+        promptStrategy: getIt<QueuePromptStrategy>(),
+        child: IvyPulseExtensionUI(extensionContext: extensionContext),
       ),
     );
   }

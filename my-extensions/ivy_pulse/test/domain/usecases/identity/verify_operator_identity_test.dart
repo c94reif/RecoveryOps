@@ -52,8 +52,7 @@ void main() {
     expect((await verify()).rejection, CacRejection.noCodeFound);
   });
 
-  test('a readable barcode is judged by the parser, not the scanner',
-      () async {
+  test('a readable barcode is judged by the parser, not the scanner', () async {
     // The Code 39 off the back of a CAC: the parser, not the scanner, turns
     // it into a Soldier by DoD ID.
     scanner.willRead('1TPBOMMS10DINPAEDL');
@@ -80,6 +79,24 @@ void main() {
     scanner.willRead('0000000001');
 
     expect((await verify()).rejection, CacRejection.notACac);
+  });
+
+  test('front OCR name and back OCR number reach the same identity', () async {
+    scanner.result = const CacCapture.read('1087987498',
+        name: (firstName: 'JOHN MICHAEL', lastName: 'SMITH'));
+
+    final identity = (await verify()).identity!;
+    expect(identity.displayName, 'SMITH, JOHN MICHAEL');
+    expect(identity.edipi, '1087987498');
+    expect(identity.verifiedAt, DateTime.utc(2026, 3, 24, 9));
+  });
+
+  test('a front name cannot make an invalid back number pass', () async {
+    scanner.result = const CacCapture.read('0000000001',
+        name: (firstName: 'JOHN', lastName: 'SMITH'));
+    final scan = await verify();
+    expect(scan.identity, isNull);
+    expect(scan.rejection, CacRejection.notACac);
   });
 
   test('the scanner is asked exactly once per attempt', () async {

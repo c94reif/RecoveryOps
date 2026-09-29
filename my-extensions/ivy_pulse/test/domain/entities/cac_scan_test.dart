@@ -43,17 +43,11 @@ void main() {
       }
     });
 
-    test('nothing tells the operator to scan "the front"', () {
-      // At a gate a Soldier is trained to present the back, and every driving
-      // licence in their wallet carries its PDF417 there too — so the bare
-      // word reads as "the side I show the guard", which is the wrong face.
-      // No exemptions any more: every message names landmarks instead.
-      for (final rejection in CacRejection.values) {
-        expect(rejection.message.toLowerCase(), isNot(contains('front')),
-            reason: '${rejection.name} sends the operator to the wrong face');
-      }
-      expect(CacRejection.notACac.message,
-          contains('wide barcode strip'));
+    test('name and number failures identify the correct card landmarks', () {
+      expect(CacRejection.nameNotFound.message, contains('front'));
+      expect(CacRejection.nameNotFound.message, contains('your photo'));
+      expect(CacRejection.noCodeFound.message, contains('back'));
+      expect(CacRejection.notACac.message, contains('wide barcode strip'));
     });
 
     test('the wrong-side message names landmarks and the gate strip', () {
@@ -78,6 +72,7 @@ void main() {
     // retry from someone whose next photograph would have worked. Every enum
     // value is pinned, not a sample.
     const retryable = {
+      CacRejection.nameNotFound,
       CacRejection.noCodeFound,
       CacRejection.codeUnreadable,
       CacRejection.cardTooSmall,

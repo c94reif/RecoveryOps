@@ -188,16 +188,14 @@ void main() {
       const codec = PmcsReportCodec();
       final body = codec.reportBody(buildReport())..remove('signature');
 
-      final decoded =
-          codec.reportFromBody(body, fromCallsign: 'Mesh')!;
+      final decoded = codec.reportFromBody(body, fromCallsign: 'Mesh')!;
 
       expect(decoded.bumperNumber, 'A-11');
       expect(decoded.signature, isNull);
       expect(decoded.isSignatureVerified, isFalse);
     });
 
-    test('a garbled signature block costs the signature, never the report',
-        () {
+    test('a garbled signature block costs the signature, never the report', () {
       const codec = PmcsReportCodec();
       final body = codec.reportBody(buildReport())
         ..['signature'] = 'not an object';

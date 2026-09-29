@@ -1,13 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:ivy_pulse/core/di/service_locator.dart';
 import 'package:ivy_pulse/core/theme/app_theme.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_phase.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_session.dart';
 import 'package:ivy_pulse/domain/entities/vehicle_type.dart';
+import 'package:ivy_pulse/domain/services/bumper_scanner_strategy.dart';
 import 'package:ivy_pulse/presentation/common/widgets/custom_button.dart';
 import 'package:ivy_pulse/presentation/common/widgets/custom_text_field.dart';
 import 'package:ivy_pulse/presentation/common/widgets/section_label.dart';
 import 'package:ivy_pulse/presentation/inspection/inspection_view_model.dart';
+import 'package:ivy_pulse/presentation/inspection/bumper_scan_dialog.dart';
 
 class SetupPage extends StatefulWidget {
   const SetupPage({super.key});
@@ -21,11 +25,16 @@ class SetupPageState extends State<SetupPage> {
   final bumperNumberController = TextEditingController();
   final uicController = TextEditingController();
   final uicFocus = FocusNode();
+  BumperScannerStrategy? bumperScanner;
+  bool scanningBumper = false;
 
   @override
   void initState() {
     super.initState();
     viewModel = getIt<InspectionViewModel>();
+    if (getIt.isRegistered<BumperScannerStrategy>()) {
+      bumperScanner = getIt<BumperScannerStrategy>();
+    }
 
     prefillUic();
     applyPrefill();
@@ -62,8 +71,25 @@ class SetupPageState extends State<SetupPage> {
     );
   }
 
+  Future<void> scanBumperNumber() async {
+    final scanner = bumperScanner;
+    if (scanner == null || scanningBumper || viewModel.isBusy) return;
+    FocusScope.of(context).unfocus();
+    setState(() => scanningBumper = true);
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (_) => BumperScanDialog(scanner: scanner),
+    );
+    if (!mounted) return;
+    setState(() {
+      scanningBumper = false;
+      if (selected != null) bumperNumberController.text = selected;
+    });
+  }
+
   @override
   void dispose() {
+    unawaited(bumperScanner?.dispose());
     viewModel.removeListener(prefillUic);
     viewModel.removeListener(applyPrefill);
     bumperNumberController.dispose();
@@ -103,6 +129,15 @@ class SetupPageState extends State<SetupPage> {
               icon: Icons.directions_car_outlined,
               textCapitalization: TextCapitalization.characters,
               uppercase: true,
+              suffixIcon: bumperScanner?.isSupported == true
+                  ? IconButton(
+                      tooltip: 'Scan bumper number',
+                      icon: const Icon(Icons.document_scanner_outlined),
+                      onPressed: scanningBumper || viewModel.isBusy
+                          ? null
+                          : scanBumperNumber,
+                    )
+                  : null,
               textInputAction: TextInputAction.next,
               onSubmitted: (_) => uicFocus.requestFocus(),
             ),

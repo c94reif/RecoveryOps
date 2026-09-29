@@ -1,4 +1,3 @@
-import 'package:ivy_pulse/core/platform/cac_camera_preview.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -8,9 +7,10 @@ import 'package:flutter/services.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 import 'package:ivy_pulse/core/constants/app_constants.dart';
+import 'package:ivy_pulse/core/platform/cac_camera_preview.dart';
 import 'package:ivy_pulse/domain/entities/cac_scan.dart';
 import 'package:ivy_pulse/domain/services/cac_scanner_strategy.dart';
-import 'package:ivy_pulse/domain/usecases/identity/find_dod_id.dart';
+import 'package:ivy_pulse/domain/usecases/identity/cac_ocr_session.dart';
 
 class AndroidCacScanner implements CacScannerStrategy, CacCameraPreview {
   @override
@@ -19,15 +19,16 @@ class AndroidCacScanner implements CacScannerStrategy, CacCameraPreview {
   @override
   final ValueNotifier<String> guidance = ValueNotifier('');
 
-  static const int framesToAgree = 2;
+  @override
+  final ValueNotifier<CacScanSide> side = ValueNotifier(CacScanSide.front);
 
   Completer<CacCapture>? _inFlight;
+  CacOcrSession? _session;
   CameraController? _controller;
   TextRecognizer? _recognizer;
   Timer? _timeout;
   bool _frameBusy = false;
-  String? _candidate;
-  int _agreed = 0;
+  Future<void>? _teardown;
 
   @override
   Future<bool> isAvailable() async => Platform.isAndroid;
@@ -39,12 +40,17 @@ class AndroidCacScanner implements CacScannerStrategy, CacCameraPreview {
 
     final completer = Completer<CacCapture>();
     _inFlight = completer;
-    _candidate = null;
-    _agreed = 0;
+    final session = CacOcrSession();
+    _session = session;
+    side.value = session.side;
     guidance.value = 'Starting camera…';
 
+    CameraController? initializingController;
     try {
+      await _teardown;
+      if (_inFlight != completer) return await completer.future;
       final cameras = await availableCameras();
+      if (_inFlight != completer) return await completer.future;
       if (cameras.isEmpty) {
         _completeCapture(const CacCapture.failed(CacRejection.noCamera));
         return await completer.future;
@@ -60,27 +66,32 @@ class AndroidCacScanner implements CacScannerStrategy, CacCameraPreview {
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.nv21,
       );
+      initializingController = controller;
       await controller.initialize();
       if (_inFlight != completer) {
-        await controller.dispose();
         return await completer.future;
       }
       _controller = controller;
+      initializingController = null;
       _recognizer = TextRecognizer(script: TextRecognitionScript.latin);
       preview.value = controller;
-      guidance.value = 'Fill the box with the BACK of the card';
+      guidance.value = session.guidance;
 
-      _timeout = Timer(AppConstants.cacCaptureTimeout, () {
-        _completeCapture(const CacCapture.failed(CacRejection.noCodeFound));
-      });
+      _startSideTimeout(completer, session);
       await controller.startImageStream(_onFrame);
     } on CameraException catch (error) {
       debugPrint(
           '[IvyPulse] camera unavailable: ${error.code} ${error.description}');
-      _completeCapture(const CacCapture.failed(CacRejection.noCamera));
+      if (_inFlight == completer) {
+        _completeCapture(const CacCapture.failed(CacRejection.noCamera));
+      }
     } catch (error) {
       debugPrint('[IvyPulse] CAC scanner failed to start: $error');
-      _completeCapture(const CacCapture.failed(CacRejection.noCamera));
+      if (_inFlight == completer) {
+        _completeCapture(const CacCapture.failed(CacRejection.noCamera));
+      }
+    } finally {
+      await initializingController?.dispose();
     }
     return completer.future;
   }
@@ -91,47 +102,55 @@ class AndroidCacScanner implements CacScannerStrategy, CacCameraPreview {
   }
 
   Future<void> _onFrame(CameraImage image) async {
+    final completer = _inFlight;
+    final session = _session;
     final recognizer = _recognizer;
     final controller = _controller;
-    if (_frameBusy || recognizer == null || controller == null) return;
+    if (_frameBusy ||
+        completer == null ||
+        session == null ||
+        recognizer == null ||
+        controller == null) {
+      return;
+    }
     _frameBusy = true;
     try {
       final input = _toInputImage(image, controller.description);
       if (input == null) return;
       final result = await recognizer.processImage(input);
-      if (_inFlight == null) return;
+      if (_inFlight != completer) return;
 
       final lines = <String>[
         for (final block in result.blocks)
           for (final line in block.lines) line.text,
       ];
-      final found = findDodId(lines);
-      if (found == null) {
-        _candidate = null;
-        _agreed = 0;
-        guidance.value = lines.isEmpty
-            ? 'Fill the box with the BACK of the card'
-            : 'Reading… hold the DoD ID number steady';
-        return;
-      }
-      if (found == _candidate) {
-        _agreed++;
-      } else {
-        _candidate = found;
-        _agreed = 1;
-      }
-      if (_agreed >= framesToAgree) {
-        guidance.value = 'Read';
+      final previousSide = session.side;
+      final outcome = session.process(lines);
+      side.value = session.side;
+      guidance.value = session.guidance;
+      if (previousSide != session.side) {
+        _startSideTimeout(completer, session);
         unawaited(HapticFeedback.mediumImpact());
-        _completeCapture(CacCapture.read(found));
-      } else {
-        guidance.value = 'Almost — hold still';
+      }
+      if (outcome != null) {
+        unawaited(HapticFeedback.mediumImpact());
+        _completeCapture(outcome);
       }
     } catch (error) {
       debugPrint('[IvyPulse] OCR frame skipped: $error');
     } finally {
       _frameBusy = false;
     }
+  }
+
+  void _startSideTimeout(
+      Completer<CacCapture> completer, CacOcrSession session) {
+    _timeout?.cancel();
+    _timeout = Timer(AppConstants.cacCaptureTimeout, () {
+      if (_inFlight == completer) {
+        _completeCapture(CacCapture.failed(session.timeoutRejection));
+      }
+    });
   }
 
   InputImage? _toInputImage(CameraImage image, CameraDescription camera) {
@@ -157,6 +176,7 @@ class AndroidCacScanner implements CacScannerStrategy, CacCameraPreview {
     final completer = _inFlight;
     if (completer == null) return;
     _inFlight = null;
+    _session = null;
     _timeout?.cancel();
     _timeout = null;
 
@@ -166,7 +186,9 @@ class AndroidCacScanner implements CacScannerStrategy, CacCameraPreview {
     _recognizer = null;
     preview.value = null;
 
-    unawaited(() async {
+    final pendingTeardown = _teardown;
+    _teardown = () async {
+      await pendingTeardown;
       try {
         if (controller != null) {
           if (controller.value.isStreamingImages) {
@@ -177,8 +199,12 @@ class AndroidCacScanner implements CacScannerStrategy, CacCameraPreview {
       } catch (error) {
         debugPrint('[IvyPulse] camera teardown: $error');
       }
-      await recognizer?.close();
-    }());
+      try {
+        await recognizer?.close();
+      } catch (error) {
+        debugPrint('[IvyPulse] OCR teardown: $error');
+      }
+    }();
 
     if (!completer.isCompleted) completer.complete(outcome);
   }

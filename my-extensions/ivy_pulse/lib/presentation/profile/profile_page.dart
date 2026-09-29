@@ -38,14 +38,6 @@ class ProfilePageState extends State<ProfilePage> {
 
   void onFieldChanged() => viewModel.checkDirty(uicController.text);
 
-  void cycleVertical() {
-    verticalQuarterTurns.value = switch (verticalQuarterTurns.value) {
-      0 => 1,
-      1 => 3,
-      _ => 0,
-    };
-  }
-
   Future<void> toggleFullScreen() async {
     if (fullScreenOn.value) {
       fullScreenWanted.value = false;
@@ -129,7 +121,7 @@ class ProfilePageState extends State<ProfilePage> {
                     const SectionLabel(text: 'DISPLAY'),
                     const SizedBox(height: 8),
                     const Text(
-                      'Choose full screen or adjust the screen orientation.',
+                      'Switch between full screen and the panel.',
                       style: TextStyle(
                         color: textSecondary,
                         fontSize: 11,
@@ -157,32 +149,6 @@ class ProfilePageState extends State<ProfilePage> {
                           label: Text(isFullScreen
                               ? 'Exit full screen'
                               : 'Enter full screen'),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ValueListenableBuilder<int>(
-                      valueListenable: verticalQuarterTurns,
-                      builder: (context, turns, _) => SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: cycleVertical,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: dashBlue,
-                            side: const BorderSide(color: dashBlue),
-                            minimumSize: const Size.fromHeight(minTouchTarget),
-                          ),
-                          icon: Icon(
-                            turns == 0
-                                ? Icons.screen_rotation
-                                : Icons.screen_lock_rotation,
-                            size: 18,
-                          ),
-                          label: Text(switch (turns) {
-                            0 => 'Switch to portrait',
-                            1 => 'Flip portrait',
-                            _ => 'Switch to landscape',
-                          }),
                         ),
                       ),
                     ),

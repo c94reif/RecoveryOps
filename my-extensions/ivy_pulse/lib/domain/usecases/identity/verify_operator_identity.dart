@@ -25,7 +25,9 @@ class VerifyOperatorIdentity {
     }
 
     final trimmed = read.trim();
-    if (_dodIdShape.hasMatch(trimmed)) return parseDodId(trimmed);
+    if (_dodIdShape.hasMatch(trimmed)) {
+      return parseDodId(trimmed, name: capture.name);
+    }
     return parseBarcode(read);
   }
 }

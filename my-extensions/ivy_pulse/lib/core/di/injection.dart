@@ -29,6 +29,7 @@ import 'package:ivy_pulse/data/repositories/reports_repo_impl.dart';
 import 'package:ivy_pulse/data/repositories/results_repo_impl.dart';
 import 'package:ivy_pulse/data/repositories/sessions_repo_impl.dart';
 import 'package:ivy_pulse/data/services/cac_scanner_factory.dart';
+import 'package:ivy_pulse/data/services/bumper_scanner_factory.dart';
 import 'package:ivy_pulse/data/services/device_speech_recognition.dart';
 import 'package:ivy_pulse/data/services/drift_transaction_runner.dart';
 import 'package:ivy_pulse/data/services/lattice_pmcs_adapter.dart';
@@ -46,6 +47,7 @@ import 'package:ivy_pulse/domain/repositories/reports_repo.dart';
 import 'package:ivy_pulse/domain/repositories/results_repo.dart';
 import 'package:ivy_pulse/domain/repositories/sessions_repo.dart';
 import 'package:ivy_pulse/domain/services/cac_scanner_strategy.dart';
+import 'package:ivy_pulse/domain/services/bumper_scanner_strategy.dart';
 import 'package:ivy_pulse/domain/services/clock.dart';
 import 'package:ivy_pulse/domain/services/delivery_coordinator.dart';
 import 'package:ivy_pulse/domain/services/fault_classifier_strategy.dart';
@@ -167,6 +169,7 @@ void configureDependencies(sdk.ExtensionContext extensionContext) {
     () => DeviceSpeechRecognition(),
   );
   getIt.registerLazySingleton<CacScannerStrategy>(() => createCacScanner());
+  getIt.registerFactory<BumperScannerStrategy>(() => createBumperScanner());
   getIt.registerLazySingleton<QueuePromptStrategy>(
     () => QueuePromptController.instance,
   );

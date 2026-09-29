@@ -1,6 +1,11 @@
 import 'package:ivy_pulse/domain/entities/cac_identity.dart';
+import 'package:ivy_pulse/domain/entities/cac_name.dart';
+
+enum CacScanSide { front, back }
 
 enum CacRejection {
+  nameNotFound,
+
   noCodeFound,
 
   codeUnreadable,
@@ -22,6 +27,9 @@ enum CacRejection {
   noCamera;
 
   String get message => switch (this) {
+        CacRejection.nameNotFound =>
+          'No name found. Scan the front of the card — the side with your '
+              'photo — and hold the printed name steady.',
         CacRejection.noCodeFound =>
           'No DoD ID number found. Fill the frame with the back of the card '
               '— the side with the wide barcode strip — and hold steady.',
@@ -51,6 +59,7 @@ enum CacRejection {
       };
 
   bool get isWorthRetrying => switch (this) {
+        CacRejection.nameNotFound ||
         CacRejection.noCodeFound ||
         CacRejection.codeUnreadable ||
         CacRejection.cardTooSmall ||
@@ -68,11 +77,14 @@ enum CacRejection {
 
 class CacCapture {
   final String? barcode;
+  final CacName? name;
   final CacRejection? rejection;
 
-  const CacCapture.read(String this.barcode) : rejection = null;
+  const CacCapture.read(String this.barcode, {this.name}) : rejection = null;
 
-  const CacCapture.failed(CacRejection this.rejection) : barcode = null;
+  const CacCapture.failed(CacRejection this.rejection)
+      : barcode = null,
+        name = null;
 }
 
 class CacScan {

@@ -20,20 +20,17 @@ dependencies:
   latlong2: ^0.9.1
   speech_to_text: ^7.0.0
   uuid: ^4.5.1
-
-  # PDF417 decode for the CAC scan. Pure Dart (only intl + charset), so the
-  # one decoder serves the web build and the native compile alike.
   zxing_lib: ^1.1.4
 
-  # `dart:js_interop` bindings for the camera capture on the web build. Only
-  # ever imported behind a `dart.library.js_interop` conditional.
   web: ^1.1.1
 
   le_sdk:
     path: ../../le_sdk/packages/le_sdk
   flutter_plugin_android_lifecycle: ^2.0.34
   camera: ^0.12.1
-  google_mlkit_text_recognition: ^0.17.1
+  google_mlkit_text_recognition: ^0.15.0
+  ivy_pulse_android:
+    path: packages/ivy_pulse_android
 
 dev_dependencies:
   flutter_test:

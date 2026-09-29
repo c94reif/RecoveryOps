@@ -124,12 +124,17 @@ void main() {
     });
 
     test('refuses the entries that cannot be a Soldier', () {
-      String? errorFor({String last = 'SMITH', String first = 'JOHN', String id = '1087987498'}) =>
-          AttestedIdentity.parse(lastName: last, firstName: first, edipi: id).error;
+      String? errorFor(
+              {String last = 'SMITH',
+              String first = 'JOHN',
+              String id = '1087987498'}) =>
+          AttestedIdentity.parse(lastName: last, firstName: first, edipi: id)
+              .error;
 
       expect(errorFor(last: ' '), 'Last name is required');
       expect(errorFor(first: ''), 'First name is required');
-      expect(errorFor(id: '12345'), 'DoD ID is the 10-digit number on the card');
+      expect(
+          errorFor(id: '12345'), 'DoD ID is the 10-digit number on the card');
       expect(errorFor(id: '0000000001'), 'That is not a DoD ID number');
       expect(errorFor(), isNull);
     });

@@ -8,6 +8,8 @@ le_sdk/host-apk/old/lattice-edge-debug.apk
 le_sdk/host-apk/lattice-edge-release.apk
 le_sdk/host-apk/lattice-edge-release.apk
 *.apk
+# Blocking the output
+*.zip
 
 # Android/Flutter build artifacts — never commit binaries
 *.apk

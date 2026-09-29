@@ -7,3 +7,6 @@ import 'package:ivy_pulse/presentation/inspection/viewfinder/cac_viewfinder_stub
 
 Widget? buildCacViewfinder(CacScannerStrategy scanner) =>
     platform.buildCacViewfinder(scanner);
+
+bool scansBothCacSides(CacScannerStrategy scanner) =>
+    platform.scansBothCacSides(scanner);

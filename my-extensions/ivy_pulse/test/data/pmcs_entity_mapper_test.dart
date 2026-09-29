@@ -73,8 +73,7 @@ void main() {
       expect(entity.extra?['signedAt'], isA<String>());
     });
 
-    test('an unverified PMCS says so on the entity and carries no DoD ID',
-        () {
+    test('an unverified PMCS says so on the entity and carries no DoD ID', () {
       final entity = mapper.buildEntity(buildReport(
         operator: 'UNVERIFIED',
         signature: buildUnverifiedSignature(),
@@ -112,7 +111,8 @@ void main() {
       expect(entity.extra?['signatureVerified'], isTrue);
     });
 
-    test('a typed name reaches the entity as typed, with its DoD ID and '
+    test(
+        'a typed name reaches the entity as typed, with its DoD ID and '
         'without a verified flag', () {
       final entity = mapper.buildEntity(buildReport(
         operator: 'SMITH, JOHN',
@@ -135,16 +135,19 @@ void main() {
 
     test('the method field tells cac from typed from none', () {
       expect(
-        mapper.buildEntity(buildReport(signature: buildSignature()))
+        mapper
+            .buildEntity(buildReport(signature: buildSignature()))
             .extra?['signatureMethod'],
         'cac',
       );
       expect(
-        mapper.buildEntity(buildReport(signature: buildUnverifiedSignature()))
+        mapper
+            .buildEntity(buildReport(signature: buildUnverifiedSignature()))
             .extra?['signatureMethod'],
         'none',
       );
-      expect(mapper.buildEntity(buildReport()).extra?['signatureMethod'], 'none');
+      expect(
+          mapper.buildEntity(buildReport()).extra?['signatureMethod'], 'none');
     });
 
     test('expires after one dispatch day so a stale PMCS leaves the map', () {
