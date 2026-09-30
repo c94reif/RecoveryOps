@@ -4,7 +4,10 @@ import 'package:ivy_pulse/domain/entities/check_result.dart';
 import 'package:ivy_pulse/domain/entities/fault_severity.dart';
 import 'package:ivy_pulse/domain/entities/pmcs_check_item.dart';
 import 'package:ivy_pulse/domain/services/fault_classifier_strategy.dart';
-import 'package:ivy_pulse/presentation/common/widgets/severity_badge.dart';
+import 'package:ivy_pulse/presentation/inspection/check_item/check_item_styles.dart';
+import 'package:ivy_pulse/presentation/inspection/check_item/fault_note_controls.dart';
+import 'package:ivy_pulse/presentation/inspection/check_item/collapsed_check_summary.dart';
+import 'package:ivy_pulse/presentation/inspection/check_item/check_condition_buttons.dart';
 
 class CheckItemCard extends StatelessWidget {
   final PmcsCheckItem item;
@@ -36,7 +39,7 @@ class CheckItemCard extends StatelessWidget {
     this.previousFinding,
   });
 
-  static const Color recordingRed = Color(0xFFE53935);
+  static const Color recordingRed = FaultNoteControls.recordingRed;
 
   Color get accentColor {
     final answer = result;
@@ -56,112 +59,15 @@ class CheckItemCard extends StatelessWidget {
           width: result == null ? 1 : 1.5,
         ),
       ),
-      child: isExpanded ? buildExpanded(context) : buildCollapsed(context),
-    );
-  }
-
-  Widget buildCollapsed(BuildContext context) {
-    final answer = result;
-    if (answer != null && answer.isFault) return buildCollapsedFault(answer);
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: enabled ? onExpand : null,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: minTouchTarget),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 88,
-                child: Text(item.id, style: idStyle),
-              ),
-              Expanded(
-                child: Text(
-                  item.item,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: textPrimary, fontSize: 14),
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (answer != null) buildServiceableAnswer(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget buildCollapsedFault(CheckResult answer) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: enabled ? onExpand : null,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 4, 10, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: minTouchTarget),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(item.id, style: idStyle),
-                        Text(item.item,
-                            style: const TextStyle(
-                                color: textPrimary, fontSize: 14)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+      child: isExpanded
+          ? buildExpanded(context)
+          : CollapsedCheckSummary(
+              item: item,
+              result: result,
+              enabled: enabled,
+              onExpand: onExpand,
+              onEditNote: onEditNote,
             ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                if (answer.severity case final severity?) ...[
-                  SeverityBadge(severity: severity),
-                  const SizedBox(width: 8),
-                ],
-                Expanded(
-                  child: Text(answer.faultLabel,
-                      style: const TextStyle(color: textPrimary, fontSize: 12)),
-                ),
-              ],
-            ),
-            if (onEditNote != null)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: enabled ? onEditNote : null,
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(0, minTouchTarget),
-                  ),
-                  icon: const Icon(Icons.edit_note, size: 20),
-                  label: Text(noteActionLabel(answer)),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String noteActionLabel(CheckResult answer) =>
-      answer.note?.isNotEmpty == true ? 'Edit description' : 'Add description';
-
-  Widget buildServiceableAnswer() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.check_circle, color: serviceableGreen, size: 20),
-        const SizedBox(width: 6),
-        Text('OK', style: okStyle),
-      ],
     );
   }
 
@@ -182,7 +88,7 @@ class CheckItemCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(item.id, style: idStyle),
+                    Text(item.id, style: checkItemIdStyle),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -232,19 +138,23 @@ class CheckItemCard extends StatelessWidget {
             child: previousFinding,
           ),
         const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: buildServiceableButton(),
-        ),
-        const SizedBox(height: 6),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: buildFaultGrid(),
+        CheckConditionButtons(
+          item: item,
+          result: result,
+          enabled: enabled,
+          classifier: classifier,
+          onAnswer: onAnswer,
         ),
         if (answer != null && answer.isFault)
           Padding(
             padding: const EdgeInsets.only(left: 2, right: 10, bottom: 2),
-            child: buildNoteRow(answer),
+            child: FaultNoteControls(
+              answer: answer,
+              isDictating: isDictating,
+              enabled: enabled,
+              onDictateNote: onDictateNote,
+              onEditNote: onEditNote,
+            ),
           )
         else
           const SizedBox(height: 8),
@@ -280,180 +190,4 @@ class CheckItemCard extends StatelessWidget {
       ),
     );
   }
-
-  Widget buildServiceableButton() {
-    final isSelected = result?.faultIndex == 0;
-    return SizedBox(
-      width: double.infinity,
-      height: faultButtonHeight,
-      child: OutlinedButton.icon(
-        onPressed: enabled ? () => onAnswer(0) : null,
-        icon: Icon(
-          isSelected ? Icons.check_circle : Icons.check_circle_outline,
-          size: 20,
-        ),
-        label: Text(
-          item.serviceableLabel.toUpperCase(),
-          maxLines: 2,
-          textAlign: TextAlign.center,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.6,
-          ),
-        ),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: serviceableGreen,
-          backgroundColor:
-              isSelected ? serviceableGreen.withAlpha(70) : serviceableGlow,
-          side: BorderSide(
-            color: serviceableGreen,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget buildFaultGrid() {
-    final rows = <Widget>[];
-    for (var index = 1; index < item.faults.length; index += 2) {
-      final hasSecond = index + 1 < item.faults.length;
-      rows.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Row(
-            children: [
-              Expanded(child: buildFaultButton(index)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: hasSecond
-                    ? buildFaultButton(index + 1)
-                    : const SizedBox(height: faultButtonHeight),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    return Column(children: rows);
-  }
-
-  Widget buildFaultButton(int faultIndex) {
-    final severity = classifier.classify(
-      itemId: item.id,
-      faultIndex: faultIndex,
-    );
-    final color = severity == null ? serviceableGreen : severityColor(severity);
-    final glow = severity == null ? serviceableGlow : severityGlow(severity);
-    final isSelected = result?.faultIndex == faultIndex;
-
-    return SizedBox(
-      height: faultButtonHeight,
-      child: OutlinedButton(
-        onPressed: enabled ? () => onAnswer(faultIndex) : null,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: color,
-          backgroundColor: isSelected ? color.withAlpha(70) : glow,
-          side: BorderSide(color: color, width: isSelected ? 2 : 1),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              item.labelAt(faultIndex),
-              maxLines: 2,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                height: 1.15,
-              ),
-            ),
-            if (severity != null) ...[
-              const SizedBox(height: 2),
-              Text(
-                severity.label,
-                style: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget buildNoteRow(CheckResult answer) {
-    final note = answer.note;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        buildMicButton(),
-        Expanded(
-          child: Text(
-            note == null || note.isEmpty
-                ? 'Optional description · up to 155 characters'
-                : note,
-            style: TextStyle(
-              color: note == null || note.isEmpty ? textSecondary : textPrimary,
-              fontSize: 12,
-              fontStyle: note == null || note.isEmpty
-                  ? FontStyle.italic
-                  : FontStyle.normal,
-            ),
-          ),
-        ),
-        if (onEditNote != null)
-          IconButton(
-            onPressed: enabled ? onEditNote : null,
-            tooltip: noteActionLabel(answer),
-            icon: const Icon(Icons.edit_note),
-            constraints: const BoxConstraints(
-              minWidth: minTouchTarget,
-              minHeight: minTouchTarget,
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget buildMicButton() {
-    return IconButton(
-      onPressed: enabled ? onDictateNote : null,
-      icon: Icon(
-        isDictating ? Icons.mic : Icons.mic_none,
-        color: isDictating ? recordingRed : masterChiefGreen,
-        size: 24,
-      ),
-      style: IconButton.styleFrom(
-        backgroundColor:
-            isDictating ? recordingRed.withAlpha(38) : Colors.transparent,
-        shape: const CircleBorder(),
-        minimumSize: const Size(minTouchTarget, minTouchTarget),
-      ),
-      tooltip: isDictating ? 'Recording — tap to stop' : 'Tap to record',
-    );
-  }
-
-  TextStyle get idStyle => TextStyle(
-        color: masterChiefGreen,
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.8,
-      );
-
-  TextStyle get okStyle => const TextStyle(
-        color: serviceableGreen,
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.8,
-      );
 }

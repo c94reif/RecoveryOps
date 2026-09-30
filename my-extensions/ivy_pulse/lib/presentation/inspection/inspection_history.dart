@@ -1,6 +1,5 @@
 part of 'inspection_view_model.dart';
 
-/// Previous reports and comparisons for the current inspection.
 mixin _InspectionHistory on _InspectionState {
   @override
   Future<void> loadHistory() async {

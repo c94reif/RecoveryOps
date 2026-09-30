@@ -1,6 +1,5 @@
 part of 'inspection_view_model.dart';
 
-/// Loading, starting, resuming, and resetting an inspection session.
 mixin _InspectionSession on _InspectionState {
   Future<void> load() async {
     isBusy = true;

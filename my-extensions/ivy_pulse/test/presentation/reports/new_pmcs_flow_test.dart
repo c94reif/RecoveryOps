@@ -202,6 +202,25 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('leaving reports during a save does not navigate on completion',
+      (tester) async {
+    await openReports(tester, buildReport());
+    sessions.insertGate = Completer<void>();
+
+    await tester.tap(find.text('New PMCS'));
+    await tester.pump();
+    expect(find.text('Starting PMCS…'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    sessions.insertGate!.complete();
+    await tester.pumpAndSettle();
+
+    expect(sessions.sessions, hasLength(1));
+    expect(harness.viewModel.stage, InspectionStage.phaseSelect);
+    expect(home.pageIndex, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a failed start clears the busy state and permits retry',
       (tester) async {
     await openReports(tester, buildReport());
