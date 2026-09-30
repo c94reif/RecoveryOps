@@ -1,10 +1,10 @@
 name:   Ivy_Pulse
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "my-extensions/ivy_pulse/**"
+#  push:
+#    branches: [main]
+#    paths:
+#      - "my-extensions/ivy_pulse/**"
   pull_request:
     branches: [main]
     paths:
