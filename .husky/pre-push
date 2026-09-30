@@ -17,29 +17,31 @@ while read local_ref local_sha remote_ref remote_sha; do
   fi
 done
 
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
 echo "running tests with coverage Ivy Pulse"
-flutter test my-extensions/ --coverage || {
+(cd my-extensions/ivy_pulse && flutter test --coverage) || {
   echo ""
   echo "🚫 Tests failed. Fix them before pushing."
   exit 1
 }
 
 echo "running tests with coverage Recovery Ops"
-flutter test my-extensions/recovery_ops --coverage || {
+(cd my-extensions/recovery_ops && flutter test --coverage) || {
   echo ""
   echo "🚫 Tests failed. Fix them before pushing."
   exit 1
 }
 
 echo "coverage gate running (80% minimum, generated files excluded)"
-dart run my-extensions/ivy_pulse tool/check_coverage.dart || {
+(cd my-extensions/ivy_pulse && dart run ../../tool/check_coverage.dart) || {
   echo ""
   echo "🚫 Coverage is below the 80% minimum. Add tests before pushing."
   exit 1
 }
 
 echo "coverage gate running (80% minimum, generated files excluded)"
-dart run my-extensions/recovery_ops tool/check_coverage.dart || {
+(cd my-extensions/recovery_ops && dart run ../../tool/check_coverage.dart) || {
   echo ""
   echo "🚫 Coverage is below the 80% minimum. Add tests before pushing."
   exit 1
