@@ -18,6 +18,12 @@ class SyncNavigatorStates {
       try {
         final state = await source.fetchNavigatorState(report.entityId!);
         if (state == null) continue;
+        if (state.stopped &&
+            report.navigatorLatitude == null &&
+            report.navigatorLongitude == null &&
+            !report.hasGeometry) {
+          continue;
+        }
         updates.add(state);
       } catch (e) {
         debugPrint(

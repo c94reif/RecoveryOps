@@ -58,6 +58,17 @@ void main() {
     usecase = SyncNavigatorStates(source);
   });
 
+  test('stored navigation stop clears stale state only once', () async {
+    source.statesByEntityId = {
+      'r': const NavigatorUpdate.stopped(entityId: 'r'),
+    };
+    final cleared = makeReport(entityId: 'r', isOutgoing: true);
+    final active =
+        cleared.copyWith(navigatorLatitude: 34, navigatorLongitude: -85);
+    expect((await usecase([active])).single.stopped, isTrue);
+    expect(await usecase([cleared]), isEmpty);
+  });
+
   test('returns empty list when there are no outgoing reports', () async {
     final result = await usecase([
       makeReport(id: 1, entityId: 'entity-1', isOutgoing: false),

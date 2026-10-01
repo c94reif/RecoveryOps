@@ -19,6 +19,8 @@ import 'package:recovery_ops/presentation/navigation/navigation_view_model.dart'
 
 export 'package:recovery_ops/domain/entities/recovery_report.dart';
 
+part 'reports_remote_sync.dart';
+
 enum DistanceBracket {
   under1km('< 1 km'),
   from1to2km('1 - 2 km'),
@@ -42,15 +44,18 @@ enum DistanceBracket {
   }
 }
 
-class ReportsViewModel extends ChangeNotifier {
+class ReportsViewModel extends ChangeNotifier with _RemoteReportSync {
   final sdk.MessagingService messaging;
+  @override
   final ReportsRepository repository;
   final ParseIncomingReport parseIncomingReport;
   final ParseIncomingDeletion parseIncomingDeletion;
   final ViewReportOnMap viewReportOnMap;
   final ParseNavigatorUpdate parseNavigatorUpdate;
   final PollRouteGeometry pollRouteGeometry;
+  @override
   final SyncRemoteReports syncRemoteReports;
+  @override
   final SyncLocalReportsToLattice syncLocalReportsToLattice;
   final SyncNavigatorStates syncNavigatorStates;
   final sdk.MapService mapService;
@@ -67,6 +72,7 @@ class ReportsViewModel extends ChangeNotifier {
   static const remoteSyncInterval = Duration(minutes: 5);
   static const navigatorSyncInterval = Duration(minutes: 3);
 
+  @override
   final List<RecoveryReport> reports = [];
   final ValueNotifier<int> unreadCount = ValueNotifier(0);
   String? responderMarkerId;
@@ -159,6 +165,7 @@ class ReportsViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  @override
   void updateUnread() {
     unreadCount.value = reports.where((r) => !r.isRead && !r.isOutgoing).length;
   }
@@ -183,17 +190,6 @@ class ReportsViewModel extends ChangeNotifier {
     if (update != null) {
       applyNavigatorUpdate(update);
     }
-  }
-
-  Future<void> applyRemoteDeletion(String entityId) async {
-    final index = reports.indexWhere((r) => r.entityId == entityId);
-    if (index == -1) return;
-    final removed = reports.removeAt(index);
-    updateUnread();
-    if (removed.id != null) {
-      await repository.deleteReport(removed.id!);
-    }
-    notifyListeners();
   }
 
   void applyNavigatorUpdate(NavigatorUpdate update) {
@@ -446,19 +442,6 @@ class ReportsViewModel extends ChangeNotifier {
   void startRemoteSyncPolling() {
     remoteSyncTimer =
         Timer.periodic(remoteSyncInterval, (_) => syncRemoteLatticeReports());
-  }
-
-  Future<void> syncRemoteLatticeReports() async {
-    final newReports = await syncRemoteReports(reports);
-    if (newReports.isNotEmpty) {
-      for (final report in newReports) {
-        reports.insert(0, report);
-      }
-      updateUnread();
-      notifyListeners();
-    }
-
-    await syncLocalReportsToLattice(reports);
   }
 
   void startNavigatorSyncPolling() {

@@ -44,8 +44,8 @@ dart format --set-exit-if-changed lib test || {
   exit 1
 }
 
-echo "analyzer running Ivy Pulse"
-flutter analyze my-extensions/ivy_pulse  || {
+echo "analyzer running circle-x"
+flutter analyze my-extensions/circle-x  || {
   echo ""
   echo "🚫 Analyzer found issues. Fix them before committing."
   exit 1

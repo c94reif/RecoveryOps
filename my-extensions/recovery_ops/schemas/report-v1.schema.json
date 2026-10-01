@@ -1,0 +1,129 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "recovery-ops report v1",
+  "description": "Stable report ID plus either a live report or a permanent withdrawal record. No TTL.",
+  "type": "object",
+  "required": [
+    "reportId",
+    "withdrawn",
+    "updatedAt"
+  ],
+  "properties": {
+    "reportId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "withdrawn": {
+      "type": "boolean"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "report": {
+      "type": "object",
+      "required": [
+        "entityId",
+        "bumperNumber",
+        "issue",
+        "recoveryType",
+        "vehicleLatitude",
+        "vehicleLongitude"
+      ],
+      "properties": {
+        "entityId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bumperNumber": {
+          "type": "string"
+        },
+        "issue": {
+          "type": "string"
+        },
+        "recoveryType": {
+          "type": "string"
+        },
+        "vehicleLatitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "vehicleLongitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "navigatorLatitude": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -90,
+          "maximum": 90
+        },
+        "navigatorLongitude": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -180,
+          "maximum": 180
+        },
+        "navigationStopped": {
+          "type": "boolean"
+        },
+        "routeGeometry": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": [
+              {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90
+              },
+              {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180
+              }
+            ],
+            "additionalItems": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "properties": {
+        "withdrawn": {
+          "const": false
+        }
+      },
+      "required": [
+        "report"
+      ]
+    },
+    {
+      "properties": {
+        "withdrawn": {
+          "const": true
+        }
+      },
+      "not": {
+        "required": [
+          "report"
+        ]
+      }
+    }
+  ]
+}

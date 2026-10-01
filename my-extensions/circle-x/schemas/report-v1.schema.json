@@ -1,0 +1,251 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "circle-x report v1",
+  "description": "Stable report ID plus either a live report or a permanent withdrawal record. No TTL.",
+  "type": "object",
+  "required": [
+    "reportId",
+    "withdrawn",
+    "updatedAt"
+  ],
+  "properties": {
+    "reportId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "withdrawn": {
+      "type": "boolean"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "report": {
+      "type": "object",
+      "required": [
+        "type",
+        "entityId",
+        "bumperNumber",
+        "vehicleType",
+        "operator",
+        "uic",
+        "phases",
+        "faults",
+        "latitude",
+        "longitude",
+        "timestamp"
+      ],
+      "properties": {
+        "type": {
+          "const": "circle-x.report"
+        },
+        "entityId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bumperNumber": {
+          "type": "string"
+        },
+        "vehicleType": {
+          "type": "string"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "uic": {
+          "type": "string"
+        },
+        "phases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "faults": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "itemId",
+              "phase",
+              "severity",
+              "recordedAt"
+            ],
+            "properties": {
+              "itemId": {
+                "type": "string"
+              },
+              "phase": {
+                "type": "string"
+              },
+              "category": {
+                "type": "string"
+              },
+              "subcategory": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "condition": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string"
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "recordedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "signature": {
+          "type": "object",
+          "required": [
+            "verified",
+            "signedAt"
+          ],
+          "properties": {
+            "verified": {
+              "type": "boolean"
+            },
+            "signedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "identity": {
+              "type": "object"
+            },
+            "attestedBy": {
+              "type": "object"
+            },
+            "blockedBy": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "maintainerReview": {
+          "type": "object",
+          "required": [
+            "sourceReportId",
+            "faults",
+            "signature"
+          ],
+          "properties": {
+            "sourceReportId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "faults": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": [
+                  "itemId",
+                  "phase",
+                  "verified",
+                  "description"
+                ],
+                "properties": {
+                  "itemId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "phase": {
+                    "type": "string"
+                  },
+                  "verified": {
+                    "type": "boolean"
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "signature": {
+              "type": "object",
+              "required": [
+                "verified",
+                "identity",
+                "signedAt"
+              ],
+              "properties": {
+                "verified": {
+                  "const": true
+                },
+                "signedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "identity": {
+                  "type": "object"
+                },
+                "attestedBy": {
+                  "type": "object"
+                },
+                "blockedBy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "properties": {
+        "withdrawn": {
+          "const": false
+        }
+      },
+      "required": [
+        "report"
+      ]
+    },
+    {
+      "properties": {
+        "withdrawn": {
+          "const": true
+        }
+      },
+      "not": {
+        "required": [
+          "report"
+        ]
+      }
+    }
+  ]
+}

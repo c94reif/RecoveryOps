@@ -19,8 +19,8 @@ done
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
-echo "running tests with coverage Ivy Pulse"
-(cd my-extensions/ivy_pulse && flutter test --coverage) || {
+echo "running tests with coverage circle-x"
+(cd my-extensions/circle-x && flutter test --coverage) || {
   echo ""
   echo "🚫 Tests failed. Fix them before pushing."
   exit 1
@@ -34,7 +34,7 @@ echo "running tests with coverage Recovery Ops"
 }
 
 echo "coverage gate running (80% minimum, generated files excluded)"
-(cd my-extensions/ivy_pulse && dart run ../../tool/check_coverage.dart) || {
+(cd my-extensions/circle-x && dart run ../../tool/check_coverage.dart) || {
   echo ""
   echo "🚫 Coverage is below the 80% minimum. Add tests before pushing."
   exit 1

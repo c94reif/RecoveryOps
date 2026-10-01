@@ -7,6 +7,9 @@ import 'package:recovery_ops/data/dao/queue/queued_requests_dao.dart';
 import 'package:recovery_ops/data/dao/reports/reports_dao.dart';
 import 'package:recovery_ops/data/datasources/local/database.dart';
 import 'package:recovery_ops/data/services/isolate_queue_worker.dart';
+import 'package:recovery_ops/data/services/mesh_item_report_store_strategy.dart';
+import 'package:recovery_ops/domain/services/remote_report_source.dart';
+import 'package:recovery_ops/domain/services/report_store_strategy.dart';
 import 'package:recovery_ops/domain/repositories/location_repo.dart';
 import 'package:recovery_ops/domain/repositories/profile_repo.dart';
 import 'package:recovery_ops/domain/repositories/queued_requests_repo.dart';
@@ -70,6 +73,13 @@ void main() {
     expect(reports.mapService, same(context.map));
     expect(reports.repository, same(getIt<ReportsRepository>()));
     expect(reports.navigationViewModel, same(getIt<NavigationViewModel>()));
+  });
+
+  test('default remote read and write ports share the mesh item strategy', () {
+    final store = getIt<ReportStoreStrategy>();
+    expect(store, isA<MeshItemReportStoreStrategy>());
+    expect(getIt<RecoveryEntityPort>(), same(store));
+    expect(getIt<RemoteReportSource>(), same(store));
   });
 
   test(
