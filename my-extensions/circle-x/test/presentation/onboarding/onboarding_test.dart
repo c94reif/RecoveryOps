@@ -51,10 +51,27 @@ void main() {
         ),
       );
 
-  Finder uicField() => find.widgetWithText(CustomTextField, 'UIC');
+  Finder uicField() => find.widgetWithText(CustomTextField, 'Default UIC');
   Finder continueButton() => find.widgetWithText(CustomButton, 'CONTINUE');
 
   group('who gets asked', () {
+    testWidgets('a stored UIC with an invalid length needs correction',
+        (tester) async {
+      repository.profile = const Profile(uic: 'NSNS');
+      register(repository);
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+      expect(find.byType(OnboardingPage), findsOneWidget);
+      await tester.enterText(uicField(), 'W12');
+      await tester.pumpAndSettle();
+      expect(tester.widget<CustomButton>(continueButton()).onPressed, isNull);
+      expect(find.text('3/6'), findsOneWidget);
+      await tester.enterText(uicField(), 'W12ABCD');
+      await tester.pumpAndSettle();
+      expect(tester.widget<CustomButton>(continueButton()).onPressed, isNull);
+      expect(find.text('7/6'), findsOneWidget);
+      expect(repository.saved, isEmpty);
+    });
     testWidgets('a device with nothing stored is asked for a UIC',
         (tester) async {
       register(repository);

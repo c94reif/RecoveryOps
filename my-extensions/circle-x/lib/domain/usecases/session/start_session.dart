@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:circle_x/domain/services/diagnostic_logger.dart';
 import 'package:circle_x/domain/entities/pmcs_session.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
+import 'package:circle_x/domain/entities/uic.dart';
 import 'package:circle_x/domain/repositories/location_repo.dart';
 import 'package:circle_x/domain/repositories/sessions_repo.dart';
 import 'package:circle_x/domain/services/clock.dart';
@@ -27,12 +28,14 @@ class StartSession {
     required VehicleType vehicleType,
     required String uic,
   }) async {
+    final error = Uic.validate(uic);
+    if (error != null) throw ArgumentError(error);
     final session = PmcsSession(
       sessionId: idGenerator.newId(),
       bumperNumber: bumperNumber.trim().toUpperCase(),
       vehicleType: vehicleType,
       operator: '',
-      uic: uic.trim().toUpperCase(),
+      uic: Uic.normalize(uic),
       startedAt: clock.nowUtc(),
     );
 

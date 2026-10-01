@@ -2,6 +2,9 @@ import 'dart:typed_data';
 import 'package:le_sdk/le_sdk.dart' as sdk;
 
 class FakeMeshItems implements sdk.MeshItemService {
+  FakeMeshItems({this.validate});
+
+  final void Function(Map<String, Object?>)? validate;
   final records = <String, sdk.MeshItem>{};
   final created = <Map<String, Object?>>[];
   final updated = <String>[];
@@ -36,6 +39,7 @@ class FakeMeshItems implements sdk.MeshItemService {
       sdk.MeshDataTypePath type, Map<String, Object?> data,
       {Duration? ttl}) async {
     if (failWrites) throw StateError('write failed');
+    validate?.call(data);
     lastTtl = ttl;
     created.add(data);
     final item = seed(type, data, persist: !dropWrites);
@@ -61,6 +65,7 @@ class FakeMeshItems implements sdk.MeshItemService {
       sdk.MeshItemPath path, Map<String, Object?> data,
       {Duration? ttl}) async {
     if (failWrites) throw StateError('write failed');
+    validate?.call(data);
     lastTtl = ttl;
     updated.add(path.id);
     final item = sdk.MeshItem(

@@ -1,21 +1,23 @@
-import { PMCS_CHECKS } from './pmcs-checks.mjs';
-import { JLTV_PMCS_CHECKS } from './pmcs-checks-jltv.mjs';
 import * as ref from './reference-data.mjs';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { dartString as s, validateCatalogs, catalogFileName,
+  emitVehicleTypes, emitRegistry } from './catalog-registry.mjs';
 
-const OUT = process.argv[2];
-if (!OUT) throw new Error('usage: node gen-dart.mjs <lib/data/catalog dir>');
+const LIB = process.argv[2];
+if (!LIB) throw new Error('usage: node gen-dart.mjs <lib dir> [manifest path]');
+const manifest = process.argv[3]
+  ? pathToFileURL(resolve(process.argv[3]))
+  : new URL('./catalog-manifest.mjs', import.meta.url);
+const { vehicleCatalogs } = await import(manifest);
+validateCatalogs(vehicleCatalogs);
+const OUT = join(LIB, 'data/catalog');
+const ENTITIES = join(LIB, 'domain/entities');
+mkdirSync(OUT, { recursive: true });
+mkdirSync(ENTITIES, { recursive: true });
 
 const PHASES = [['BEFORE', 'PmcsPhase.before'], ['DURING', 'PmcsPhase.during'], ['AFTER', 'PmcsPhase.after']];
-
-/** Dart single-quoted string literal. */
-function s(v) {
-  return "'" + String(v)
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/\$/g, '\\$')
-    .replace(/\r?\n/g, '\\n') + "'";
-}
 
 function header(desc) {
   return [
@@ -74,33 +76,19 @@ function emitCatalog({ varName, vehicleEnum, source, desc, docs }) {
   return lines.join('\n');
 }
 
-const strykerCount = PHASES.reduce((a, [k]) => a + PMCS_CHECKS[k].reduce((x, c) => x + c.items.length, 0), 0);
-const jltvCount = PHASES.reduce((a, [k]) => a + JLTV_PMCS_CHECKS[k].reduce((x, c) => x + c.items.length, 0), 0);
-
-writeFileSync(`${OUT}/stryker_pmcs_catalog.g.dart`, emitCatalog({
-  varName: 'strykerPmcsCatalog',
-  vehicleEnum: 'VehicleType.stryker',
-  source: PMCS_CHECKS,
-  desc: 'Stryker family PMCS checks transcribed from TM 9-2355-311-10.',
-  docs: [
-    'Stryker PMCS catalog — ' + strykerCount + ' TM checks across before, during,',
-    'and after operations.',
-  ],
-}));
-
-writeFileSync(`${OUT}/jltv_pmcs_catalog.g.dart`, emitCatalog({
-  varName: 'jltvPmcsCatalog',
-  vehicleEnum: 'VehicleType.jltv',
-  source: JLTV_PMCS_CHECKS,
-  desc: 'JLTV PMCS checks transcribed from TM 9-2320-400-10 PMCS tables.',
-  docs: [
-    'JLTV PMCS catalog — ' + jltvCount + ' TM checks across before, during, and',
-    'after operations.',
-    '',
-    'Item ids carrying the `CRIT` marker have a "Not Mission Capable If"',
-    'condition in the TM and are graded as critical systems by the classifier.',
-  ],
-}));
+for (const catalog of vehicleCatalogs) {
+  const count = PHASES.reduce((sum, [phase]) => sum +
+    (catalog.source[phase] ?? []).reduce((total, category) => total + category.items.length, 0), 0);
+  writeFileSync(join(OUT, catalogFileName(catalog)), emitCatalog({
+    varName: `${catalog.id}PmcsCatalog`,
+    vehicleEnum: `VehicleType.${catalog.id}`,
+    source: catalog.source,
+    desc: `${catalog.displayName}: ${catalog.technicalManual}.`,
+    docs: [`${count} PMCS checks for ${catalog.family} / ${catalog.variant}.`],
+  }));
+}
+writeFileSync(join(ENTITIES, 'vehicle_type.g.dart'), emitVehicleTypes(vehicleCatalogs));
+writeFileSync(join(OUT, 'pmcs_catalog_registry.g.dart'), emitRegistry(vehicleCatalogs));
 
 // ── Reference data ────────────────────────────────────────────────────────
 const r = [];
@@ -158,4 +146,4 @@ r.push('');
 // takes a vehicle from another company.
 writeFileSync(`${OUT}/pmcs_reference_data.g.dart`, r.join('\n'));
 
-console.log(`stryker=${strykerCount} jltv=${jltvCount} wrote 3 files to ${OUT}`);
+console.log(`Generated ${vehicleCatalogs.length} vehicle catalogs, registry, vehicle types and reference data.`);

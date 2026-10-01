@@ -20,6 +20,7 @@ import 'package:circle_x/domain/entities/profile.dart';
 import 'package:circle_x/domain/entities/publish_result.dart';
 import 'package:circle_x/domain/entities/transport_kind.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
+import 'package:circle_x/domain/entities/uic.dart';
 import 'package:circle_x/domain/repositories/faults_repo.dart';
 import 'package:circle_x/domain/repositories/profile_repo.dart';
 import 'package:circle_x/domain/repositories/reports_repo.dart';

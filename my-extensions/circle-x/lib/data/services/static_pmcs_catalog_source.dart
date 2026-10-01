@@ -1,14 +1,11 @@
-import 'package:circle_x/data/catalog/jltv_pmcs_catalog.g.dart';
-import 'package:circle_x/data/catalog/stryker_pmcs_catalog.g.dart';
+import 'package:circle_x/data/catalog/pmcs_catalog_registry.g.dart';
 import 'package:circle_x/domain/entities/pmcs_catalog.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
 import 'package:circle_x/domain/services/pmcs_catalog_source.dart';
 
 class StaticPmcsCatalogSource implements PmcsCatalogSource {
-  static const Map<VehicleType, PmcsCatalog> defaultCatalogs = {
-    VehicleType.stryker: strykerPmcsCatalog,
-    VehicleType.jltv: jltvPmcsCatalog,
-  };
+  static const Map<VehicleType, PmcsCatalog> defaultCatalogs =
+      registeredPmcsCatalogs;
 
   final Map<VehicleType, PmcsCatalog> _catalogs;
 

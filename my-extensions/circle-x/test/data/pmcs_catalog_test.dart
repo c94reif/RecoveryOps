@@ -25,11 +25,8 @@ void main() {
       expect(jltvPmcsCatalog.totalItemCount, 94);
     });
 
-    for (final entry in {
-      'Stryker': strykerPmcsCatalog,
-      'JLTV': jltvPmcsCatalog,
-    }.entries) {
-      final name = entry.key;
+    for (final entry in StaticPmcsCatalogSource.defaultCatalogs.entries) {
+      final name = entry.key.displayName;
       final catalog = entry.value;
 
       test('$name item ids are unique', () {
@@ -84,7 +81,7 @@ void main() {
       });
 
       test('$name labels resolve by index and reject out-of-range', () {
-        final item = catalog.itemsFor(PmcsPhase.before).first;
+        final item = PmcsPhase.values.expand(catalog.itemsFor).first;
         expect(item.labelAt(0), item.faults.first);
         expect(item.labelAt(-1), '');
         expect(item.labelAt(item.faults.length), '');
@@ -98,18 +95,24 @@ void main() {
   });
 
   group('StaticPmcsCatalogSource', () {
-    test('supports both fielded platforms', () {
+    test('registers every generated vehicle and preserves its stored identity',
+        () {
       final source = StaticPmcsCatalogSource();
 
-      expect(source.supportedVehicles, [VehicleType.stryker, VehicleType.jltv]);
-    });
-
-    test('hands back the right catalog per platform', () {
-      final source = StaticPmcsCatalogSource();
-
-      expect(source.catalogFor(VehicleType.stryker).vehicleType,
-          VehicleType.stryker);
-      expect(source.catalogFor(VehicleType.jltv).vehicleType, VehicleType.jltv);
+      expect(source.supportedVehicles, VehicleType.values);
+      for (final vehicle in VehicleType.values) {
+        expect(source.catalogFor(vehicle).vehicleType, vehicle);
+        expect(source.catalogFor(vehicle).totalItemCount, greaterThan(0));
+        expect(VehicleType.fromWireName(vehicle.wireName), vehicle);
+        expect(vehicle.family.trim(), isNotEmpty);
+        expect(vehicle.variant.trim(), isNotEmpty);
+        expect(vehicle.technicalManual.trim(), isNotEmpty);
+      }
+      expect(VehicleType.fromWireName('STRYKER'), VehicleType.stryker);
+      expect(VehicleType.fromWireName('JLTV'), VehicleType.jltv);
+      expect(VehicleType.tryFromWireName('UNKNOWN'), isNull);
+      expect(VehicleType.tryFromWireName(null), isNull);
+      expect(() => VehicleType.fromWireName('UNKNOWN'), throwsArgumentError);
     });
 
     test('a platform can be added without touching the flow', () {

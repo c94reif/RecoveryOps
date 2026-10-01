@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:circle_x/data/mappers/pmcs_storage_codec.dart';
 import 'package:circle_x/domain/entities/maintainer_review.dart';
+import 'package:circle_x/domain/entities/pmcs_fault.dart';
 
 import 'package:flutter/foundation.dart';
 
@@ -30,7 +31,7 @@ class ReportsRepoImpl implements ReportsRepository {
     final reports = rows.map(toEntity).whereType<PmcsReport>().toList();
     if (reports.length != rows.length) {
       debugPrint('[CircleX] getAllReports: skipped '
-          '${rows.length - reports.length} row(s) for an unknown platform');
+          '${rows.length - reports.length} unreadable report row(s)');
     }
     return reports;
   }
@@ -58,7 +59,7 @@ class ReportsRepoImpl implements ReportsRepository {
     );
     final stored = toEntity(await dao.getById(id));
     if (stored == null) {
-      throw StateError('Stored report uses an unknown platform');
+      throw StateError('Stored report is unreadable');
     }
     return stored;
   }
@@ -82,6 +83,14 @@ class ReportsRepoImpl implements ReportsRepository {
     final vehicleType = VehicleType.tryFromWireName(row.vehicleType);
     if (vehicleType == null) return null;
 
+    final List<PmcsFault> faults;
+    try {
+      faults = PmcsStorageCodec.decodeFaults(row.entityId, row.faultsJson);
+    } on FormatException {
+      // Keep the row on disk, but do not present corrupt faults as a clean PMCS.
+      return null;
+    }
+
     MaintainerReview? review;
     if (row.maintainerReviewJson != null) {
       try {
@@ -103,7 +112,7 @@ class ReportsRepoImpl implements ReportsRepository {
       operator: row.operator,
       uic: row.uic,
       phases: PmcsStorageCodec.decodePhases(row.phases),
-      faults: PmcsStorageCodec.decodeFaults(row.entityId, row.faultsJson),
+      faults: faults,
       signature: PmcsStorageCodec.decodeSignature(row.signatureJson),
       maintainerReview: review,
       latitude: row.latitude,

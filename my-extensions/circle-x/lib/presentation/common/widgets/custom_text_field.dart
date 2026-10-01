@@ -16,6 +16,10 @@ class CustomTextField extends StatelessWidget {
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
   final bool uppercase;
+  final bool autocorrect;
+  final String? helperText;
+  final String? errorText;
+  final String? counterText;
 
   const CustomTextField({
     super.key,
@@ -32,12 +36,17 @@ class CustomTextField extends StatelessWidget {
     this.textInputAction,
     this.onSubmitted,
     this.uppercase = false,
+    this.autocorrect = true,
+    this.helperText,
+    this.errorText,
+    this.counterText,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      autocorrect: autocorrect,
       textCapitalization: textCapitalization,
       onChanged: onChanged,
       keyboardType: keyboardType,
@@ -51,6 +60,11 @@ class CustomTextField extends StatelessWidget {
         hintText: hint,
         prefixIcon: icon != null ? Icon(icon) : null,
         suffixIcon: suffixIcon,
+        helperText: helperText,
+        helperMaxLines: 2,
+        errorText: errorText,
+        errorMaxLines: 2,
+        counterText: counterText,
       ),
     );
   }

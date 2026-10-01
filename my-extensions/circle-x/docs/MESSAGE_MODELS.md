@@ -20,7 +20,7 @@ The extension has two application payload types: `circle-x.report` and `circle-x
 ```typescript
 type Phase = "BEFORE" | "DURING" | "AFTER";
 type Severity = "RED_X" | "CIRCLE_X" | "DASH";
-type VehicleType = "STRYKER" | "JLTV";
+type VehicleType = string;  // Registered catalog wireName; currently STRYKER or JLTV
 type ISO8601UTC = string;
 
 interface PmcsReportPayload {
@@ -39,7 +39,9 @@ interface PmcsReportPayload {
 }
 ```
 
-`entityId` links the peer report, Lattice entity, and queued retry. A new PMCS receives a new ID even when it uses the same vehicle. Bumper number and UIC are trimmed and uppercased for new inspections.
+`entityId` links the peer report, Lattice entity, and queued retry. A new PMCS receives a new ID even when it uses the same vehicle. Bumper number and UIC are trimmed and uppercased for new inspections. Incoming UICs must also normalize to exactly six ASCII letters or numbers; report serialization emits that canonical uppercase UIC. Invalid historical UICs need correction before they can be imported or republished to the stricter mesh store.
+
+Vehicle IDs are generated from [`catalog-manifest.mjs`](../tool/tm_source/catalog-manifest.mjs). Every selectable variant has its own stable `wireName`, which is retained in saved and transmitted reports. Adding an entry does not change the payload shape; recipients must carry that entry to recognize its ID. See [Adding vehicles, variants, and TMs](../README.md#adding-vehicles-variants-and-tms).
 
 `faults` can be empty. Each new PMCS selects BEFORE, DURING, or AFTER and can be submitted as soon as that checklist is finished and signed. `phases` contains that inspection type; it does not represent progress toward a three-phase lifecycle. The list format still supports older reports and drafts containing multiple completed types. Only completed-checklist fault records are assembled into the submitted report. Serviceable answers and unanswered checks are not included as individual records.
 
@@ -157,7 +159,7 @@ interface PmcsLatticeEntityJson {
   description: string;            // JSON-encoded PmcsReportPayload
   environment: "land";
   ontology: {
-    platformType: "Stryker" | "JLTV";
+    platformType: string; // Catalog displayName; currently Stryker or JLTV
     specificType: ReportStatus;
     template: "TEMPLATE_ASSET";
   };
@@ -245,10 +247,11 @@ Repeated deliveries are identified by `entityId`, which is protected against dup
 
 The models above describe current output. The receiver also supports older input:
 
-- Peer payloads must have a recognized `type`. A peer report requires a nonempty `entityId`, a string bumper number, a recognized vehicle type, and numeric latitude/longitude. Unusable payloads are ignored.
-- A missing `uic` can fall back to the older `unit` field. A missing signature remains unverified. Unknown extra properties are not included in the reconstructed domain report.
-- Unknown phase-list entries are skipped. Missing phase/fault lists default to empty lists. Missing or invalid report timestamps default to receive-time decoding; these are compatibility defaults, not current output conventions.
-- A valid identity block establishes the decoder’s verified signature state; the `verified` boolean by itself is insufficient. An unknown unverified reason falls back to `noCodeFound` when a signature can otherwise be reconstructed.
+- Report payloads must have the recognized `type`, a nonempty `entityId`, a string bumper number, a recognized vehicle type, a valid six-character UIC, and finite latitude/longitude within geographic bounds. Unusable payloads are ignored.
+- A missing `uic` can fall back to the older `unit` field when it contains a valid UIC. The reader normalizes case and surrounding whitespace. A missing signature remains unverified. Unknown extra properties are not included in the reconstructed domain report.
+- Unknown or duplicate phase-list entries and invalid fault phases/severities reject the entire incoming report. Malformed fault lists or entries are never dropped to manufacture a clean PMCS. Missing phase/fault lists still default to empty lists for legacy peer/entity input. Missing or invalid report timestamps default to receive-time decoding; these are compatibility defaults, not current output conventions or the stricter item-store schema.
+- Verification requires both `verified: true` and a valid CAC identity. CAC identities require a ten-digit, nonzero-leading DoD ID, string first/last names, and a parseable verification timestamp; optional fields are type-checked. Typed identities require the same ID format and nonblank names. An invalid operator identity remains unverified; an invalid maintainer identity rejects the review. An unknown unverified reason falls back to `noCodeFound` when a signature can otherwise be reconstructed.
+- Mesh import and reconciliation use the same live-report decoder. Rejected live records are not considered successfully stored, so a valid local outgoing copy can repair them. Permanent withdrawals always remain known and prevent resurrection. Report-ID equality and unique `(phase, itemId)` review keys are checked in application code; JSON Schema cannot express these cross-field/key constraints. Corrupt stored fault lists stay on disk but are excluded from report results instead of displaying as FMC.
 - Peer deletion requires the exact deletion type and a nonempty string entity ID. Lattice imports use provenance/live filtering and the description body rather than the peer-message envelope.
 
 There is no explicit schema-version field in the current application payload.

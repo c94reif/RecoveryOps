@@ -38,7 +38,7 @@ class SubmitMaintainerReview {
   }) async {
     if (reviewId.isEmpty ||
         reviewId == sourceReportId ||
-        !RegExp(r'^\d{10}$').hasMatch(identity.edipi) ||
+        !CacIdentity.isValidEdipi(identity.edipi) ||
         (identity.daysUntilCardExpiry ?? 0) < 0) {
       throw ArgumentError('A valid CAC scan is required');
     }

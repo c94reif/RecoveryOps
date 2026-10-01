@@ -40,19 +40,28 @@ class MeshItemReportStoreStrategy implements ReportStoreStrategy {
     final records = await collection.snapshot();
     final reports = <PmcsReport>[];
     for (final entry in records.entries) {
-      if (MeshReportCollection.withdrawn(entry.value)) continue;
-      final body = MeshReportCollection.body(entry.value);
-      if (body == null || body['entityId'] != entry.key) continue;
-      final report =
-          codec.reportFromBody(body, fromCallsign: 'Mesh item store');
+      final report = _readReport(entry.key, entry.value);
       if (report != null) reports.add(report);
     }
     return reports;
   }
 
   @override
-  Future<Set<String>> fetchKnownPmcsEntityIds() async =>
-      (await collection.snapshot()).keys.toSet();
+  Future<Set<String>> fetchKnownPmcsEntityIds() async => {
+        for (final entry in (await collection.snapshot()).entries)
+          if (MeshReportCollection.withdrawn(entry.value) ||
+              _readReport(entry.key, entry.value) != null)
+            entry.key,
+      };
+
+  // Import and reconciliation must agree about which live records are usable.
+  // Withdrawals stay known even when no report body can be decoded.
+  PmcsReport? _readReport(String reportId, sdk.MeshItem item) {
+    if (item.data['withdrawn'] != false) return null;
+    final body = MeshReportCollection.body(item);
+    if (body == null || body['entityId'] != reportId) return null;
+    return codec.reportFromBody(body, fromCallsign: 'Mesh item store');
+  }
 
   @override
   Future<Set<String>> fetchWithdrawnPmcsEntityIds() async => {

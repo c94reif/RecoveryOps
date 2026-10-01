@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:circle_x/domain/entities/profile.dart';
+import 'package:circle_x/domain/entities/uic.dart';
 import 'package:circle_x/domain/repositories/profile_repo.dart';
 
 class ProfileViewModel extends ChangeNotifier {
@@ -36,8 +37,9 @@ class ProfileViewModel extends ChangeNotifier {
   Future<void> save(String uic) async {
     final value = normalize(uic);
 
-    if (value.isEmpty) {
-      snackBarMessage = 'UIC is required';
+    final error = Uic.validate(value);
+    if (error != null) {
+      snackBarMessage = error;
       notifyListeners();
       return;
     }
@@ -47,9 +49,9 @@ class ProfileViewModel extends ChangeNotifier {
     savedUic = value;
     isDirty = false;
     hasExistingProfile = true;
-    snackBarMessage = 'Profile Saved!';
+    snackBarMessage = 'Default UIC saved';
     notifyListeners();
   }
 
-  static String normalize(String uic) => uic.trim().toUpperCase();
+  static String normalize(String uic) => Uic.normalize(uic);
 }

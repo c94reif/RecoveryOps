@@ -37,7 +37,7 @@ void main() {
   ProfilePageState stateOf(WidgetTester tester) =>
       tester.state<ProfilePageState>(find.byType(ProfilePage));
 
-  Finder uicField() => find.widgetWithText(CustomTextField, 'UIC');
+  Finder uicField() => find.widgetWithText(CustomTextField, 'Default UIC');
 
   Future<void> tapSave(WidgetTester tester, String label) async {
     final save = find.widgetWithText(CustomButton, label);
@@ -71,9 +71,11 @@ void main() {
 
     expect(find.byType(MaintainerPage), findsNothing);
     expect(stateOf(tester).uicController.text, 'WAB4C0');
-    expect(find.widgetWithText(CustomButton, 'Save Edit'), findsOneWidget);
+    expect(
+        find.widgetWithText(CustomButton, 'Save default UIC'), findsOneWidget);
     expect(repository.saved, isEmpty);
 
+    await tester.ensureVisible(find.text('Enter maintainer mode'));
     await tester.tap(find.text('Enter maintainer mode'));
     await tester.pumpAndSettle();
     expect(reports.syncCalls, 2);
@@ -124,7 +126,7 @@ void main() {
     testWidgets('stays hidden on a freshly loaded profile', (tester) async {
       // Regression from the name/rank/unit profile: the controllers were
       // filled before the picked field was restored, so the dirty check
-      // latched and showed Save Edit on work the operator never did.
+      // latched and showed a save button on work the operator never did.
       repository.profile = const Profile(uic: 'WJ8TAA');
 
       await tester.pumpWidget(subject());
@@ -140,10 +142,11 @@ void main() {
       await tester.enterText(uicField(), 'WJ8TAA');
       await tester.pumpAndSettle();
 
-      expect(find.widgetWithText(CustomButton, 'Save'), findsOneWidget);
+      expect(find.widgetWithText(CustomButton, 'Save default UIC'),
+          findsOneWidget);
     });
 
-    testWidgets('reads Save Edit when a profile already exists',
+    testWidgets('names the default UIC when updating a saved profile',
         (tester) async {
       repository.profile = const Profile(uic: 'WJ8TAA');
 
@@ -153,7 +156,8 @@ void main() {
       await tester.enterText(uicField(), 'WAB4C0');
       await tester.pumpAndSettle();
 
-      expect(find.widgetWithText(CustomButton, 'Save Edit'), findsOneWidget);
+      expect(find.widgetWithText(CustomButton, 'Save default UIC'),
+          findsOneWidget);
     });
 
     testWidgets('goes away again when the edit is reverted', (tester) async {
@@ -174,6 +178,46 @@ void main() {
   });
 
   group('saving', () {
+    testWidgets(
+        'can edit and save in a narrow panel with large text and keyboard',
+        (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+      addTearDown(tester.view.reset);
+      repository.profile = const Profile(uic: 'WJ8TAA');
+
+      await tester.pumpWidget(MaterialApp(
+        theme: appTheme,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: const TextScaler.linear(2),
+          ),
+          child: child!,
+        ),
+        home: const Scaffold(
+          resizeToAvoidBottomInset: false,
+          body: ProfilePage(),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(uicField());
+      await tester.enterText(uicField(), 'WAB4C0');
+      await tester.pumpAndSettle();
+      await tapSave(tester, 'Save default UIC');
+      await tester.pumpAndSettle();
+
+      expect(repository.saved.single.uic, 'WAB4C0');
+      expect(find.text('Default UIC saved'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      final maintainerButton = find.text('Enter maintainer mode');
+      await tester.ensureVisible(maintainerButton);
+      await tester.pumpAndSettle();
+      expect(maintainerButton.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('a typed UIC reaches the database upper case', (tester) async {
       await tester.pumpWidget(subject());
       await tester.pumpAndSettle();
@@ -181,7 +225,7 @@ void main() {
       await tester.enterText(uicField(), 'wab4c0');
       await tester.pumpAndSettle();
 
-      await tapSave(tester, 'Save');
+      await tapSave(tester, 'Save default UIC');
       await tester.pumpAndSettle();
 
       expect(repository.saved.single.uic, 'WAB4C0');
@@ -190,9 +234,6 @@ void main() {
 
     testWidgets('clearing a stored UIC is refused and says why',
         (tester) async {
-      // Blanking the field on a device that has a UIC is the only way to
-      // reach the empty save — on a fresh device an empty field is not an
-      // edit, so there is no button to press.
       repository.profile = const Profile(uic: 'WJ8TAA');
 
       await tester.pumpWidget(subject());
@@ -201,12 +242,37 @@ void main() {
       await tester.enterText(uicField(), '   ');
       await tester.pumpAndSettle();
 
-      await tapSave(tester, 'Save Edit');
-      await tester.pump();
-
+      expect(
+          tester
+              .widget<CustomButton>(
+                  find.widgetWithText(CustomButton, 'Save default UIC'))
+              .onPressed,
+          isNull);
       expect(find.text('UIC is required'), findsOneWidget);
       expect(repository.saved, isEmpty);
       expect(repository.profile!.uic, 'WJ8TAA');
+    });
+
+    testWidgets('invalid lengths disable saving until the UIC is corrected',
+        (tester) async {
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+      for (final value in ['W12', 'W12ABCD', 'W12A!C']) {
+        await tester.enterText(uicField(), value);
+        await tester.pumpAndSettle();
+        expect(
+            tester
+                .widget<CustomButton>(
+                    find.widgetWithText(CustomButton, 'Save default UIC'))
+                .onPressed,
+            isNull);
+      }
+      await tester.enterText(uicField(), 'W12ABC');
+      await tester.pumpAndSettle();
+      expect(find.text('6/6'), findsOneWidget);
+      await tapSave(tester, 'Save default UIC');
+      await tester.pumpAndSettle();
+      expect(repository.saved.single.uic, 'W12ABC');
     });
   });
 }

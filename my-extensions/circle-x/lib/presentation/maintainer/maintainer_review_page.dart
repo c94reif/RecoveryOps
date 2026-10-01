@@ -14,6 +14,7 @@ import 'package:circle_x/presentation/maintainer/maintainer_review_summary.dart'
 import 'package:circle_x/presentation/maintainer/maintainer_description_field.dart';
 import 'package:circle_x/presentation/maintainer/maintainer_fault_search.dart';
 import 'package:circle_x/presentation/maintainer/maintainer_review_view_model.dart';
+import 'package:circle_x/presentation/maintainer/review_completion_dialog.dart';
 import 'package:circle_x/presentation/maintainer/swipe_fault_card.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
 
@@ -31,6 +32,7 @@ class _MaintainerReviewPageState extends State<MaintainerReviewPage> {
   late final MaintainerReviewViewModel model;
   final reviewScroll = ScrollController();
   bool searching = false;
+  bool showingCompletion = false;
 
   @override
   void initState() {
@@ -94,6 +96,30 @@ class _MaintainerReviewPageState extends State<MaintainerReviewPage> {
     }
   }
 
+  Future<void> decide(bool verified) async {
+    if (showingCompletion || model.busy) return;
+    FocusScope.of(context).unfocus();
+    final wasComplete = model.complete;
+    final wasAllVerified = model.allVerified;
+    model.decide(verified);
+    final justFinished = !wasComplete && model.complete;
+    final justVerifiedAll = !wasAllVerified && model.allVerified;
+    if (!justFinished && !justVerifiedAll) return;
+    showingCompletion = true;
+    final sign = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: .8),
+      builder: (_) => ReviewCompletionDialog(
+        vehicle: model.report.summary,
+        verifiedCount: model.verifiedCount,
+        total: model.decisions.length,
+      ),
+    );
+    if (!mounted) return;
+    showingCompletion = false;
+    if (sign == true) model.requestSignature();
+  }
+
   Widget buildFault() {
     final index = model.index;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -116,16 +142,6 @@ class _MaintainerReviewPageState extends State<MaintainerReviewPage> {
         ),
       ),
       const SizedBox(height: 16),
-      MaintainerDescriptionField(
-        key: ValueKey(('maintainer-description', index)),
-        value: model.descriptions[index],
-        onChanged: model.describe,
-        onDictate: model.toggleDictation,
-        isListening: model.isDictating,
-        enabled: !model.decisionAnimating,
-        message: model.dictationMessage,
-      ),
-      const SizedBox(height: 16),
       SwipeFaultCard(
         key: ValueKey(index),
         enabled: !model.isDictating,
@@ -137,10 +153,17 @@ class _MaintainerReviewPageState extends State<MaintainerReviewPage> {
                 .any((entry) => entry.key != index && entry.value == null),
         fault: model.report.faults[index],
         decision: model.decisions[index],
-        onDecision: (value) {
-          FocusScope.of(context).unfocus();
-          model.decide(value);
-        },
+        onDecision: decide,
+      ),
+      const SizedBox(height: 16),
+      MaintainerDescriptionField(
+        key: ValueKey(('maintainer-description', index)),
+        value: model.descriptions[index],
+        onChanged: model.describe,
+        onDictate: model.toggleDictation,
+        isListening: model.isDictating,
+        enabled: !model.decisionAnimating,
+        message: model.dictationMessage,
       ),
       const SizedBox(height: 8),
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -154,6 +177,14 @@ class _MaintainerReviewPageState extends State<MaintainerReviewPage> {
                 : null,
             child: const Text('Next')),
       ]),
+      if (model.complete) ...[
+        Text(model.allVerified ? 'All faults verified' : 'All faults reviewed',
+            style: const TextStyle(
+                color: serviceableGreen,
+                fontWeight: FontWeight.w700,
+                fontSize: 16)),
+        const SizedBox(height: 6),
+      ],
       Text(
           '${model.reviewedCount} of ${model.decisions.length} reviewed. '
           'Decisions remain a draft until you CAC-sign the batch.',
@@ -185,8 +216,7 @@ class _MaintainerReviewPageState extends State<MaintainerReviewPage> {
   Widget buildSignature() {
     final rejection = model.scan.lastScan?.rejection;
     final scanner = model.scan.cacScanner;
-    final verified =
-        model.decisions.where((decision) => decision == true).length;
+    final verified = model.verifiedCount;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const Text('Sign the review batch',
           style: TextStyle(
@@ -282,7 +312,8 @@ class _MaintainerReviewPageState extends State<MaintainerReviewPage> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                             MaintainerReviewSummary(
-                                review: model.saved!.maintainerReview!),
+                                review: model.saved!.maintainerReview!,
+                                faults: model.report.faults),
                             const SizedBox(height: 12),
                             Text(model.delivery == null
                                 ? 'Review saved on this device. Sending…'

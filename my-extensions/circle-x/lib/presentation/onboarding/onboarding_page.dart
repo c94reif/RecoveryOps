@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/di/service_locator.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
+import 'package:circle_x/domain/entities/uic.dart';
 import 'package:circle_x/presentation/common/widgets/custom_button.dart';
-import 'package:circle_x/presentation/common/widgets/custom_text_field.dart';
+import 'package:circle_x/presentation/common/widgets/uic_text_field.dart';
 import 'package:circle_x/presentation/common/widgets/section_label.dart';
 import 'package:circle_x/presentation/profile/profile_view_model.dart';
 
@@ -29,9 +30,10 @@ class OnboardingPageState extends State<OnboardingPage> {
 
   void onFieldChanged() => setState(() {});
 
-  bool get canContinue => uicController.text.trim().isNotEmpty && !isSaving;
+  bool get canContinue => Uic.isValid(uicController.text) && !isSaving;
 
   Future<void> submit() async {
+    if (!canContinue) return;
     setState(() => isSaving = true);
     try {
       await viewModel.save(uicController.text);
@@ -46,7 +48,7 @@ class OnboardingPageState extends State<OnboardingPage> {
     }
     if (!mounted) return;
     setState(() => isSaving = false);
-    if (viewModel.savedUic.isEmpty) {
+    if (!Uic.isValid(viewModel.savedUic)) {
       final message = viewModel.snackBarMessage ?? 'UIC is required';
       viewModel.snackBarMessage = null;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -105,20 +107,17 @@ class OnboardingPageState extends State<OnboardingPage> {
                     ),
                   ),
                   const SizedBox(height: 28),
-                  const SectionLabel(text: 'UIC'),
+                  const SectionLabel(text: 'INSPECTION DEFAULTS'),
                   const SizedBox(height: 8),
-                  CustomTextField(
+                  UicTextField(
                     controller: uicController,
-                    label: 'UIC',
-                    icon: Icons.groups_outlined,
-                    hint: 'W12ABC',
-                    textCapitalization: TextCapitalization.characters,
+                    label: 'Default UIC',
                   ),
                   const SizedBox(height: 12),
                   const Text(
-                    'The unit you are signed for. It routes every 5988-E you '
-                    'submit and fills itself in on every PMCS from here on. '
-                    'Change it any time under Profile.',
+                    'This UIC fills in automatically for a new PMCS. You can '
+                    'change it during setup for each inspection, or update '
+                    'your default any time in Profile.',
                     style: TextStyle(
                       color: textSecondary,
                       fontSize: 11,

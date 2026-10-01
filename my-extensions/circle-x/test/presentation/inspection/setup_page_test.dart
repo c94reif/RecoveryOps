@@ -8,6 +8,7 @@ import 'package:circle_x/presentation/common/widgets/custom_button.dart';
 import 'package:circle_x/presentation/common/widgets/custom_text_field.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
 import 'package:circle_x/presentation/inspection/setup_page.dart';
+import 'package:circle_x/presentation/inspection/vehicle_manual_selector.dart';
 
 import '../../support/fakes.dart';
 import '../../support/inspection_harness.dart';
@@ -41,7 +42,26 @@ void main() {
   bool isBeginEnabled(WidgetTester tester) =>
       tester.widget<CustomButton>(beginButton).onPressed != null;
 
+  Future<void> openManuals(WidgetTester tester) async {
+    await tester.tap(find.byKey(const ValueKey('vehicle-manual-selector')));
+    await tester.pumpAndSettle();
+  }
+
   group('starting a PMCS', () {
+    testWidgets('short, long and invalid prefilled UICs block starting',
+        (tester) async {
+      await tester.pumpWidget(createWidgetUnderTest());
+      for (final uic in ['W12', 'W12ABCD', 'W12A!C']) {
+        harness.viewModel.prefillVehicle(
+            bumperNumber: 'A-11', uic: uic, vehicleType: VehicleType.stryker);
+        await tester.pumpAndSettle();
+        expect(isBeginEnabled(tester), isFalse);
+      }
+      await tester.enterText(field('UIC'), 'W12ABC');
+      await tester.pumpAndSettle();
+      expect(find.text('6/6'), findsOneWidget);
+      expect(isBeginEnabled(tester), isTrue);
+    });
     testWidgets(
         'Next focuses UIC, Done dismisses the keyboard, and input is uppercase',
         (tester) async {
@@ -182,6 +202,8 @@ void main() {
 
       expect(find.text('Stryker'), findsOneWidget);
       expect(find.text('TM 9-2355-311-10'), findsOneWidget);
+      await openManuals(tester);
+      expect(find.text('STRYKER'), findsOneWidget);
       expect(find.text('JLTV'), findsOneWidget);
       expect(find.text('TM 9-2320-400-10'), findsOneWidget);
     });
@@ -190,10 +212,9 @@ void main() {
         (tester) async {
       await tester.pumpWidget(createWidgetUnderTest());
 
-      final selector = tester.widget<SegmentedButton<VehicleType>>(
-        find.byType(SegmentedButton<VehicleType>),
-      );
-      expect(selector.selected, {VehicleType.stryker});
+      final selector = tester
+          .widget<VehicleManualSelector>(find.byType(VehicleManualSelector));
+      expect(selector.selected, VehicleType.stryker);
     });
 
     testWidgets('picking a platform switches the checklist that gets walked',
@@ -201,13 +222,15 @@ void main() {
       await harness.load();
       await tester.pumpWidget(createWidgetUnderTest());
 
-      await tester.tap(find.text('JLTV'));
-      await tester.pump();
-
-      final selector = tester.widget<SegmentedButton<VehicleType>>(
-        find.byType(SegmentedButton<VehicleType>),
-      );
-      expect(selector.selected, {VehicleType.jltv});
+      await openManuals(tester);
+      final option =
+          find.byKey(const ValueKey(('vehicle-manual-option', 'JLTV')));
+      await tester.ensureVisible(option);
+      await tester.tap(option);
+      await tester.pumpAndSettle();
+      final selector = tester
+          .widget<VehicleManualSelector>(find.byType(VehicleManualSelector));
+      expect(selector.selected, VehicleType.jltv);
 
       await tester.enterText(field('Bumper Number'), 'HQ-9');
       await tester.pump();

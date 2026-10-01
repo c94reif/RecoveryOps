@@ -52,6 +52,119 @@ folder while excluding build output, caches, local IDE settings, logs, and exist
 ZIP files. It verifies the new archive before replacing an existing output ZIP.
 Requires `zip` and `unzip`; a custom output directory must already exist.
 
+## Adding vehicles, variants, and TMs
+
+The **Vehicle & technical manual** picker is searchable by family, variant, and
+TM number. Its entries come from
+[`tool/tm_source/catalog-manifest.mjs`](tool/tm_source/catalog-manifest.mjs).
+The current build includes the existing Stryker and JLTV checklists. Additional
+manuals can be added when their checklist content is available.
+
+1. Add a checklist source under `tool/tm_source/`, following
+   [`pmcs-checks-jltv.mjs`](tool/tm_source/pmcs-checks-jltv.mjs). Export an object
+   with `BEFORE`, `DURING`, and `AFTER` category arrays. Each category has a
+   `category` name and `items`; each item has a stable `id`, `item` label, `check`
+   instruction, and `faults` answer list. The first answer is serviceable;
+   subsequent answers describe faults in increasing severity. The current
+   [classifier](lib/domain/services/tm_fault_classifier.dart) uses `CRIT` in new
+   critical-system IDs and answer order to assign severity, so check both
+   against the source manual when transcribing.
+2. Import that source in the manifest and add one entry per selectable variant:
+
+   ```javascript
+   {
+     id: 'exampleCargo',              // Unique lower-camel-case Dart identifier
+     wireName: 'EXAMPLE_CARGO',        // Stable ID in saved/shared reports
+     displayName: 'Example cargo',     // Vehicle name shown on reports
+     family: 'Example vehicle family',// Groups related variants in the picker
+     variant: 'Cargo variant',        // Distinguishes models within that family
+     technicalManual: 'Actual TM number and edition',
+     source: EXAMPLE_CARGO_PMCS,
+   }
+   ```
+
+   This is a registration example, not an included checklist. Variants share a
+   `family` name but have distinct `id` and `wireName` values. Each `source`
+   supplies that variant's applicable checks; reuse a source only when the TM
+   covers the same checks for both variants.
+3. From `my-extensions/circle-x`, run:
+
+   ```bash
+   ./tool/generate_catalog.sh
+   node --test tool/tm_source/catalog-generator.test.mjs
+   flutter analyze --no-pub
+   flutter test --no-pub
+   ```
+
+The generator validates the manifest and checklists before writing files. It
+creates the vehicle enum, checklist registration, and Dart catalog files.
+Commit the source and generated files together, then rebuild the extension.
+The picker and report serialization use the generated registry, so adding a
+vehicle requires no UI or database-schema edits. Keep existing vehicle IDs and
+check IDs stable to preserve saved inspections; keep registered entries for
+vehicles with historical reports. Receiving clients need the same catalog
+update to recognize a newly added vehicle ID. This is a build-time catalog;
+the app does not import PDF manuals at runtime.
+
+### TM source audit — 1 October 2026
+
+Use the [TM download checklist](docs/TM_DOWNLOAD_CHECKLIST.md) to collect the
+operator manuals, with checkboxes, variant coverage, official links, and the
+files needed for import.
+
+The existing checklist sources claim Stryker `TM 9-2355-311-10` and JLTV
+`TM 9-2320-400-10`. Those exact numbers were not found in the current APD
+Range 9 index. The registry refactor preserves the existing checklist data;
+its source labels do **not** establish that the checklists match current TMs.
+Compare the applicable PMCS work packages before replacing those labels or
+enabling additional variants.
+
+The following active operator-manual records were verified through APD. Dates
+are APD publication dates; full manual content and any separately issued
+changes have not been downloaded or incorporated into the application.
+
+| Coverage | Official APD record | Publication date |
+|---|---|---|
+| JLTV M1278 / M1279 / M1280 / M1281 and their A1 variants | [TM 9-2320-452-10](https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1028190) | 5 February 2024 |
+| JLTV M1278A2 / M1279A2 / M1280A2 / M1281A2 | [TM 9-2320-264-10](https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1033310) | 1 June 2026 |
+| JLTV trailer M1289 | [TM 9-2330-345-10](https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1024284) | 24 January 2022 |
+| Stryker M1126, M1127, M1129A1, M1130, M1131A1, M1132, M1133, M1134 | [TM 9-2355-473-10](https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1033411) | 20 July 2026 |
+| Stryker DVH M1251–M1257 | [TM 9-2355-363-10](https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1033523) | 21 July 2026 |
+| Stryker DVH A1 M1251A1–M1257A1 | [TM 9-2355-450-10](https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1032645) | 16 March 2026 |
+| Stryker M1135 NBCRV | [TM 9-2355-326-10](https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1032806) | 16 March 2026 |
+| Stryker Dragoon, listed as XM 1296 | [TM 9-2355-459-10](https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1027224) | 31 July 2023 |
+| Stryker DVH A1 30 mm, listed as XM1304 | [TM 9-2355-480-10](https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1030353) | 30 April 2025 |
+| Stryker M1128 MGS, legacy | [TM 9-2355-321-10-1](https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1022232), [-2](https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1022233), [-3](https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1022234), [-4](https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1022235) | 15 June 2021; volume 3 record lists 15 May 2021 |
+| SGT STOUT / M-SHORAD Increment 1 | [TM 9-1430-300-10](https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1033555) | 24 August 2026 |
+
+The second pass checked both the TM and electronic-media indexes, including
+spaced model names and the [SGT STOUT naming change](https://www.army.mil/article-amp/277291/army_names_the_m_shorad_after_vietnam_war_medal_of_honor_recipient).
+The acquisition inventory in
+[`manual-inventory.json`](tool/tm_source/manual-inventory.json) lists every
+covered model explicitly: 12 JLTV variants, one JLTV trailer, and 27 Stryker
+configurations across 14 operator publications. It records publication dates,
+source URLs, access attempts, and missing content. These are metadata matches;
+none of the full manuals has been obtained or parsed and none of these new
+entries has been enabled in the app. The inventory is separate from the
+selectable checklist manifest.
+
+DE M-SHORAD and later increments remain unresolved; SGT STOUT coverage must not
+be assumed to include them. The MGS volume-date discrepancy also requires a
+title-page check. APD publication status does not establish current fleet use.
+
+APD directs these manual downloads to [AESIP](https://login.aesip.army.mil/portal/faces/home).
+The Army's [IADS access instructions](https://iads.redstone.army.mil/gettingstarted.html)
+also identify LDAC ETMs Online and its NIPR/account requirements. Use authorized
+access to obtain the applicable manual and change record. This table is a source
+lookup, not a claim of checklist coverage or an exhaustive list of every Stryker
+configuration.
+
+To continue the import, provide authorized full PDF sets or IETM packages/XML
+with title pages, change records, and applicability/UOC definitions. PDF exports
+from IADS should include all PMCS work packages and referenced figures. Each
+imported check must retain its source work-package/item reference and model
+applicability; a shared TM does not mean every check applies to every variant.
+
 ## Features / Bugs:
 > TODO's:
 > - [/] Maintainer role: verify faults, adjust severity, record corrective action.
@@ -117,6 +230,22 @@ The extension discovers this schema but cannot register it through the SDK.
 Missing schemas or service failures fail publication and leave normal report
 submissions available to the existing retry/outbox flow. There is no automatic
 fallback to entities or dual writing.
+
+The schema now restricts fault severities and phases to their supported wire
+values, requires a six-character uppercase alphanumeric UIC, and validates CAC
+and typed identities. Verified signatures require a valid CAC identity;
+unverified signatures cannot carry one. Install the updated schema at the same
+configured path when deploying these validation fixes. Existing invalid records
+are not migrated by changing this file: a valid local outgoing copy can repair
+an unreadable live record, while permanent withdrawals remain authoritative.
+Historical invalid UICs or identities require correction before republication.
+Vehicle names remain extensible in the schema; each client only imports catalog
+types it recognizes.
+
+`flutter test` includes contract tests using the actual JSON Schema validator,
+serializer output, and mesh create/update paths. Tests also cover invalid input,
+repair of rejected records, and withdrawal protection. No live-store connection
+is needed for these checks.
 
 Build with the default, or select the retained entity implementation:
 

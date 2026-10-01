@@ -176,13 +176,20 @@ void main() {
       await tester.pumpWidget(subject());
       await tester.pumpAndSettle();
       await openVehicle(tester);
-      await tester.tap(find.text('View changes'));
+      expect(find.text('MAINTAINER REVIEW'), findsOneWidget);
+      expect(find.text('1 verified'), findsOneWidget);
+      expect(find.textContaining('Leak confirmed by maintainer'), findsNothing);
+      final details = find.text('View review details (1)');
+      await tester.ensureVisible(details);
+      await tester.pumpAndSettle();
+      await tester.tap(details);
       await tester.pumpAndSettle();
       final summary = find.textContaining('Leak confirmed by maintainer');
       await tester.ensureVisible(summary);
       expect(summary, findsOneWidget);
       expect(find.textContaining('CAC signed by'), findsOneWidget);
       expect(find.text('MAINTAINER REVIEW'), findsOneWidget);
+      expect(find.text('Show less'), findsNothing);
     });
 
     testWidgets('operator notes can be opened and collapsed on a short report',

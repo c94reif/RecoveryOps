@@ -59,8 +59,11 @@ class MaintainerReviewViewModel extends ChangeNotifier
   bool get busy =>
       scan.isScanning || saving || isDictating || decisionAnimating;
   int get reviewedCount => decisions.whereType<bool>().length;
+  int get verifiedCount =>
+      decisions.where((decision) => decision == true).length;
   bool get complete =>
       decisions.isNotEmpty && reviewedCount == decisions.length;
+  bool get allVerified => complete && verifiedCount == decisions.length;
 
   void describe(String description) {
     if (signing || saved != null || busy) return;

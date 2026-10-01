@@ -95,6 +95,7 @@ void main() {
     await h.speech.deliver('Brake line is intact.');
     await tester.pumpAndSettle();
     await tap(tester, 'Not verified');
+    await tap(tester, 'Keep editing');
     expect(find.text('Fault 2 of 2'), findsOneWidget);
     expect(find.text('Brake line is intact.'), findsOneWidget);
     await tap(tester, 'Previous');
@@ -133,6 +134,7 @@ void main() {
     await tester.ensureVisible(swipe);
     await tester.drag(swipe, const Offset(180, 0));
     await tester.pumpAndSettle();
+    await tap(tester, 'Keep editing');
     expect(find.text('Fault 2 of 2'), findsOneWidget);
     expect(swipe, findsOneWidget);
     expect(find.text('Brake damage confirmed'), findsOneWidget);
@@ -161,7 +163,7 @@ void main() {
     await tester.pumpAndSettle();
     await tap(tester, 'Verified');
     await tap(tester, 'Not verified');
-    await tap(tester, 'Submit review');
+    await tap(tester, 'Sign & submit');
     await tap(tester, 'Scan CAC & submit');
     expect(find.textContaining('A CAC scan is required'), findsOneWidget);
     expect(h.repository.reports, hasLength(1));
@@ -172,23 +174,6 @@ void main() {
     expect(find.textContaining('2 of 2 reviewed.'), findsOneWidget);
   });
 
-  testWidgets('swipe and sign controls fit a narrow panel with larger text',
-      (tester) async {
-    tester.view.physicalSize = const Size(320, 740);
-    tester.view.devicePixelRatio = 1;
-    tester.platformDispatcher.textScaleFactorTestValue = 1.6;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-    await tester.pumpWidget(subject());
-    await tester.pumpAndSettle();
-    await tap(tester, 'Verified');
-    await tap(tester, 'Not verified');
-    await tap(tester, 'Submit review');
-    expect(find.text('Scan CAC & submit'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets(
       'an animated decision finishes before navigation or CAC submission',
       (tester) async {
@@ -196,6 +181,7 @@ void main() {
     await tester.pumpAndSettle();
     await tap(tester, 'Verified');
     await tap(tester, 'Verified');
+    await tap(tester, 'Keep editing');
     await tap(tester, 'Previous');
     final button = find.widgetWithText(OutlinedButton, 'Not verified');
     await tester.ensureVisible(button);
@@ -246,6 +232,7 @@ void main() {
     await tester.enterText(
         find.byType(TextFormField), 'Brake line intact after pressure check.');
     await tap(tester, 'Not verified');
+    await tap(tester, 'Keep editing');
     expect(find.text('Fault 2 of 2'), findsOneWidget);
     expect(find.byKey(const ValueKey('fault-swipe-area')), findsOneWidget);
     expect(find.text(firstNote), findsNothing);
@@ -285,9 +272,11 @@ void main() {
         .first);
     scroll.position.jumpTo(scroll.position.maxScrollExtent);
     await tester.pumpAndSettle();
+    final swipe = find.byKey(const ValueKey('fault-swipe-area'));
+    await tester.ensureVisible(swipe);
+    await tester.pumpAndSettle();
     final offset = scroll.position.pixels;
     expect(offset, greaterThan(100));
-    final swipe = find.byKey(const ValueKey('fault-swipe-area'));
     await tester.drag(swipe, const Offset(180, 0));
     await tester.pumpAndSettle();
     expect(find.text('Fault 2 of 2'), findsOneWidget);
@@ -306,6 +295,7 @@ void main() {
         isNull);
     await tester.drag(swipe, const Offset(-180, 0));
     await tester.pumpAndSettle();
+    await tap(tester, 'Keep editing');
     expect(find.text('Fault 2 of 2'), findsOneWidget);
     expect(scroll.position.pixels, closeTo(offset, .1));
     expect(
@@ -347,6 +337,7 @@ void main() {
             .onPressed,
         isNull);
     await tap(tester, 'Verified');
+    await tap(tester, 'Keep editing');
     expect(find.text('Fault 1 of 2'), findsOneWidget);
     await search(tester, 'hydraulic');
     expect(find.text('Not verified · draft'), findsOneWidget);

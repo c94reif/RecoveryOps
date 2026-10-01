@@ -54,6 +54,12 @@ mixin _InspectionSession on _InspectionState {
       return false;
     }
 
+    final uicError = Uic.validate(uic);
+    if (uicError != null) {
+      snackBarService.enqueue(uicError, isError: true);
+      return false;
+    }
+
     isBusy = true;
     notifyListeners();
 

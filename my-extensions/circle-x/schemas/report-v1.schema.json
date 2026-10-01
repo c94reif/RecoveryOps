@@ -53,13 +53,17 @@
           "type": "string"
         },
         "uic": {
-          "type": "string"
+          "type": "string",
+          "minLength": 6,
+          "maxLength": 6,
+          "pattern": "^[A-Z0-9]{6}$"
         },
         "phases": {
           "type": "array",
           "items": {
-            "type": "string"
-          }
+            "$ref": "#/definitions/phase"
+          },
+          "uniqueItems": true
         },
         "faults": {
           "type": "array",
@@ -73,10 +77,11 @@
             ],
             "properties": {
               "itemId": {
-                "type": "string"
+                "type": "string",
+                "minLength": 1
               },
               "phase": {
-                "type": "string"
+                "$ref": "#/definitions/phase"
               },
               "category": {
                 "type": "string"
@@ -91,7 +96,7 @@
                 "type": "string"
               },
               "severity": {
-                "type": "string"
+                "$ref": "#/definitions/severity"
               },
               "note": {
                 "type": [
@@ -108,30 +113,7 @@
           }
         },
         "signature": {
-          "type": "object",
-          "required": [
-            "verified",
-            "signedAt"
-          ],
-          "properties": {
-            "verified": {
-              "type": "boolean"
-            },
-            "signedAt": {
-              "type": "string",
-              "format": "date-time"
-            },
-            "identity": {
-              "type": "object"
-            },
-            "attestedBy": {
-              "type": "object"
-            },
-            "blockedBy": {
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
+          "$ref": "#/definitions/signature"
         },
         "latitude": {
           "type": "number",
@@ -176,7 +158,7 @@
                     "minLength": 1
                   },
                   "phase": {
-                    "type": "string"
+                    "$ref": "#/definitions/phase"
                   },
                   "verified": {
                     "type": "boolean"
@@ -187,34 +169,22 @@
                   }
                 },
                 "additionalProperties": false
-              }
+              },
+              "uniqueItems": true
             },
             "signature": {
-              "type": "object",
-              "required": [
-                "verified",
-                "identity",
-                "signedAt"
-              ],
-              "properties": {
-                "verified": {
-                  "const": true
+              "allOf": [
+                {
+                  "$ref": "#/definitions/signature"
                 },
-                "signedAt": {
-                  "type": "string",
-                  "format": "date-time"
-                },
-                "identity": {
-                  "type": "object"
-                },
-                "attestedBy": {
-                  "type": "object"
-                },
-                "blockedBy": {
-                  "type": "string"
+                {
+                  "properties": {
+                    "verified": {
+                      "const": true
+                    }
+                  }
                 }
-              },
-              "additionalProperties": false
+              ]
             }
           },
           "additionalProperties": false
@@ -247,5 +217,163 @@
         ]
       }
     }
-  ]
+  ],
+  "definitions": {
+    "phase": {
+      "type": "string",
+      "enum": [
+        "BEFORE",
+        "DURING",
+        "AFTER"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "RED_X",
+        "CIRCLE_X",
+        "DASH"
+      ]
+    },
+    "cacIdentity": {
+      "type": "object",
+      "required": [
+        "edipi",
+        "firstName",
+        "lastName",
+        "verifiedAt"
+      ],
+      "properties": {
+        "firstName": {
+          "type": "string"
+        },
+        "lastName": {
+          "type": "string"
+        },
+        "middleInitial": {
+          "type": "string"
+        },
+        "rank": {
+          "type": "string"
+        },
+        "branchCode": {
+          "type": "string"
+        },
+        "categoryCode": {
+          "type": "string"
+        },
+        "cardInstance": {
+          "type": "string"
+        },
+        "edipi": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[1-9][0-9]{9}$"
+        },
+        "verifiedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "cardExpiresOn": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "attestedIdentity": {
+      "type": "object",
+      "required": [
+        "edipi",
+        "firstName",
+        "lastName"
+      ],
+      "properties": {
+        "edipi": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[1-9][0-9]{9}$"
+        },
+        "firstName": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "lastName": {
+          "type": "string",
+          "pattern": "\\S"
+        }
+      },
+      "additionalProperties": false
+    },
+    "signature": {
+      "type": "object",
+      "required": [
+        "verified",
+        "signedAt"
+      ],
+      "properties": {
+        "verified": {
+          "type": "boolean"
+        },
+        "signedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "identity": {
+          "$ref": "#/definitions/cacIdentity"
+        },
+        "attestedBy": {
+          "$ref": "#/definitions/attestedIdentity"
+        },
+        "blockedBy": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "verified": {
+              "const": true
+            }
+          },
+          "required": [
+            "identity"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "blockedBy"
+                ]
+              },
+              {
+                "required": [
+                  "attestedBy"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "properties": {
+            "verified": {
+              "const": false
+            }
+          },
+          "required": [
+            "blockedBy"
+          ],
+          "not": {
+            "required": [
+              "identity"
+            ]
+          }
+        }
+      ]
+    }
+  }
 }

@@ -1,4 +1,5 @@
 import 'package:circle_x/domain/usecases/identity/parse_cac_barcode.dart';
+import 'package:circle_x/domain/entities/cac_identity.dart';
 
 class AttestedIdentity {
   final String edipi;
@@ -61,11 +62,19 @@ class AttestedIdentity {
 
   static AttestedIdentity? fromMap(Map<String, Object?> map) {
     final edipi = map['edipi'];
-    if (edipi is! String || edipi.isEmpty) return null;
+    final firstName = map['firstName'];
+    final lastName = map['lastName'];
+    if (!CacIdentity.isValidEdipi(edipi) ||
+        firstName is! String ||
+        firstName.trim().isEmpty ||
+        lastName is! String ||
+        lastName.trim().isEmpty) {
+      return null;
+    }
     return AttestedIdentity(
-      edipi: edipi,
-      firstName: map['firstName'] as String? ?? '',
-      lastName: map['lastName'] as String? ?? '',
+      edipi: edipi as String,
+      firstName: firstName,
+      lastName: lastName,
     );
   }
 }

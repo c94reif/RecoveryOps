@@ -5,13 +5,15 @@ import 'package:circle_x/core/di/service_locator.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
 import 'package:circle_x/domain/entities/pmcs_session.dart';
-import 'package:circle_x/domain/entities/vehicle_type.dart';
+import 'package:circle_x/domain/entities/uic.dart';
 import 'package:circle_x/domain/services/bumper_scanner_strategy.dart';
 import 'package:circle_x/presentation/common/widgets/custom_button.dart';
 import 'package:circle_x/presentation/common/widgets/custom_text_field.dart';
+import 'package:circle_x/presentation/common/widgets/uic_text_field.dart';
 import 'package:circle_x/presentation/common/widgets/section_label.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
 import 'package:circle_x/presentation/inspection/bumper_scan_dialog.dart';
+import 'package:circle_x/presentation/inspection/vehicle_manual_selector.dart';
 
 class SetupPage extends StatefulWidget {
   const SetupPage({super.key});
@@ -61,7 +63,7 @@ class SetupPageState extends State<SetupPage> {
 
   bool get canBegin =>
       bumperNumberController.text.trim().isNotEmpty &&
-      uicController.text.trim().isNotEmpty &&
+      Uic.isValid(uicController.text) &&
       !viewModel.isBusy;
 
   Future<void> begin() async {
@@ -118,9 +120,13 @@ class SetupPageState extends State<SetupPage> {
               for (final open in viewModel.openSessions) buildResumeCard(open),
               const SizedBox(height: 20),
             ],
-            const SectionLabel(text: 'VEHICLE PLATFORM'),
+            const SectionLabel(text: 'VEHICLE & TECHNICAL MANUAL'),
             const SizedBox(height: 8),
-            buildVehicleSelector(),
+            VehicleManualSelector(
+              selected: viewModel.selectedVehicle,
+              vehicles: viewModel.catalogSource.supportedVehicles,
+              onSelected: viewModel.isBusy ? null : viewModel.selectVehicle,
+            ),
             const SizedBox(height: 24),
             CustomTextField(
               controller: bumperNumberController,
@@ -142,16 +148,9 @@ class SetupPageState extends State<SetupPage> {
               onSubmitted: (_) => uicFocus.requestFocus(),
             ),
             const SizedBox(height: 24),
-            CustomTextField(
+            UicTextField(
               controller: uicController,
               focusNode: uicFocus,
-              label: 'UIC',
-              floatingLabelBehavior: FloatingLabelBehavior.always,
-              icon: Icons.groups_outlined,
-              textCapitalization: TextCapitalization.characters,
-              uppercase: true,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => FocusScope.of(context).unfocus(),
             ),
             const SizedBox(height: 28),
             CustomButton(
@@ -163,40 +162,6 @@ class SetupPageState extends State<SetupPage> {
           ],
         );
       },
-    );
-  }
-
-  Widget buildVehicleSelector() {
-    return SizedBox(
-      width: double.infinity,
-      child: SegmentedButton<VehicleType>(
-        showSelectedIcon: false,
-        segments: [
-          for (final vehicle in viewModel.catalogSource.supportedVehicles)
-            ButtonSegment(
-              value: vehicle,
-              label: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    vehicle.displayName,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    vehicle.technicalManual,
-                    style: const TextStyle(fontSize: 10, height: 1.4),
-                  ),
-                ],
-              ),
-            ),
-        ],
-        selected: {viewModel.selectedVehicle},
-        onSelectionChanged: (selection) =>
-            viewModel.selectVehicle(selection.first),
-      ),
     );
   }
 

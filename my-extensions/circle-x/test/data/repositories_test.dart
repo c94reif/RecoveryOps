@@ -431,7 +431,7 @@ void main() {
       expect(all.map((r) => r.entityId), ['readable']);
     });
 
-    test('a malformed fault blob costs the fault detail, never the report',
+    test('a malformed fault blob stays on disk but cannot display as FMC',
         () async {
       await reportsDao.insertReport(
         entityId: 'garbled',
@@ -449,9 +449,10 @@ void main() {
         isRead: false,
       );
 
-      final read = (await reports.getAllReports()).single;
-      expect(read.entityId, 'garbled');
-      expect(read.faults, isEmpty);
+      await reports.insertReport(buildReport(entityId: 'readable'));
+      expect(
+          (await reports.getAllReports()).map((r) => r.entityId), ['readable']);
+      expect(await reportsDao.getAllReports(), hasLength(2));
     });
 
     test('an unknown phase name is dropped from a stored report', () async {

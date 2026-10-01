@@ -152,31 +152,41 @@ class ReportsPageState extends State<ReportsPage> {
     final isExpanded = expandedIds.contains(report.entityId);
     final previousHistory =
         isExpanded ? browser.historyFor(report, previousOnly: true) : null;
-    final reviews = isExpanded
-        ? viewModel.reports
-            .where((candidate) =>
-                candidate.maintainerReview?.sourceReportId == report.entityId)
-            .toList()
-        : <PmcsReport>[];
+    final reviews = viewModel.reports
+        .where((candidate) =>
+            candidate.maintainerReview?.sourceReportId == report.entityId)
+        .toList();
     reviews.sort((a, b) => b.maintainerReview!.signature.signedAt
         .compareTo(a.maintainerReview!.signature.signedAt));
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      PmcsReportCard(
-        report: report,
-        isLatest: isLatest,
-        isExpanded: isExpanded,
-        comparisons: [
-          if (previousHistory != null)
-            for (final phase in report.phases)
-              previousHistory.compare(phase, report.faults),
-        ],
-        onToggleExpanded: () => toggleExpanded(report),
-        onDelete:
-            newPmcs.startingPmcsId != null ? null : () => confirmDelete(report),
-      ),
-      for (final review in reviews)
-        MaintainerReviewSummary(review: review.maintainerReview!),
-    ]);
+    return PmcsReportCard(
+      key: ValueKey(report.entityId),
+      report: report,
+      isLatest: isLatest,
+      isExpanded: isExpanded,
+      comparisons: [
+        if (previousHistory != null)
+          for (final phase in report.phases)
+            previousHistory.compare(phase, report.faults),
+      ],
+      onToggleExpanded: () => toggleExpanded(report),
+      onDelete:
+          newPmcs.startingPmcsId != null ? null : () => confirmDelete(report),
+      footer: reviews.isEmpty
+          ? null
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (index, review) in reviews.indexed) ...[
+                  if (index > 0) const Divider(height: 24),
+                  MaintainerReviewSummary(
+                    key: ValueKey(review.entityId),
+                    review: review.maintainerReview!,
+                    faults: report.faults,
+                  ),
+                ],
+              ],
+            ),
+    );
   }
 
   Widget buildVehicleCard(ReportVehicleKey vehicle, List<PmcsReport> reports) {

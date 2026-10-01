@@ -60,6 +60,13 @@ void main() {
     expect(session.uic, 'WJ8TAA');
   });
 
+  for (final value in ['', 'W12', 'W12ABCD', 'W12A!C']) {
+    test('invalid UIC $value cannot create a session', () async {
+      await expectLater(start(uic: value), throwsArgumentError);
+      expect(sessions.sessions, isEmpty);
+    });
+  }
+
   test('starts with nobody signed to it — the CAC scan at submit names them',
       () async {
     final session = await start();

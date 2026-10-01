@@ -84,34 +84,31 @@ class MaintainerPageState extends State<MaintainerPage> {
     final expanded = expandedIds.contains(report.entityId);
     final previous =
         expanded ? browser.historyFor(report, previousOnly: true) : null;
-    return Column(
+    return Padding(
       key: ValueKey(report.entityId),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        PmcsReportCard(
-          report: report,
-          isLatest: true,
-          isExpanded: expanded,
-          showDeleteAction: false,
-          comparisons: [
-            if (previous != null)
-              for (final phase in report.phases)
-                previous.compare(phase, report.faults),
-          ],
-          onToggleExpanded: () {
-            setState(() {
-              if (!expandedIds.remove(report.entityId)) {
-                expandedIds.add(report.entityId);
-              }
-            });
-            viewModel.markReportAsRead(report);
-          },
-        ),
-        MaintainerReviewPrompt(
-          report: report,
+      padding: const EdgeInsets.only(bottom: 12),
+      child: PmcsReportCard(
+        report: report,
+        isLatest: true,
+        isExpanded: expanded,
+        showDeleteAction: false,
+        comparisons: [
+          if (previous != null)
+            for (final phase in report.phases)
+              previous.compare(phase, report.faults),
+        ],
+        onToggleExpanded: () {
+          setState(() {
+            if (!expandedIds.remove(report.entityId)) {
+              expandedIds.add(report.entityId);
+            }
+          });
+          viewModel.markReportAsRead(report);
+        },
+        footer: MaintainerReviewPrompt(
           onReview: () => setState(() => reviewing = report),
         ),
-      ],
+      ),
     );
   }
 

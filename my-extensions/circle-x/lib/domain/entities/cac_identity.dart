@@ -122,22 +122,38 @@ class CacIdentity {
 
   static CacIdentity? fromMap(Map<String, Object?> map) {
     final edipi = map['edipi'];
-    if (edipi is! String || edipi.isEmpty) return null;
+    final verifiedAt = map['verifiedAt'];
+    final expiresOn = map['cardExpiresOn'];
+    if (!isValidEdipi(edipi) ||
+        map['firstName'] is! String ||
+        map['lastName'] is! String ||
+        verifiedAt is! String ||
+        DateTime.tryParse(verifiedAt) == null ||
+        (expiresOn != null &&
+            (expiresOn is! String || DateTime.tryParse(expiresOn) == null)) ||
+        ['middleInitial', 'rank', 'branchCode', 'categoryCode', 'cardInstance']
+            .any((key) => map.containsKey(key) && map[key] is! String)) {
+      return null;
+    }
 
     return CacIdentity(
-      edipi: edipi,
-      firstName: map['firstName'] as String? ?? '',
-      lastName: map['lastName'] as String? ?? '',
+      edipi: edipi as String,
+      firstName: map['firstName'] as String,
+      lastName: map['lastName'] as String,
       middleInitial: map['middleInitial'] as String? ?? '',
       rank: map['rank'] as String? ?? '',
       branchCode: map['branchCode'] as String? ?? '',
       categoryCode: map['categoryCode'] as String? ?? '',
-      cardExpiresOn:
-          DateTime.tryParse(map['cardExpiresOn'] as String? ?? '')?.toUtc(),
+      cardExpiresOn: expiresOn == null
+          ? null
+          : DateTime.parse(expiresOn as String).toUtc(),
       cardInstance: map['cardInstance'] as String? ?? '',
-      verifiedAt:
-          DateTime.tryParse(map['verifiedAt'] as String? ?? '')?.toUtc() ??
-              DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      verifiedAt: DateTime.parse(verifiedAt).toUtc(),
     );
   }
+
+  static bool isValidEdipi(Object? value) =>
+      value is String &&
+      value.length == 10 &&
+      RegExp(r'^[1-9][0-9]{9}$').hasMatch(value);
 }

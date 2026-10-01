@@ -1,4 +1,5 @@
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/entities/cac_identity.dart';
 import 'package:circle_x/domain/entities/pmcs_signature.dart';
 
 class FaultReview {
@@ -45,9 +46,10 @@ class MaintainerReview {
   }) : faults = List.unmodifiable(faults) {
     if (sourceReportId.isEmpty ||
         !signature.isVerified ||
-        !RegExp(r'^\d{10}$').hasMatch(signature.dodId ?? '') ||
+        !CacIdentity.isValidEdipi(signature.dodId) ||
         faults.isEmpty ||
-        faults.any((fault) => fault.itemId.isEmpty) ||
+        faults.any((fault) =>
+            fault.itemId.isEmpty || fault.description.runes.length > 2000) ||
         faults.map((fault) => fault.key).toSet().length != faults.length) {
       throw ArgumentError('A complete review and CAC signature are required');
     }

@@ -63,7 +63,7 @@ void main() {
 
     test('retyping the stored UIC in lower case is still not an edit', () {
       // The UIC is stored upper case, so the operator fighting a soft keyboard
-      // must not be shown a Save Edit button for work they did not do.
+      // must not be shown a save button for work they did not do.
       viewModel.checkDirty('wj8taa');
 
       expect(viewModel.isDirty, isFalse);
@@ -95,6 +95,17 @@ void main() {
       await viewModel.loadProfile();
     });
 
+    for (final value in ['W12', 'W12ABCD', 'W12A!C']) {
+      test('refuses invalid UIC $value without overwriting the profile',
+          () async {
+        await viewModel.save('WJ8TAA');
+        await viewModel.save(value);
+        expect(viewModel.snackBarMessage, isNot('Default UIC saved'));
+        expect(repository.saved, hasLength(1));
+        expect(viewModel.savedUic, 'WJ8TAA');
+      });
+    }
+
     test('an empty UIC is refused and says why', () async {
       await viewModel.save('');
 
@@ -116,7 +127,7 @@ void main() {
       await viewModel.save('  wj8taa  ');
 
       expect(viewModel.isDirty, isFalse);
-      expect(viewModel.snackBarMessage, 'Profile Saved!');
+      expect(viewModel.snackBarMessage, 'Default UIC saved');
       expect(repository.saved.single.uic, 'WJ8TAA');
     });
 

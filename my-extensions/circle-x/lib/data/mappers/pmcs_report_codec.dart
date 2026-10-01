@@ -6,6 +6,7 @@ import 'package:circle_x/domain/entities/maintainer_review.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
 import 'package:circle_x/domain/entities/pmcs_report.dart';
 import 'package:circle_x/domain/entities/pmcs_signature.dart';
+import 'package:circle_x/domain/entities/uic.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
 import 'package:circle_x/domain/services/report_codec.dart';
 
@@ -27,7 +28,7 @@ class PmcsReportCodec implements ReportCodec {
         'bumperNumber': report.bumperNumber,
         'vehicleType': report.vehicleType.wireName,
         'operator': report.operator,
-        'uic': report.uic,
+        'uic': Uic.normalize(report.uic),
         'phases': [for (final phase in report.phases) phase.wireName],
         'faults': [for (final fault in report.faults) fault.toMap()],
         if (report.signature != null) 'signature': report.signature!.toMap(),
@@ -73,12 +74,19 @@ class PmcsReportCodec implements ReportCodec {
           VehicleType.tryFromWireName(body['vehicleType'] as String?);
       final latitude = (body['latitude'] as num?)?.toDouble();
       final longitude = (body['longitude'] as num?)?.toDouble();
-      if (entityId == null ||
+      final uic = body['uic'] as String? ?? body['unit'] as String? ?? '';
+      if (body['type'] != AppConstants.meshReportType ||
+          entityId == null ||
           entityId.isEmpty ||
           bumperNumber == null ||
           vehicleType == null ||
           latitude == null ||
-          longitude == null) {
+          longitude == null ||
+          !latitude.isFinite ||
+          latitude.abs() > 90 ||
+          !longitude.isFinite ||
+          longitude.abs() > 180 ||
+          !Uic.isValid(uic)) {
         return null;
       }
 
@@ -88,7 +96,7 @@ class PmcsReportCodec implements ReportCodec {
         bumperNumber: bumperNumber,
         vehicleType: vehicleType,
         operator: body['operator'] as String? ?? '',
-        uic: body['uic'] as String? ?? body['unit'] as String? ?? '',
+        uic: Uic.normalize(uic),
         phases: _decodePhases(body['phases']),
         faults: _decodeFaults(entityId, body['faults']),
         signature: _decodeSignature(body['signature']),
@@ -111,11 +119,15 @@ class PmcsReportCodec implements ReportCodec {
 }
 
 List<PmcsPhase> _decodePhases(Object? raw) {
-  if (raw is! List) return const [];
+  if (raw == null) return const [];
+  if (raw is! List) throw const FormatException('Invalid phases');
   final phases = <PmcsPhase>[];
   for (final value in raw) {
     final phase = PmcsPhase.tryFromWireName(value is String ? value : null);
-    if (phase != null) phases.add(phase);
+    if (phase == null || phases.contains(phase)) {
+      throw const FormatException('Unknown or duplicate PMCS phase');
+    }
+    phases.add(phase);
   }
   return phases;
 }
@@ -130,10 +142,11 @@ PmcsSignature? _decodeSignature(Object? raw) {
 }
 
 List<PmcsFault> _decodeFaults(String entityId, Object? raw) {
-  if (raw is! List) return const [];
+  if (raw == null) return const [];
+  if (raw is! List) throw const FormatException('Invalid faults');
   final faults = <PmcsFault>[];
   for (final value in raw) {
-    if (value is! Map) continue;
+    if (value is! Map) throw const FormatException('Invalid fault');
     faults.add(PmcsFault.fromMap(entityId, value.cast<String, Object?>()));
   }
   return faults;

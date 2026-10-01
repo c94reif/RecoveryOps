@@ -1,9 +1,15 @@
+// GENERATED FILE — DO NOT EDIT BY HAND.
+//
+// JLTV: TM 9-2320-400-10.
+// Regenerate with tool/generate_catalog.sh after editing the TM source data.
+
 import 'package:circle_x/domain/entities/pmcs_catalog.dart';
 import 'package:circle_x/domain/entities/pmcs_category.dart';
 import 'package:circle_x/domain/entities/pmcs_check_item.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
 
+/// 94 PMCS checks for JLTV / Family PMCS.
 const PmcsCatalog jltvPmcsCatalog = PmcsCatalog(
   vehicleType: VehicleType.jltv,
   phases: {

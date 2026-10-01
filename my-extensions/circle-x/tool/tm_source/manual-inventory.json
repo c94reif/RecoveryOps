@@ -1,0 +1,331 @@
+{
+  "checkedOn": "2026-10-01",
+  "scope": "Public APD operator-manual metadata for Stryker, JLTV and the associated JLTV trailer; not manual content or a complete census of fielded configurations.",
+  "status": "awaiting_full_manuals",
+  "sources": [
+    "https://armypubs.army.mil/ProductMaps/PubForm/TM_9.aspx",
+    "https://armypubs.army.mil/ProductMaps/PubForm/EM.aspx",
+    "https://www.army.mil/article-amp/277291/army_names_the_m_shorad_after_vietnam_war_medal_of_honor_recipient"
+  ],
+  "accessAttempts": [
+    {
+      "service": "AESIP",
+      "url": "https://login.aesip.army.mil/portal/faces/home",
+      "result": "TLS handshake failed in this session, including retry outside the sandbox; no authenticated session available."
+    },
+    {
+      "service": "LDAC ETMs Online",
+      "url": "https://ent.ldac.army.mil/etmapp/#/etm/home",
+      "result": "Connection timed out, including retry outside the sandbox. Official IADS guidance requires NIPR and a system access request.",
+      "requirementsSource": "https://iads.redstone.army.mil/gettingstarted.html"
+    },
+    {
+      "service": "UTAP",
+      "url": "https://utap.army.mil/",
+      "result": "TLS certificate verification failed, including retry outside the sandbox. Official program page requires CAC access.",
+      "requirementsSource": "https://cpeground.army.mil/Equipment/unit-training-assistance-program-utap/"
+    },
+    {
+      "service": "Army Software Factory PMCS",
+      "url": "https://pmcs.swf.army.mil/",
+      "result": "Public landing page reachable; manuals require the advertised PMCS login. No authenticated session available."
+    }
+  ],
+  "groups": [
+    {
+      "id": "jltvBaseAndA1",
+      "family": "JLTV",
+      "label": "Base and A1",
+      "models": [
+        "M1278",
+        "M1278A1",
+        "M1279",
+        "M1279A1",
+        "M1280",
+        "M1280A1",
+        "M1281",
+        "M1281A1"
+      ],
+      "publications": [
+        {
+          "number": "TM 9-2320-452-10",
+          "publicationDate": "2024-02-05",
+          "status": "ACTIVE",
+          "apdRecord": "https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1028190"
+        }
+      ],
+      "downloadPortal": "https://login.aesip.army.mil/portal/faces/home",
+      "fullManualAcquired": false,
+      "pmcsParsed": false,
+      "catalogEnabled": false,
+      "notes": "HGC, utility, general purpose, and close combat weapons carrier. A2 applicability is not assumed."
+    },
+    {
+      "id": "jltvA2",
+      "family": "JLTV",
+      "label": "A2",
+      "models": [
+        "M1278A2",
+        "M1279A2",
+        "M1280A2",
+        "M1281A2"
+      ],
+      "publications": [
+        {
+          "number": "TM 9-2320-264-10",
+          "publicationDate": "2026-06-01",
+          "status": "ACTIVE",
+          "apdRecord": "https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1033310"
+        }
+      ],
+      "downloadPortal": "https://login.aesip.army.mil/portal/faces/home",
+      "fullManualAcquired": false,
+      "pmcsParsed": false,
+      "catalogEnabled": false,
+      "notes": "Separate A2 manual. APD also identifies Air Force TO 36A12-1C-2904-1 and Marine Corps TM 00278A/00358A/00359A-10."
+    },
+    {
+      "id": "jltvTrailer",
+      "family": "JLTV trailer",
+      "label": "Trailer",
+      "models": [
+        "M1289"
+      ],
+      "publications": [
+        {
+          "number": "TM 9-2330-345-10",
+          "publicationDate": "2022-01-24",
+          "status": "ACTIVE",
+          "apdRecord": "https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1024284"
+        }
+      ],
+      "downloadPortal": "https://login.aesip.army.mil/portal/faces/home",
+      "fullManualAcquired": false,
+      "pmcsParsed": false,
+      "catalogEnabled": false
+    },
+    {
+      "id": "strykerFlatBottom",
+      "family": "Stryker",
+      "label": "Flat-bottom hull",
+      "models": [
+        "M1126",
+        "M1127",
+        "M1129A1",
+        "M1130",
+        "M1131A1",
+        "M1132",
+        "M1133",
+        "M1134"
+      ],
+      "publications": [
+        {
+          "number": "TM 9-2355-473-10",
+          "publicationDate": "2026-07-20",
+          "status": "ACTIVE",
+          "apdRecord": "https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1033411"
+        }
+      ],
+      "downloadPortal": "https://login.aesip.army.mil/portal/faces/home",
+      "fullManualAcquired": false,
+      "pmcsParsed": false,
+      "catalogEnabled": false,
+      "electronicMedia": "EM 0431"
+    },
+    {
+      "id": "strykerDvh",
+      "family": "Stryker",
+      "label": "Double V hull",
+      "models": [
+        "M1251",
+        "M1252",
+        "M1253",
+        "M1254",
+        "M1255",
+        "M1256",
+        "M1257"
+      ],
+      "publications": [
+        {
+          "number": "TM 9-2355-363-10",
+          "publicationDate": "2026-07-21",
+          "status": "ACTIVE",
+          "apdRecord": "https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1033523"
+        }
+      ],
+      "downloadPortal": "https://login.aesip.army.mil/portal/faces/home",
+      "fullManualAcquired": false,
+      "pmcsParsed": false,
+      "catalogEnabled": false,
+      "electronicMedia": "EM 0438"
+    },
+    {
+      "id": "strykerDvhA1",
+      "family": "Stryker",
+      "label": "Double V hull A1",
+      "models": [
+        "M1251A1",
+        "M1252A1",
+        "M1253A1",
+        "M1254A1",
+        "M1255A1",
+        "M1256A1",
+        "M1257A1"
+      ],
+      "publications": [
+        {
+          "number": "TM 9-2355-450-10",
+          "publicationDate": "2026-03-16",
+          "status": "ACTIVE",
+          "apdRecord": "https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1032645"
+        }
+      ],
+      "downloadPortal": "https://login.aesip.army.mil/portal/faces/home",
+      "fullManualAcquired": false,
+      "pmcsParsed": false,
+      "catalogEnabled": false,
+      "electronicMedia": "EM 0402"
+    },
+    {
+      "id": "strykerNbcrv",
+      "family": "Stryker",
+      "label": "Nuclear, biological and chemical reconnaissance",
+      "models": [
+        "M1135"
+      ],
+      "publications": [
+        {
+          "number": "TM 9-2355-326-10",
+          "publicationDate": "2026-03-16",
+          "status": "ACTIVE",
+          "apdRecord": "https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1032806"
+        }
+      ],
+      "downloadPortal": "https://login.aesip.army.mil/portal/faces/home",
+      "fullManualAcquired": false,
+      "pmcsParsed": false,
+      "catalogEnabled": false,
+      "electronicMedia": "EM 0437"
+    },
+    {
+      "id": "strykerDragoon",
+      "family": "Stryker",
+      "label": "Infantry carrier vehicle Dragoon",
+      "models": [
+        "XM1296"
+      ],
+      "publications": [
+        {
+          "number": "TM 9-2355-459-10",
+          "publicationDate": "2023-07-31",
+          "status": "ACTIVE",
+          "apdRecord": "https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1027224"
+        }
+      ],
+      "downloadPortal": "https://login.aesip.army.mil/portal/faces/home",
+      "fullManualAcquired": false,
+      "pmcsParsed": false,
+      "catalogEnabled": false,
+      "electronicMedia": "EM 0456",
+      "notes": "APD uses XM 1296 in its title. Match actual configuration and applicability before importing."
+    },
+    {
+      "id": "strykerDvhA1ThirtyMm",
+      "family": "Stryker",
+      "label": "Double V hull A1 30 mm",
+      "models": [
+        "XM1304"
+      ],
+      "publications": [
+        {
+          "number": "TM 9-2355-480-10",
+          "publicationDate": "2025-04-30",
+          "status": "ACTIVE",
+          "apdRecord": "https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1030353"
+        }
+      ],
+      "downloadPortal": "https://login.aesip.army.mil/portal/faces/home",
+      "fullManualAcquired": false,
+      "pmcsParsed": false,
+      "catalogEnabled": false,
+      "electronicMedia": "EM 0527",
+      "notes": "Operator record uses XM1304; the separate maintenance record uses M1304. Do not infer interchangeability without applicability data."
+    },
+    {
+      "id": "strykerMgs",
+      "family": "Stryker",
+      "label": "Mobile gun system, legacy",
+      "models": [
+        "M1128"
+      ],
+      "publications": [
+        {
+          "number": "TM 9-2355-321-10-1",
+          "publicationDate": "2021-06-15",
+          "status": "ACTIVE",
+          "apdRecord": "https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1022232"
+        },
+        {
+          "number": "TM 9-2355-321-10-2",
+          "publicationDate": "2021-06-15",
+          "status": "ACTIVE",
+          "apdRecord": "https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1022233"
+        },
+        {
+          "number": "TM 9-2355-321-10-3",
+          "publicationDate": "2021-05-15",
+          "status": "ACTIVE",
+          "apdRecord": "https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1022234"
+        },
+        {
+          "number": "TM 9-2355-321-10-4",
+          "publicationDate": "2021-06-15",
+          "status": "ACTIVE",
+          "apdRecord": "https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1022235"
+        }
+      ],
+      "downloadPortal": "https://login.aesip.army.mil/portal/faces/home",
+      "fullManualAcquired": false,
+      "pmcsParsed": false,
+      "catalogEnabled": false,
+      "notes": "All four volumes are required for the full operator set. APD lists volume 3 as 2021-05-15, while volume 1 supersession footnotes describe the set as 2021-06-15; confirm against title pages. ACTIVE describes publication status, not fleet fielding."
+    },
+    {
+      "id": "strykerSgtStout",
+      "family": "Stryker",
+      "label": "SGT STOUT / M-SHORAD Increment 1",
+      "models": [
+        "SGT STOUT"
+      ],
+      "publications": [
+        {
+          "number": "TM 9-1430-300-10",
+          "publicationDate": "2026-08-24",
+          "status": "ACTIVE",
+          "apdRecord": "https://armypubs.army.mil/ProductMaps/PubForm/Details.aspx?PUB_ID=1033555"
+        }
+      ],
+      "downloadPortal": "https://login.aesip.army.mil/portal/faces/home",
+      "fullManualAcquired": false,
+      "pmcsParsed": false,
+      "catalogEnabled": false,
+      "notes": "The Army renamed M-SHORAD Increment 1 to SGT STOUT. This record does not establish coverage of DE M-SHORAD or later increments."
+    }
+  ],
+  "unresolvedCoverage": [
+    {
+      "configuration": "DE M-SHORAD / M-SHORAD Increment 2 and later increments",
+      "reason": "No matching operator publication established in the inspected APD TM and EM records. SGT STOUT applicability must not be extrapolated."
+    },
+    {
+      "configuration": "Other mission equipment packages, retrofit kits, serial-number ranges and export variants",
+      "reason": "Applicability must be established from full manuals and their change records before adding checks."
+    }
+  ],
+  "requiredForImport": [
+    "Full operator PDF set or IETM package/XML with title pages, edition and change record.",
+    "All PMCS work packages, warnings, referenced figures and applicability/UOC definitions.",
+    "Check each candidate model against the source applicability; preserve source work-package/item references.",
+    "Compare exact maintenance criteria and conditions before deriving app choices or severity; do not clone a generic family checklist."
+  ]
+}

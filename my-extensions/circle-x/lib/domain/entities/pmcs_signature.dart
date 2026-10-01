@@ -52,7 +52,7 @@ class PmcsSignature {
             DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
 
     final rawIdentity = map['identity'];
-    if (rawIdentity is Map) {
+    if (map['verified'] == true && rawIdentity is Map) {
       final identity = CacIdentity.fromMap(rawIdentity.cast<String, Object?>());
       if (identity != null) {
         return PmcsSignature.verified(identity: identity, signedAt: signedAt);

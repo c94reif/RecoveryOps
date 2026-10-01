@@ -64,17 +64,24 @@ class PmcsFault {
       };
 
   static PmcsFault fromMap(String sessionId, Map<String, Object?> map) {
+    final itemId = map['itemId'];
+    final phase = PmcsPhase.tryFromWireName(map['phase'] as String?);
+    final severity = FaultSeverity.tryFromWireName(map['severity'] as String?);
+    if (itemId is! String ||
+        itemId.isEmpty ||
+        phase == null ||
+        severity == null) {
+      throw const FormatException('Invalid fault item, phase, or severity');
+    }
     return PmcsFault(
       sessionId: sessionId,
-      itemId: map['itemId'] as String? ?? '',
-      phase: PmcsPhase.tryFromWireName(map['phase'] as String?) ??
-          PmcsPhase.before,
+      itemId: itemId,
+      phase: phase,
       category: map['category'] as String? ?? '',
       subcategory: map['subcategory'] as String? ?? '',
       description: map['description'] as String? ?? '',
       condition: map['condition'] as String? ?? '',
-      severity: FaultSeverity.tryFromWireName(map['severity'] as String?) ??
-          FaultSeverity.dash,
+      severity: severity,
       note: map['note'] as String?,
       recordedAt:
           DateTime.tryParse(map['recordedAt'] as String? ?? '')?.toUtc() ??

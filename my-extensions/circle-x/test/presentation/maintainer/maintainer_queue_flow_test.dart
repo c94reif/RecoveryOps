@@ -59,7 +59,7 @@ void main() {
     await tap(tester, 'Not verified');
     expect(find.text('Fault 2 of 2'), findsOneWidget);
     expect(find.textContaining('2 of 2 reviewed.'), findsOneWidget);
-    await tap(tester, 'Submit review');
+    await tap(tester, 'Sign & submit');
     expect(h.repository.reports, hasLength(1));
     expect(h.queue.submissions, isEmpty);
     await tap(tester, 'Scan CAC & submit');
@@ -88,7 +88,7 @@ void main() {
     await tap(tester, 'Review faults');
     await tap(tester, 'Verified');
     await tap(tester, 'Not verified');
-    await tap(tester, 'Submit review');
+    await tap(tester, 'Sign & submit');
     await tap(tester, 'Scan CAC & submit');
     expect(find.textContaining('A CAC scan is required'), findsOneWidget);
     expect(reports.reports, hasLength(1));
