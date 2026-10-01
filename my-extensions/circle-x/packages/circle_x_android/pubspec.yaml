@@ -1,0 +1,19 @@
+name: circle_x_android
+description: Android build rules circle-x carries into whatever app hosts it.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.4.0
+  flutter: '>=3.3.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.circlex.circle_x_android
+        pluginClass: CircleXAndroidPlugin

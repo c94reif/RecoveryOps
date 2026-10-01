@@ -1,4 +1,4 @@
-name: ivy_pulse
+name: circle_x
 description: A Lattice Edge extension
 version: 1.0.0
 publish_to: 'none'

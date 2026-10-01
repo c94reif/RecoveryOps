@@ -1,3 +1,7 @@
+import 'package:recovery_ops/core/config/report_store_config.dart';
+import 'package:recovery_ops/data/services/report_store_factory.dart';
+import 'package:recovery_ops/domain/services/report_store_backend.dart';
+import 'package:recovery_ops/domain/services/report_store_strategy.dart';
 import 'package:get_it/get_it.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
 import 'package:recovery_ops/data/datasources/local/database.dart';
@@ -10,8 +14,6 @@ import 'package:recovery_ops/data/repositories/reports_repo_impl.dart';
 import 'package:recovery_ops/data/repositories/location_repo_impl.dart';
 import 'package:recovery_ops/data/services/device_speech_recognition.dart';
 import 'package:recovery_ops/data/services/isolate_queue_worker.dart';
-import 'package:recovery_ops/data/services/lattice_entity_adapter.dart';
-import 'package:recovery_ops/data/services/lattice_report_source.dart';
 import 'package:recovery_ops/data/services/regex_transcript_parsetr.dart';
 import 'package:recovery_ops/data/services/sdk_mesh_broadcaster.dart';
 import 'package:recovery_ops/domain/repositories/profile_repo.dart';
@@ -49,7 +51,11 @@ import 'package:recovery_ops/presentation/reports/reports_view_model.dart';
 
 final getIt = GetIt.instance;
 
-void configureDependencies(sdk.ExtensionContext extensionContext) {
+void configureDependencies(
+  sdk.ExtensionContext extensionContext, {
+  ReportStoreBackend? reportStoreBackend,
+  sdk.MeshDataTypePath reportItemType = ReportStoreConfig.itemType,
+}) {
   getIt.registerLazySingleton<sdk.ExtensionContext>(() => extensionContext);
   getIt.registerLazySingleton<sdk.LocationService>(
       () => extensionContext.location);
@@ -98,14 +104,17 @@ void configureDependencies(sdk.ExtensionContext extensionContext) {
     () => RegexTranscriptParser(),
   );
 
-  getIt.registerLazySingleton<RecoveryEntityPort>(
-    () => LatticeEntityAdapter(entities: getIt<sdk.EntityService>()),
+  getIt.registerLazySingleton<ReportStoreStrategy>(
+    () => createReportStore(extensionContext,
+        backend: reportStoreBackend, itemType: reportItemType),
   );
+  getIt.registerLazySingleton<RecoveryEntityPort>(
+      () => getIt<ReportStoreStrategy>());
   getIt.registerLazySingleton<MeshBroadcasterPort>(
     () => SdkMeshBroadcaster(messaging: getIt<sdk.MessagingService>()),
   );
   getIt.registerLazySingleton<RemoteReportSource>(
-    () => LatticeReportSource(entities: getIt<sdk.EntityService>()),
+    () => getIt<ReportStoreStrategy>(),
   );
 
   getIt.registerLazySingleton<QueueWorkerStrategy>(
@@ -137,7 +146,10 @@ void configureDependencies(sdk.ExtensionContext extensionContext) {
     () => PublishNavigatorEntity(getIt<RecoveryEntityPort>()),
   );
   getIt.registerLazySingleton<PublishNavigationStopped>(
-    () => PublishNavigationStopped(getIt<MeshBroadcasterPort>()),
+    () => PublishNavigationStopped(getIt<MeshBroadcasterPort>(),
+        navigatorStore: getIt<ReportStoreStrategy>() is NavigatorStateStore
+            ? getIt<ReportStoreStrategy>() as NavigatorStateStore
+            : null),
   );
 
   getIt.registerFactory<ProfileViewModel>(

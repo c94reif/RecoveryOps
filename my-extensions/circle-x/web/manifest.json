@@ -1,0 +1,19 @@
+{
+    "name": "circle-x",
+    "short_name": "circle-x",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#171b14",
+    "theme_color": "#4b5320",
+    "description": "Guided PMCS for tactical vehicles",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "favicon.png",
+            "sizes": "1254x1254",
+            "type": "image/png",
+            "purpose": "any"
+        }
+    ]
+}
