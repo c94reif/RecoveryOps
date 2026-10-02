@@ -2,8 +2,10 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
 import 'package:circle_x/core/platform/cac_camera_preview.dart';
+import 'package:circle_x/core/platform/cac_camera_geometry.dart';
 import 'package:circle_x/domain/entities/cac_scan.dart';
 import 'package:circle_x/domain/services/cac_scanner_strategy.dart';
+import 'package:circle_x/presentation/inspection/viewfinder/cac_live_preview.dart';
 
 Widget? buildCacViewfinder(CacScannerStrategy scanner) => switch (scanner) {
       CacCameraPreview preview => CacViewfinder(scanner: preview),
@@ -18,7 +20,7 @@ class CacViewfinder extends StatelessWidget {
 
   const CacViewfinder({super.key, required this.scanner});
 
-  static const double cardAspect = 85.6 / 53.98;
+  static const double cardAspect = CacCameraGeometry.cardAspect;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +52,7 @@ class CacViewfinder extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: AspectRatio(
-                aspectRatio: 4 / 3,
+                aspectRatio: CacCameraGeometry.previewAspect,
                 child: controller == null || !controller.value.isInitialized
                     ? const ColoredBox(
                         color: surface,
@@ -62,24 +64,22 @@ class CacViewfinder extends StatelessWidget {
                           ),
                         ),
                       )
-                    : Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          FittedBox(
-                            fit: BoxFit.cover,
-                            clipBehavior: Clip.hardEdge,
-                            child: SizedBox(
-                              width: controller.value.previewSize?.height ?? 4,
-                              height: controller.value.previewSize?.width ?? 3,
-                              child: CameraPreview(controller),
-                            ),
-                          ),
-                          CardGuide(side: side),
-                        ],
+                    : CacLivePreview(
+                        controller: controller,
+                        onFocus: scanner.focusAt,
+                        guide: CardGuide(side: side),
                       ),
               ),
             ),
             const SizedBox(height: 8),
+            Text(
+              side == CacScanSide.front
+                  ? 'Tap your name to focus'
+                  : 'Tap the DoD ID number to focus',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: textSecondary, fontSize: 11),
+            ),
+            const SizedBox(height: 4),
             ValueListenableBuilder<String>(
               valueListenable: scanner.guidance,
               builder: (_, text, __) => Semantics(
@@ -113,12 +113,9 @@ class CardGuide extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final front = side == CacScanSide.front;
-        final width = front
-            ? constraints.maxHeight * 0.78 / CacViewfinder.cardAspect
-            : constraints.maxWidth * 0.86;
-        final height = front
-            ? width * CacViewfinder.cardAspect
-            : width / CacViewfinder.cardAspect;
+        final card = CacCameraGeometry.guide(constraints.biggest, side);
+        final width = card.width;
+        final height = card.height;
         return Stack(
           fit: StackFit.expand,
           children: [

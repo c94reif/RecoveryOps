@@ -34,6 +34,9 @@ class _OcrScanner implements CacScannerStrategy, CacCameraPreview {
   Future<bool> isAvailable() async => true;
 
   @override
+  Future<void> focusAt(Offset point) async {}
+
+  @override
   Future<void> cancel() async => cancelCalls++;
 
   @override
@@ -141,6 +144,30 @@ void main() {
     expect(report.operator, 'SMITH, JOHN MICHAEL');
     expect(report.signature!.dodId, '1087987498');
     expect(report.isSignatureVerified, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a missing digit keeps the report unsigned until a full read',
+      (tester) async {
+    await start(tester);
+    readFront();
+    scanner.read(['DoD ID Number 108798749']);
+    scanner.read(['DoD ID Number 108798749']);
+    await tester.pump();
+
+    expect(find.textContaining('Read 9 of 10 digits'), findsOneWidget);
+    expect(find.textContaining('Rescan the back of your CAC'), findsOneWidget);
+    expect(harness.viewModel.isSignedOff, isFalse);
+    expect(harness.reports.reports, isEmpty);
+    expect(find.text('SUBMIT PMCS'), findsNothing);
+
+    scanner.read(['DoD ID Number 1087987498']);
+    await tester.pump();
+    expect(harness.viewModel.isSignedOff, isFalse);
+    scanner.read(['DoD ID Number 1087987498']);
+    await tester.pumpAndSettle();
+    expect(harness.viewModel.isSignedOff, isTrue);
+    expect(find.text('DoD ID 1087987498'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -106,4 +106,15 @@ void main() {
 
     expect(scanner.captureCalls, 1);
   });
+
+  test('a short or long OCR number cannot verify even with a front name',
+      () async {
+    for (final number in ['108798749', '10879874981']) {
+      scanner.result =
+          CacCapture.read(number, name: (firstName: 'JOHN', lastName: 'SMITH'));
+      final scan = await verify();
+      expect(scan.identity, isNull);
+      expect(scan.rejection, CacRejection.notACac);
+    }
+  });
 }

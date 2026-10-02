@@ -61,6 +61,10 @@ void main() {
     for (final interruption in [
       <String>[],
       ['DoD ID Number 0000000001'],
+      ['DoD ID Number 108798749'],
+      ['DoD ID Number 10879874981'],
+      ['DoD ID Number 1087987498-1'],
+      ['DoD Benefits Number 1087987498'],
       ['DoD Benefits Number 10879874981'],
       ['DoD ID Number 1098765432'],
     ]) {
@@ -69,6 +73,25 @@ void main() {
     }
     expect(session.process(back), isNull);
     expect(session.process(back)!.name!.lastName, 'SMITH');
+  });
+
+  test('short and long reads explain the length and keep scanning', () {
+    final session = CacOcrSession();
+    session.process(front);
+    session.process(front);
+
+    for (var frame = 0; frame < 4; frame++) {
+      expect(session.process(['DoD ID Number 108798749']), isNull);
+      expect(session.guidance, contains('Read 9 of 10 digits'));
+      expect(session.guidance, contains('Rescan the back of your CAC'));
+      expect(session.side, CacScanSide.back);
+    }
+    expect(session.process(['DoD ID Number 10879874981']), isNull);
+    expect(session.guidance, contains('Read 11 digits'));
+    expect(session.guidance, contains('exactly 10'));
+    expect(session.guidance, contains('Rescan the back of your CAC'));
+    expect(session.process(back), isNull);
+    expect(session.process(back)!.barcode, '1087987498');
   });
 
   test('a timeout tells the operator which side could not be read', () {

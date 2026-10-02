@@ -41,5 +41,12 @@ void main() {
       expect(parse('0000000001').rejection, CacRejection.notACac);
       expect(parse('0999999999').rejection, CacRejection.notACac);
     });
+
+    test('does not discard an unreadable digit to manufacture ten digits', () {
+      for (final raw in ['10879O87498', '1087987498?', '1087987498-1']) {
+        expect(parse(raw).isVerified, isFalse);
+        expect(parse(raw).rejection, CacRejection.notACac);
+      }
+    });
   });
 }

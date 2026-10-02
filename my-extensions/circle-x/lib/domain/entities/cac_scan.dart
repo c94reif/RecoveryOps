@@ -31,11 +31,13 @@ enum CacRejection {
           'No name found. Scan the front of the card — the side with your '
               'photo — and hold the printed name steady.',
         CacRejection.noCodeFound =>
-          'No DoD ID number found. Fill the frame with the back of the card '
-              '— the side with the wide barcode strip — and hold steady.',
+          'Could not read the complete 10-digit DoD ID number. Rescan the '
+              'back of your CAC — fill the frame with the side with the '
+              'wide barcode strip and hold all 10 digits steady.',
         CacRejection.codeUnreadable =>
-          'Found the card but could not read the DoD ID number. Wipe the '
-              'card, tilt it away from the light, and hold steady.',
+          'Could not read all 10 digits of the DoD ID number. Rescan the '
+              'back of your CAC — wipe the card, tilt it away from the '
+              'light, and hold the full number steady.',
         CacRejection.cardTooSmall =>
           'The card is too small in the frame. Move closer until the DoD ID '
               'number is clear.',

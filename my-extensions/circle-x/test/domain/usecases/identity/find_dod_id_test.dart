@@ -54,6 +54,62 @@ void main() {
       expect(findDodId(['DoD ID Number 0000000001']), isNull);
     });
 
+    test('rejects a missing digit at every position without padding it', () {
+      const number = '1087987498';
+      for (var index = 0; index < number.length; index++) {
+        final short = number.replaceRange(index, index + 1, '');
+        expect(inspectDodId(['DoD ID Number $short']),
+            (dodId: null, digitCount: 9));
+      }
+    });
+
+    test('counts the whole number across OCR whitespace and dashes', () {
+      for (final separator in [' ', '  ', '\t', '\u00a0', '-']) {
+        expect(findDodId(['ID 10879${separator}87498']), '1087987498');
+        expect(inspectDodId(['ID 1087987498${separator}1']),
+            (dodId: null, digitCount: 11));
+        expect(findDodId(['1${separator}1087987498']), isNull);
+      }
+    });
+
+    test('does not mistake a shortened benefits number for a DoD ID', () {
+      for (final label in ['DoD Benefits Number', 'BENEFITS', 'DBN']) {
+        expect(findDodId(['$label 1087987498']), isNull);
+        expect(findDodId([label, '1087987498']), isNull);
+      }
+      expect(findDodId(['DBN 2001234567 ID 1087987498']), '1087987498');
+    });
+
+    test('keeps reading a short labelled ID instead of using another number',
+        () {
+      for (final lines in [
+        ['ID 108798749', '2001234567'],
+        ['ID', '108798749', '2001234567'],
+        ['ID', 'DoD Benefits Number 1087987498'],
+        ['DoD ID Number 108798749', 'DoD Benefits Number 1087987498'],
+      ]) {
+        expect(findDodId(lines), isNull);
+      }
+      expect(inspectDodId(['108798749']), (dodId: null, digitCount: 9));
+    });
+
+    test('reads a number below its label without joining separate lines', () {
+      expect(findDodId(['DoD ID Number', '', '1087987498']), '1087987498');
+      expect(findDodId(['DoD ID Number', '10879', '87498']), isNull);
+    });
+
+    test('requires an unambiguous number instead of choosing the first', () {
+      expect(findDodId(['1087987498', '2001234567']), isNull);
+      expect(findDodId(['ID 1087987498', 'ID 2001234567']), isNull);
+      expect(findDodId(['ID 1087987498', 'ID 1087987498']), '1087987498');
+    });
+
+    test('does not extract digits from a word or repair misread letters', () {
+      for (final number in ['O1087987498', '1087987498O', '10879O87498']) {
+        expect(findDodId(['DoD ID Number $number']), isNull);
+      }
+    });
+
     test('finds nothing on an empty frame', () {
       expect(findDodId(const []), isNull);
       expect(findDodId(['', 'ARMY']), isNull);
