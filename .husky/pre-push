@@ -26,6 +26,13 @@ echo "running tests with coverage circle-x"
   exit 1
 }
 
+echo "running tests with coverage cac_ocr"
+(cd my-extensions/circle-x/packages/cac_ocr && flutter test --coverage) || {
+  echo ""
+  echo "🚫 Tests failed. Fix them before pushing."
+  exit 1
+}
+
 echo "running tests with coverage Recovery Ops"
 (cd my-extensions/recovery_ops && flutter test --coverage) || {
   echo ""
@@ -35,6 +42,13 @@ echo "running tests with coverage Recovery Ops"
 
 echo "coverage gate running (80% minimum, generated files excluded)"
 (cd my-extensions/circle-x && dart run ../../tool/check_coverage.dart) || {
+  echo ""
+  echo "🚫 Coverage is below the 80% minimum. Add tests before pushing."
+  exit 1
+}
+
+echo "coverage gate running cac_ocr (80% minimum, generated files excluded)"
+(cd my-extensions/circle-x/packages/cac_ocr && dart run ../../../../tool/check_coverage.dart) || {
   echo ""
   echo "🚫 Coverage is below the 80% minimum. Add tests before pushing."
   exit 1

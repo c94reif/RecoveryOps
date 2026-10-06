@@ -5,13 +5,11 @@ import 'package:flutter/foundation.dart';
 import 'package:circle_x/domain/entities/maintainer_review.dart';
 import 'package:circle_x/domain/entities/pmcs_report.dart';
 import 'package:circle_x/domain/entities/publish_result.dart';
-import 'package:circle_x/domain/services/cac_scanner_strategy.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/domain/services/speech_recognition_strategy.dart';
 import 'package:circle_x/domain/services/user_notification_sink.dart';
-import 'package:circle_x/domain/usecases/identity/verify_operator_identity.dart';
 import 'package:circle_x/domain/usecases/publishing/publish_pmcs_report.dart';
 import 'package:circle_x/domain/usecases/reporting/submit_maintainer_review.dart';
-import 'package:circle_x/presentation/inspection/controllers/cac_scan_controller.dart';
 import 'package:circle_x/presentation/inspection/controllers/fault_dictation_controller.dart';
 
 class MaintainerReviewViewModel extends ChangeNotifier

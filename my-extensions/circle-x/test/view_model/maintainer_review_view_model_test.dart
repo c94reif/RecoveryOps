@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:circle_x/domain/entities/cac_scan.dart';
-import 'package:circle_x/domain/services/cac_scanner_strategy.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 
 import '../support/maintainer_harness.dart';
 
@@ -96,11 +95,11 @@ void main() {
     model.describe('Edited after cancelling');
     model.requestSignature();
     final second = model.scanAndSubmit();
-    scanner.captures.first.complete(const CacCapture.read('1087987498'));
+    scanner.captures.first.complete(const CacCapture.fields('1087987498'));
     await first;
     expect(model.saved, isNull);
     expect(h.queue.submissions, isEmpty);
-    scanner.captures.last.complete(const CacCapture.read('1087987499'));
+    scanner.captures.last.complete(const CacCapture.fields('1087987499'));
     await second;
     expect(model.saved!.maintainerReview!.signature.dodId, '1087987499');
     expect(model.saved!.maintainerReview!.faults.last.description,
@@ -117,7 +116,7 @@ void main() {
     model.requestSignature();
     final submission = model.scanAndSubmit();
     model.dispose();
-    scanner.captures.single.complete(const CacCapture.read('1087987498'));
+    scanner.captures.single.complete(const CacCapture.fields('1087987498'));
     await submission;
     expect(h.repository.reports, hasLength(1));
     expect(h.queue.submissions, isEmpty);

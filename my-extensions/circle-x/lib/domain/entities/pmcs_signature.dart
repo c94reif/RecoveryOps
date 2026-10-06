@@ -1,6 +1,4 @@
-import 'package:circle_x/domain/entities/attested_identity.dart';
-import 'package:circle_x/domain/entities/cac_identity.dart';
-import 'package:circle_x/domain/entities/cac_scan.dart';
+import 'package:cac_ocr/cac_core.dart';
 
 class PmcsSignature {
   final CacIdentity? identity;
@@ -31,7 +29,7 @@ class PmcsSignature {
         _ => 'none',
       };
 
-  String? get dodId => identity?.edipi ?? attestedBy?.edipi;
+  String? get dodId => identity?.dodId ?? attestedBy?.dodId;
 
   String get displayName =>
       identity?.displayName ?? attestedBy?.displayName ?? 'UNVERIFIED';

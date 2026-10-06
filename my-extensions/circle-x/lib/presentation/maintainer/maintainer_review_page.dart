@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/di/service_locator.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/cac_scan.dart';
-import 'package:circle_x/domain/services/cac_scanner_strategy.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/domain/services/id_generator.dart';
 import 'package:circle_x/domain/services/speech_recognition_strategy.dart';
-import 'package:circle_x/domain/usecases/identity/verify_operator_identity.dart';
 import 'package:circle_x/domain/usecases/publishing/publish_pmcs_report.dart';
 import 'package:circle_x/domain/usecases/reporting/submit_maintainer_review.dart';
 import 'package:circle_x/presentation/common/widgets/confirm_dialog.dart';
-import 'package:circle_x/presentation/inspection/viewfinder/cac_viewfinder.dart';
 import 'package:circle_x/presentation/maintainer/maintainer_review_summary.dart';
 import 'package:circle_x/presentation/maintainer/maintainer_description_field.dart';
 import 'package:circle_x/presentation/maintainer/maintainer_fault_search.dart';

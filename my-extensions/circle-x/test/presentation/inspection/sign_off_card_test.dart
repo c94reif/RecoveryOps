@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/core/di/injection.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/cac_scan.dart';
+import 'package:cac_ocr/cac_ocr.dart';
+import 'package:cac_ocr/testing.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/presentation/common/widgets/custom_button.dart';
 import 'package:circle_x/presentation/inspection/sign_off_card.dart';
 import 'package:circle_x/presentation/inspection/summary_page.dart';
 
-import '../../support/cac_fixtures.dart';
 import '../../support/fakes.dart';
 import '../../support/inspection_harness.dart';
 
@@ -72,10 +71,10 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  final scanButton = find.widgetWithText(CustomButton, 'SCAN CAC');
-  final scanAgainButton = find.widgetWithText(CustomButton, 'SCAN AGAIN');
+  final scanButton = find.widgetWithText(CacButton, 'SCAN CAC');
+  final scanAgainButton = find.widgetWithText(CacButton, 'SCAN AGAIN');
   final scanAgainLink = find.widgetWithText(TextButton, 'SCAN AGAIN');
-  final overrideButton = find.widgetWithText(CustomButton, 'SUBMIT UNVERIFIED');
+  final overrideButton = find.widgetWithText(CacButton, 'SUBMIT UNVERIFIED');
   final overrideLink = find.widgetWithText(TextButton, 'SUBMIT UNVERIFIED');
 
   /// The summary is a ListView on a 314px panel, so anything below the fold is
@@ -295,10 +294,13 @@ void main() {
       await walkPmcs();
       await pumpPanel(tester);
       // BBQH is 15 January 2020, long dead against the harness's 2026 clock.
-      harness.cacScanner.willRead(cacBarcode(expires: 'BBQH'));
+      harness.cacScanner.willReadBarcode(cacBarcode(expires: 'BBQH'));
       await scan(tester);
 
       expect(find.textContaining('That CAC expired'), findsOneWidget);
+      expect(find.text('CAC EXPIRED'), findsOneWidget);
+      expect(find.text('SGT SMITH, JOHN A'), findsOneWidget);
+      expect(find.text('Expired 15 JAN 2020'), findsOneWidget);
       expect(overrideButton, findsOneWidget);
       expect(scanAgainLink, findsOneWidget);
     });
@@ -306,7 +308,7 @@ void main() {
     testWidgets('a pre-2012 card leads with the override', (tester) async {
       await walkPmcs();
       await pumpPanel(tester);
-      harness.cacScanner.willRead(cacBarcode(securityId: 'ABCDEF'));
+      harness.cacScanner.willReadBarcode(cacBarcode(securityId: 'ABCDEF'));
       await scan(tester);
 
       expect(find.textContaining('predates 2012'), findsOneWidget);
@@ -391,7 +393,7 @@ void main() {
       expect(find.textContaining('fill the box'), findsOneWidget);
 
       // The count stands, but the card is now the thing being refused.
-      harness.cacScanner.willRead(cacBarcode(expires: 'BBQH'));
+      harness.cacScanner.willReadBarcode(cacBarcode(expires: 'BBQH'));
       await scan(tester, from: scanAgainButton);
 
       expect(find.textContaining('fill the box'), findsNothing);
@@ -403,7 +405,7 @@ void main() {
     testWidgets('shows what the app checked the card against', (tester) async {
       await walkPmcs();
       await pumpPanel(tester);
-      harness.cacScanner.willRead(cacBarcode());
+      harness.cacScanner.willReadBarcode(cacBarcode());
       await scan(tester);
 
       expect(find.text('SGT SMITH, JOHN A'), findsOneWidget);
@@ -417,7 +419,7 @@ void main() {
       await walkPmcs();
       await pumpPanel(tester);
       // BE1H is 5 April 2026; the harness clock is 24 March 2026.
-      harness.cacScanner.willRead(cacBarcode(expires: 'BE1H'));
+      harness.cacScanner.willReadBarcode(cacBarcode(expires: 'BE1H'));
       await scan(tester);
 
       expect(
@@ -425,13 +427,13 @@ void main() {
       expect(find.text('Card expires 05 APR 2026'), findsOneWidget);
       // A heads-up, not a refusal. Dressing it as one would teach operators to
       // ignore the real refusals.
-      expect(find.widgetWithText(CustomButton, 'SUBMIT PMCS'), findsOneWidget);
+      expect(find.widgetWithText(CacButton, 'SUBMIT PMCS'), findsOneWidget);
     });
 
     testWidgets('a card with months left raises nothing', (tester) async {
       await walkPmcs();
       await pumpPanel(tester);
-      harness.cacScanner.willRead(cacBarcode());
+      harness.cacScanner.willReadBarcode(cacBarcode());
       await scan(tester);
 
       expect(find.byIcon(Icons.event_busy_outlined), findsNothing);
@@ -444,7 +446,7 @@ void main() {
     testWidgets('rides the verified card', (tester) async {
       await walkPmcs();
       await pumpPanel(tester);
-      harness.cacScanner.willRead(cacBarcode());
+      harness.cacScanner.willReadBarcode(cacBarcode());
       await scan(tester);
 
       expect(find.textContaining(line), findsOneWidget);
@@ -485,8 +487,7 @@ void main() {
 
   group('the typed fallback', () {
     final dodIdField = find.widgetWithText(TextField, 'DoD ID');
-    final typedSubmit =
-        find.widgetWithText(CustomButton, 'SUBMIT WITH TYPED ID');
+    final typedSubmit = find.widgetWithText(CacButton, 'SUBMIT WITH TYPED ID');
 
     Future<void> refuseScan(WidgetTester tester) async {
       await walkPmcs();
@@ -533,7 +534,7 @@ void main() {
         (tester) async {
       await refuseScan(tester);
       await reach(tester, typedSubmit);
-      expect(tester.widget<CustomButton>(typedSubmit).onPressed, isNull);
+      expect(tester.widget<CacButton>(typedSubmit).onPressed, isNull);
 
       await tester.enterText(
           find.widgetWithText(TextField, 'Last name'), 'SMITH');
@@ -542,7 +543,7 @@ void main() {
       await tester.enterText(dodIdField, '1087987498');
       await tester.pumpAndSettle();
 
-      expect(tester.widget<CustomButton>(typedSubmit).onPressed, isNotNull);
+      expect(tester.widget<CacButton>(typedSubmit).onPressed, isNotNull);
     });
   });
 

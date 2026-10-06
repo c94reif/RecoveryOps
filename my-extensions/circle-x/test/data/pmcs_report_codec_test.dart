@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/core/constants/app_constants.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
-import 'package:circle_x/domain/entities/cac_scan.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/domain/entities/fault_severity.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
@@ -163,7 +163,7 @@ void main() {
       )!;
 
       expect(decoded.isSignatureVerified, isTrue);
-      expect(decoded.signature!.identity!.edipi, '1087987498');
+      expect(decoded.signature!.identity!.dodId, '1087987498');
       expect(decoded.signature!.identity!.displayName, 'SGT SMITH, JOHN A');
     });
 

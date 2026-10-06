@@ -51,6 +51,13 @@ flutter analyze my-extensions/circle-x  || {
   exit 1
 }
 
+echo "analyzer running cac_ocr"
+flutter analyze my-extensions/circle-x/packages/cac_ocr  || {
+  echo ""
+  echo "🚫 Analyzer found issues. Fix them before committing."
+  exit 1
+}
+
 echo "analyzer running Recovery Ops"
 flutter analyze my-extensions/recovery_ops || {
   echo ""

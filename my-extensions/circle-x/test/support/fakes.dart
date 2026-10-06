@@ -4,9 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:circle_x/presentation/common/services/fault_suggestion_controller.dart';
 import 'package:latlong2/latlong.dart';
 
-import 'package:circle_x/domain/entities/cac_identity.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/domain/entities/maintainer_review.dart';
-import 'package:circle_x/domain/entities/cac_scan.dart';
 import 'package:circle_x/domain/entities/check_result.dart';
 import 'package:circle_x/domain/entities/fault_severity.dart';
 import 'package:circle_x/domain/entities/pmcs_fault.dart';
@@ -27,7 +26,6 @@ import 'package:circle_x/domain/repositories/queued_submissions_repo.dart';
 import 'package:circle_x/domain/repositories/reports_repo.dart';
 import 'package:circle_x/domain/repositories/results_repo.dart';
 import 'package:circle_x/domain/repositories/sessions_repo.dart';
-import 'package:circle_x/domain/services/cac_scanner_strategy.dart';
 import 'package:circle_x/domain/services/fault_classifier_strategy.dart';
 import 'package:circle_x/domain/services/id_generator.dart';
 import 'package:circle_x/domain/services/mesh_broadcaster_port.dart';
@@ -36,6 +34,8 @@ import 'package:circle_x/domain/services/queue_worker_strategy.dart';
 import 'package:circle_x/domain/services/remote_report_source.dart';
 import 'package:circle_x/domain/services/report_codec.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
+
+export 'package:cac_ocr/testing.dart' show FakeCacScanner, HangingCacScanner;
 
 /// Shared in-memory doubles. Hand-written rather than generated so the tests
 /// break loudly when a domain contract changes.
@@ -266,63 +266,6 @@ class FakeProfileRepository implements ProfileRepository {
     saved.add(profile);
     this.profile = profile;
   }
-}
-
-/// Hands back whatever the test set, so the sign-off gate can be driven
-/// through every outcome without a camera.
-class FakeCacScanner implements CacScannerStrategy {
-  bool available = true;
-  CacCapture result = const CacCapture.failed(CacRejection.noCodeFound);
-  Object? throwOnCapture;
-  int captureCalls = 0;
-  int cancelCalls = 0;
-
-  /// Convenience for the common case: a readable card.
-  void willRead(String barcode) => result = CacCapture.read(barcode);
-
-  void willFail(CacRejection rejection) =>
-      result = CacCapture.failed(rejection);
-
-  @override
-  Future<bool> isAvailable() async => available;
-
-  @override
-  Future<CacCapture> capture() async {
-    captureCalls++;
-    if (throwOnCapture != null) throw throwOnCapture!;
-    return result;
-  }
-
-  @override
-  Future<void> cancel() async => cancelCalls++;
-}
-
-/// A capture that never resolves until the test says so.
-///
-/// The one scanner shape [FakeCacScanner] cannot take: everything that guards
-/// an in-flight scan — the cancel control, the generation guard, the latch
-/// this whole path exists to prevent — is unreachable if `capture()` has
-/// already returned by the time the test looks at it.
-class HangingCacScanner implements CacScannerStrategy {
-  final Completer<CacCapture> pending = Completer<CacCapture>();
-  int captureCalls = 0;
-  int cancelCalls = 0;
-
-  @override
-  Future<bool> isAvailable() async => true;
-
-  @override
-  Future<CacCapture> capture() {
-    captureCalls++;
-    return pending.future;
-  }
-
-  /// Nothing is completed here on purpose. The real scanner cannot close the
-  /// Android camera activity either; it abandons the scan on its own side and
-  /// drops whatever lands afterwards, which is exactly the sequence the
-  /// generation guard has to survive.
-  @override
-  Future<void> cancel() async => cancelCalls++;
 }
 
 class FakeLocationRepository implements LocationRepository {
@@ -791,7 +734,7 @@ class FakeReportsViewModel extends ChangeNotifier implements ReportsViewModel {
 /// A Soldier as the parser would hand one back, for tests that need an
 /// identity without going through a barcode.
 CacIdentity buildIdentity({
-  String edipi = '1087987498',
+  String dodId = '1087987498',
   String firstName = 'JOHN',
   String lastName = 'SMITH',
   String middleInitial = 'A',
@@ -803,7 +746,7 @@ CacIdentity buildIdentity({
   DateTime? verifiedAt,
 }) {
   return CacIdentity(
-    edipi: edipi,
+    dodId: dodId,
     firstName: firstName,
     lastName: lastName,
     middleInitial: middleInitial,

@@ -3,10 +3,8 @@ part of 'inspection_view_model.dart';
 /// CAC sign-off, report submission, and delivery status.
 mixin _InspectionSubmission on _InspectionState {
   CacScan? get lastScan => identityScan.lastScan;
-  set lastScan(CacScan? value) => identityScan.lastScan = value;
   bool get isScanning => identityScan.isScanning;
   int get scanAttempts => identityScan.scanAttempts;
-  set scanAttempts(int value) => identityScan.scanAttempts = value;
 
   DeliveryStatus? deliveryStatus(TransportKind transport) => submittedReport ==
           null
@@ -59,7 +57,7 @@ mixin _InspectionSubmission on _InspectionState {
   Future<void> submitAttested({
     required String lastName,
     required String firstName,
-    required String edipi,
+    required String dodId,
   }) async {
     if (session == null) return;
 
@@ -72,11 +70,11 @@ mixin _InspectionSubmission on _InspectionState {
     final parsed = AttestedIdentity.parse(
       lastName: lastName,
       firstName: firstName,
-      edipi: edipi,
+      dodId: dodId,
     );
     final identity = parsed.identity;
     if (identity == null) {
-      snackBarService.enqueue(parsed.error!, isError: true);
+      snackBarService.enqueue(parsed.error!.message, isError: true);
       return;
     }
 

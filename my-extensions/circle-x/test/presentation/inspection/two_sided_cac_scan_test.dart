@@ -4,14 +4,10 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/core/di/injection.dart';
-import 'package:circle_x/core/platform/cac_camera_preview.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/cac_scan.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/domain/services/cac_scanner_strategy.dart';
-import 'package:circle_x/domain/usecases/identity/cac_ocr_session.dart';
 import 'package:circle_x/presentation/inspection/summary_page.dart';
-import 'package:circle_x/presentation/inspection/viewfinder/cac_viewfinder_android.dart';
 
 import '../../support/fakes.dart';
 import '../../support/inspection_harness.dart';
@@ -23,9 +19,12 @@ class _OcrScanner implements CacScannerStrategy, CacCameraPreview {
   int cancelCalls = 0;
 
   @override
+  final sides = CacSides.frontAndBack;
+  @override
   final ValueNotifier<CameraController?> preview = ValueNotifier(null);
   @override
-  final ValueNotifier<String> guidance = ValueNotifier('');
+  final ValueNotifier<CacGuidance> guidance =
+      ValueNotifier(CacInstruction.startingCamera);
   @override
   final ValueNotifier<CacScanSide> side = ValueNotifier(CacScanSide.front);
   final session = CacOcrSession();
@@ -110,10 +109,15 @@ void main() {
     await tester.pump();
   }
 
-  void readFront() {
-    scanner.read(['NAME', 'SMITH, JOHN MICHAEL', 'RANK']);
-    scanner.read(['NAME', 'SMITH, JOHN MICHAEL', 'RANK']);
+  /// Shows the same lines on as many frames as a reading must agree over.
+  void readAgreeing(List<String> lines,
+      [int frames = CacOcrSession.framesToAgree]) {
+    for (var frame = 0; frame < frames; frame++) {
+      scanner.read(lines);
+    }
   }
+
+  void readFront() => readAgreeing(['NAME', 'SMITH, JOHN MICHAEL', 'RANK']);
 
   testWidgets('prompts for both sides and submits the name with the DoD ID',
       (tester) async {
@@ -130,8 +134,7 @@ void main() {
     expect(find.text('SUBMIT PMCS'), findsNothing);
     expect(harness.viewModel.isSignedOff, isFalse);
 
-    scanner.read(['DoD ID Number 1087987498']);
-    scanner.read(['DoD ID Number 1087987498']);
+    readAgreeing(['DoD ID Number 1087987498']);
     await tester.pumpAndSettle();
     expect(find.text('SMITH, JOHN MICHAEL'), findsOneWidget);
     expect(find.text('DoD ID 1087987498'), findsOneWidget);
@@ -151,8 +154,7 @@ void main() {
       (tester) async {
     await start(tester);
     readFront();
-    scanner.read(['DoD ID Number 108798749']);
-    scanner.read(['DoD ID Number 108798749']);
+    readAgreeing(['DoD ID Number 108798749']);
     await tester.pump();
 
     expect(find.textContaining('Read 9 of 10 digits'), findsOneWidget);
@@ -161,7 +163,7 @@ void main() {
     expect(harness.reports.reports, isEmpty);
     expect(find.text('SUBMIT PMCS'), findsNothing);
 
-    scanner.read(['DoD ID Number 1087987498']);
+    readAgreeing(['DoD ID Number 1087987498'], CacOcrSession.framesToAgree - 1);
     await tester.pump();
     expect(harness.viewModel.isSignedOff, isFalse);
     scanner.read(['DoD ID Number 1087987498']);
@@ -184,8 +186,7 @@ void main() {
     expect(find.text('SUBMIT PMCS'), findsNothing);
 
     // A queued OCR response arriving after cancellation cannot sign anything.
-    scanner.read(['1087987498']);
-    scanner.read(['1087987498']);
+    readAgreeing(['1087987498']);
     await tester.pumpAndSettle();
     expect(harness.viewModel.isSignedOff, isFalse);
     expect(harness.reports.reports, isEmpty);
@@ -203,34 +204,5 @@ void main() {
         findsOneWidget);
     expect(find.text('SCAN AGAIN'), findsOneWidget);
     expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('the guide changes from portrait front to landscape back',
-      (tester) async {
-    for (final side in CacScanSide.values) {
-      await tester.pumpWidget(MaterialApp(
-          home: Center(
-              child: SizedBox(
-        width: 320,
-        height: 240,
-        child: CardGuide(side: side),
-      ))));
-      final brackets = find.byWidgetPredicate((widget) =>
-          widget is CustomPaint && widget.painter is CornerBracketsPainter);
-      final size = tester.getSize(brackets);
-      expect(
-          size.width / size.height,
-          closeTo(
-              side == CacScanSide.front
-                  ? 1 / CacViewfinder.cardAspect
-                  : CacViewfinder.cardAspect,
-              0.001));
-      expect(
-          find.text(side == CacScanSide.front
-              ? 'FRONT — NAME BELOW YOUR PHOTO'
-              : 'BACK — DoD ID NUMBER ABOVE THE STRIP'),
-          findsOneWidget);
-      expect(tester.takeException(), isNull);
-    }
   });
 }

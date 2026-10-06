@@ -22,6 +22,4 @@ class AppConstants {
   static const Duration remoteSyncInterval = Duration(minutes: 5);
 
   static const Duration transportProbeInterval = Duration(seconds: 45);
-
-  static const Duration cacCaptureTimeout = Duration(seconds: 120);
 }

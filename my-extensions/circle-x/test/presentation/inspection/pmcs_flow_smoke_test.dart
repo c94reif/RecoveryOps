@@ -23,8 +23,7 @@ import 'package:circle_x/domain/entities/vehicle_type.dart';
 import 'package:circle_x/domain/services/clock.dart';
 import 'package:circle_x/domain/services/fault_classifier_strategy.dart';
 import 'package:circle_x/domain/services/speech_recognition_strategy.dart';
-import 'package:circle_x/domain/usecases/identity/parse_cac_barcode.dart';
-import 'package:circle_x/domain/usecases/identity/verify_operator_identity.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/domain/usecases/publishing/publish_pmcs_report.dart';
 import 'package:circle_x/domain/usecases/reporting/build_session_report.dart';
 import 'package:circle_x/domain/usecases/reporting/submit_session.dart';
@@ -112,7 +111,7 @@ void main() {
         speechStrategy: FakeSpeech(),
         verifyOperatorIdentity: VerifyOperatorIdentity(
           scanner: cacScanner,
-          parseBarcode: ParseCacBarcode(clock),
+          parseBarcode: ParseCacBarcode(clock.nowUtc),
         ),
         cacScanner: cacScanner,
         profileRepository: FakeProfileRepository(

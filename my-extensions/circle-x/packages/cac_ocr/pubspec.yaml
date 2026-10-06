@@ -1,0 +1,29 @@
+name: cac_ocr
+description: Reads a DoD Common Access Card and signs with it. Live OCR on Android of both sides or the back alone, PDF417 and Code 39 decoding on the web, plus the scan, result and typed-fallback UI.
+version: 0.6.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.4.0
+  flutter: '>=3.3.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  camera: ^0.12.1
+  google_mlkit_barcode_scanning: ^0.14.2
+  google_mlkit_text_recognition: ^0.15.0
+  web: ^1.1.1
+  zxing_lib: ^1.1.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.wssextensions.cac_ocr
+        pluginClass: CacOcrPlugin

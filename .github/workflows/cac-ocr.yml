@@ -1,0 +1,50 @@
+name:   cac-ocr
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "my-extensions/circle-x/packages/cac_ocr/**"
+
+env:
+  FLUTTER_VERSION: "3.44.1"
+  WORKING_DIR: my-extensions/circle-x/packages/cac_ocr
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Format, Analysis & Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify formatting
+        run: dart format . --output=none --set-exit-if-changed
+
+      - name: Static analysis
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Run tests
+        run: flutter test --coverage
+
+      - name: Coverage gate
+        run: dart run ../../../../tool/check_coverage.dart

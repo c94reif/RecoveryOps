@@ -5,8 +5,7 @@ import 'package:circle_x/core/theme/app_theme.dart';
 import 'package:circle_x/domain/entities/fault_severity.dart';
 import 'package:circle_x/domain/entities/maintainer_review.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/domain/entities/attested_identity.dart';
-import 'package:circle_x/domain/entities/cac_scan.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/domain/entities/pmcs_signature.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
 import 'package:circle_x/presentation/common/widgets/fault_tally_bar.dart';
@@ -975,7 +974,7 @@ void main() {
           blockedBy: CacRejection.codeUnreadable,
           signedAt: DateTime.utc(2026, 3, 24, 9),
           attestedBy: const AttestedIdentity(
-            edipi: '1087987498',
+            dodId: '1087987498',
             firstName: 'JOHN',
             lastName: 'SMITH',
           ),

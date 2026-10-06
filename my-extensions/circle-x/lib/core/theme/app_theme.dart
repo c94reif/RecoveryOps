@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/domain/entities/fault_severity.dart';
 
 final Color masterChiefGreen = const Color(0xFF4A7820);
@@ -256,4 +257,20 @@ final ThemeData appTheme = ThemeData(
   progressIndicatorTheme: ProgressIndicatorThemeData(
     color: masterChiefGreen,
   ),
+  extensions: [
+    CacOcrTheme(
+      text: textPrimary,
+      mutedText: textSecondary,
+      surface: surface,
+      raisedSurface: surfaceLight,
+      outline: border,
+      accent: masterChiefGreen,
+      success: serviceableGreen,
+      successContainer: serviceableGlow,
+      warning: circleXAmber,
+      warningContainer: circleXGlow,
+      danger: redXRed,
+      dangerContainer: redXGlow,
+    ),
+  ],
 );

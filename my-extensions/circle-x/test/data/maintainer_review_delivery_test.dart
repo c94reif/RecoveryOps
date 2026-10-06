@@ -116,7 +116,7 @@ void main() {
         reviewId: 'review',
         sourceReportId: 'original',
         faults: decisions,
-        identity: buildIdentity(edipi: '1087987499'));
+        identity: buildIdentity(dodId: '1087987499'));
     expect(await queue.count(), 2);
     final stored = await reports.getAllReports();
     expect(stored, hasLength(2));

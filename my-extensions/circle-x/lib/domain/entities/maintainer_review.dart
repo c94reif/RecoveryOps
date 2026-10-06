@@ -1,5 +1,5 @@
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/domain/entities/cac_identity.dart';
+import 'package:cac_ocr/cac_core.dart';
 import 'package:circle_x/domain/entities/pmcs_signature.dart';
 
 class FaultReview {
@@ -46,7 +46,7 @@ class MaintainerReview {
   }) : faults = List.unmodifiable(faults) {
     if (sourceReportId.isEmpty ||
         !signature.isVerified ||
-        !CacIdentity.isValidEdipi(signature.dodId) ||
+        !DodId.isValid(signature.dodId) ||
         faults.isEmpty ||
         faults.any((fault) =>
             fault.itemId.isEmpty || fault.description.runes.length > 2000) ||

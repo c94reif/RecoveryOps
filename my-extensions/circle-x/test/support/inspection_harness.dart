@@ -6,14 +6,12 @@ import 'package:circle_x/domain/entities/pmcs_phase.dart';
 import 'package:circle_x/domain/entities/pmcs_report.dart';
 import 'package:circle_x/domain/entities/profile.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
-import 'package:circle_x/domain/services/cac_scanner_strategy.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/domain/services/clock.dart';
 import 'package:circle_x/domain/services/fault_classifier_strategy.dart';
 import 'package:circle_x/domain/services/pmcs_catalog_source.dart';
 import 'package:circle_x/domain/services/report_codec.dart';
 import 'package:circle_x/domain/services/speech_recognition_strategy.dart';
-import 'package:circle_x/domain/usecases/identity/parse_cac_barcode.dart';
-import 'package:circle_x/domain/usecases/identity/verify_operator_identity.dart';
 import 'package:circle_x/domain/usecases/publishing/publish_pmcs_report.dart';
 import 'package:circle_x/domain/usecases/reporting/build_session_report.dart';
 import 'package:circle_x/domain/usecases/reporting/submit_session.dart';
@@ -242,7 +240,7 @@ class InspectionHarness {
       speechStrategy: speech,
       verifyOperatorIdentity: VerifyOperatorIdentity(
         scanner: this.scanner,
-        parseBarcode: ParseCacBarcode(fixedClock),
+        parseBarcode: ParseCacBarcode(fixedClock.nowUtc),
       ),
       cacScanner: this.scanner,
       profileRepository: profiles,

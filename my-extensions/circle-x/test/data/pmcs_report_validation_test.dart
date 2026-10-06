@@ -2,8 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
-import 'package:circle_x/domain/entities/attested_identity.dart';
-import 'package:circle_x/domain/entities/cac_identity.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/domain/entities/pmcs_fault.dart';
 import 'package:circle_x/domain/entities/pmcs_signature.dart';
 
@@ -83,7 +82,7 @@ void main() {
       ..['unit'] = 'WJ8TAA');
   });
 
-  for (final edipi in [
+  for (final dodId in [
     '',
     '123',
     'abcdefghij',
@@ -91,14 +90,14 @@ void main() {
     '12345678901',
     1234567890
   ]) {
-    test('invalid identity number $edipi cannot verify a signature', () {
-      final identity = buildIdentity().toMap()..['edipi'] = edipi;
+    test('invalid identity number $dodId cannot verify a signature', () {
+      final identity = buildIdentity().toMap()..['edipi'] = dodId;
       expect(CacIdentity.fromMap(identity), isNull);
       final signature = buildSignature().toMap()..['identity'] = identity;
       expect(PmcsSignature.fromMap(signature)?.isVerified, isFalse);
       expect(
           AttestedIdentity.fromMap({
-            'edipi': edipi,
+            'edipi': dodId,
             'firstName': 'TEST',
             'lastName': 'USER',
           }),

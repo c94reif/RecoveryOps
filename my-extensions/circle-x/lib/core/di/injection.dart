@@ -32,7 +32,7 @@ import 'package:circle_x/data/repositories/queued_submissions_repo_impl.dart';
 import 'package:circle_x/data/repositories/reports_repo_impl.dart';
 import 'package:circle_x/data/repositories/results_repo_impl.dart';
 import 'package:circle_x/data/repositories/sessions_repo_impl.dart';
-import 'package:circle_x/data/services/cac_scanner_factory.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/data/services/bumper_scanner_factory.dart';
 import 'package:circle_x/data/services/device_speech_recognition.dart';
 import 'package:circle_x/data/services/drift_transaction_runner.dart';
@@ -48,7 +48,6 @@ import 'package:circle_x/domain/repositories/queued_submissions_repo.dart';
 import 'package:circle_x/domain/repositories/reports_repo.dart';
 import 'package:circle_x/domain/repositories/results_repo.dart';
 import 'package:circle_x/domain/repositories/sessions_repo.dart';
-import 'package:circle_x/domain/services/cac_scanner_strategy.dart';
 import 'package:circle_x/domain/services/bumper_scanner_strategy.dart';
 import 'package:circle_x/domain/services/clock.dart';
 import 'package:circle_x/domain/services/delivery_coordinator.dart';
@@ -63,8 +62,6 @@ import 'package:circle_x/domain/services/remote_report_source.dart';
 import 'package:circle_x/domain/services/report_codec.dart';
 import 'package:circle_x/domain/services/speech_recognition_strategy.dart';
 import 'package:circle_x/domain/usecases/faults/build_phase_faults.dart';
-import 'package:circle_x/domain/usecases/identity/parse_cac_barcode.dart';
-import 'package:circle_x/domain/usecases/identity/verify_operator_identity.dart';
 import 'package:circle_x/domain/usecases/map/show_report_on_map.dart';
 import 'package:circle_x/domain/usecases/parts/suggest_parts_for_fault.dart';
 import 'package:circle_x/domain/usecases/publishing/publish_pmcs_deletion.dart';
@@ -175,7 +172,13 @@ void configureDependencies(
   getIt.registerLazySingleton<SpeechRecognitionStrategy>(
     () => DeviceSpeechRecognition(),
   );
-  getIt.registerLazySingleton<CacScannerStrategy>(() => createCacScanner());
+  getIt.registerLazySingleton<CacScannerStrategy>(
+    () => createCacScanner(
+      diagnostics: const bool.fromEnvironment('CAC_DIAGNOSTICS')
+          ? CacScanDiagnostics()
+          : null,
+    ),
+  );
   getIt.registerFactory<BumperScannerStrategy>(() => createBumperScanner());
   getIt.registerLazySingleton<QueuePromptStrategy>(
     () => QueuePromptController.instance,
@@ -210,7 +213,7 @@ void configureDependencies(
 
   getIt.registerLazySingleton<BuildPhaseFaults>(() => const BuildPhaseFaults());
   getIt.registerLazySingleton<ParseCacBarcode>(
-    () => ParseCacBarcode(getIt<Clock>()),
+    () => ParseCacBarcode(getIt<Clock>().nowUtc),
   );
   getIt.registerLazySingleton<VerifyOperatorIdentity>(
     () => VerifyOperatorIdentity(
