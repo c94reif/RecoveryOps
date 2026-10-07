@@ -210,6 +210,100 @@ field, leaving store delivery queued. Update participating clients together;
 older clients do not distinguish review snapshots from operator PMCS reports.
 
 
+## Automatic delivery and peer relaying
+
+Queued PMCS reports, signed maintainer verifications, and withdrawals send
+automatically; no confirmation dialog is needed. The native and web workers
+restore the durable queue on startup, retry each transport independently, and
+remove an entry only after successful delivery and local queue cleanup.
+Failures use exponential backoff from 45 seconds to 12 minutes. Returning to the
+app, activating the extension, or seeing an online peer triggers an immediate
+retry. Individual SDK requests time out after 30 seconds so an unanswered call
+cannot hold the queue indefinitely.
+
+Peer-received reports are saved locally before reconciliation. Any device holding
+a PMCS or maintainer review can upload it to the configured remote store if its
+stable report ID is missing there. A review arriving before its PMCS restores and
+relays the included original snapshot too. Relaying preserves the original
+signature, mileage, ownership, and IDs; it does not broadcast the record back to
+peers. Identical records already in the mesh item store are verified without
+another write. Withdrawals propagate upstream and suppress stale PMCS and review
+uploads, including queued review snapshots whose original report was withdrawn.
+
+If the store cannot be read, reports and withdrawals stay in the local database
+for reconciliation on the next wake or five-minute poll. Failed upload attempts
+also enter the durable store retry queue. Records received during an active
+reconciliation trigger a follow-up pass so they do not wait for the next poll.
+
+The native host startup hook starts delivery before the panel opens. Closing the
+panel or backgrounding the app leaves reception and retries active while the
+extension runtime runs. If the OS stops the host process, or a web host destroys
+its extension runtime, work resumes from local storage on the next initialization;
+this SDK does not expose an OS background scheduler. A timed-out SDK call may
+still commit remotely, so retries recheck IDs and permanent mesh-store withdrawal
+records remain authoritative.
+
+Concurrent devices can still create separate physical items before seeing one
+another's writes. Reads resolve them by the original report ID, with withdrawals
+taking precedence. Strict physical uniqueness requires an atomic create-if-absent
+operation keyed by that ID (or equivalent server-enforced unique item keys), which
+the current SDK does not expose. The report JSON schema cannot enforce uniqueness
+across items; duplicate cleanup is not performed by clients.
+
+## Following multiple units
+
+In **Profile**, keep a default UIC for new inspections and optionally name that
+unit. **Followed units → Follow another UIC** adds other six-character UICs with
+optional names. Names and followed-unit preferences are stored only on this
+device and are not included in peer messages or mesh item report payloads.
+Followed units can be renamed, changed, or removed without changing existing
+inspections, reports, or the default UIC.
+
+**Reports → MY UNITS** has a unit selector: **All my units**, each configured
+unit displayed by its local name and UIC, and **Other units**. The same filters
+apply to PMCS received from peers and from the remote store. Profile saves update
+the selector, report lists, and unread count immediately. The unread badge counts
+unread PMCS for followed units (including the default); maintainer reviews stay
+attached to their source PMCS. Vehicle history remains grouped by bumper number
+and UIC, even when two units use the same bumper number.
+
+The severity choices **All severities**, **RED X**, **X**, and **DASH** combine
+with unit selection, search, **With faults**, and **Unread**. A selected severity
+matches any fault in the vehicle's latest PMCS or an earlier unresolved fault
+still suggested for review; dismissed or superseded faults do not match. Opening
+a matching vehicle still shows its complete history. **Clear filters** resets
+severity, search, and the fault/unread toggles while keeping the selected unit.
+The amber severity displays as **X** throughout PMCS; existing `CIRCLE_X` stored
+values and message payloads remain compatible.
+
+Following is a local report-view preference. Receiving and relaying continue for
+other UICs too, so removing a followed unit does not delete its saved reports or
+interrupt distributed delivery. Local database version 8 adds these preferences
+while preserving existing mileage, reports, and the default UIC.
+
+## Dashboard mileage
+
+At the end of any PMCS checklist, the summary offers **Scan mileage** before
+CAC sign-off. On Android this reuses the bumper reader's on-device camera/OCR.
+Frame the odometer digits and tap **Read mileage**, select a value if several
+are found, then confirm the digits and dashboard units with **Yes, use mileage**.
+**No, enter manually** allows corrections; **Enter mileage manually** also works
+without a camera. Miles and kilometers are stored as displayed, without conversion.
+Unreadable scans, denied permission, and unsupported devices allow manual entry.
+
+Only a confirmed or manually saved reading is attached to the PMCS. It persists
+in the draft, appears on report cards, and travels with the report through the
+remote store, Lattice entities, peer broadcasts, queued retries, and maintainer
+review snapshots. Mileage is optional so existing reports and inspections without
+a reading remain usable. Mileage storage was introduced in local database
+version 7 and is preserved by the version 8 profile upgrade.
+
+The existing [`schemas/report-v1.schema.json`](schemas/report-v1.schema.json)
+includes an optional `report.mileage` object, for example
+`{"value": 12345.6, "unit": "mi"}`. `value` is a nonnegative number up to
+9,999,999.9; `unit` is `mi` or `km`. Use this updated schema for the initial
+registration at the existing `sustainment/circle-x/pmcs-report/v1` path.
+
 ## Remote report storage
 
 Mesh item store is the default remote storage strategy. The existing Lattice
@@ -289,7 +383,7 @@ item streams are not needed for this refactor. Item records do not automatically
 publish a Lattice COP entity; extension map markers continue using the map API.
 
 Switching strategies does not migrate server records automatically. Locally
-stored outgoing reports can republish through the existing reconciliation path;
+stored reports, including those received from peers, can relay through reconciliation;
 remote-only historical entities require a separate migration if they must be
 available in item-store mode. All participating extensions should use the same
 backend and schema path for consistent remote reads and withdrawals.

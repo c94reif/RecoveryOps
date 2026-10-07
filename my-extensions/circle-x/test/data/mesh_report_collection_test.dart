@@ -47,6 +47,73 @@ void main() {
         {'value': 2});
   });
 
+  test(
+      'separate relays reuse identical reports without rewriting their timestamp',
+      () async {
+    final report = <String, Object?>{
+      'mileage': {'value': 12345.6, 'unit': 'mi'},
+      'faults': [
+        {'itemId': 'brakes', 'severity': 'RED_X'}
+      ],
+    };
+    await collection.save('peer-report', report);
+    final initial = items.records.values.single.data;
+    await MeshReportCollection(items: items, type: type)
+        .save('peer-report', report);
+    await collection.save('peer-report', report);
+    expect(items.created, hasLength(1));
+    expect(items.updated, isEmpty);
+    expect(items.records.values.single.data, initial);
+  });
+
+  for (final malformedEnvelope in [
+    <String, Object?>{},
+    <String, Object?>{'withdrawn': 'false'},
+    <String, Object?>{'withdrawn': false},
+    <String, Object?>{'withdrawn': false, 'updatedAt': 'invalid'},
+  ]) {
+    test('identical body repairs malformed envelope $malformedEnvelope',
+        () async {
+      final existing = items.seed(type, {
+        'reportId': 'r',
+        'report': {'value': 1},
+        ...malformedEnvelope,
+      });
+      await collection.save('r', {'value': 1});
+      expect(items.created, isEmpty);
+      expect(items.updated, [existing.path.id]);
+      final stored = items.records[existing.path.id]!;
+      expect(stored.data['withdrawn'], isFalse);
+      expect(DateTime.tryParse(stored.data['updatedAt'] as String), isNotNull);
+    });
+  }
+
+  test('source withdrawal suppresses a review even when its own ID is new',
+      () async {
+    await collection.withdraw('original');
+    await collection.save('review', {'value': 1}, sourceReportId: 'original');
+    expect(items.created, hasLength(1));
+    expect(items.updated, isEmpty);
+    expect((await collection.snapshot()).keys, ['original']);
+  });
+
+  test('source withdrawal also prevents updates to an existing review',
+      () async {
+    await collection.save('review', {'value': 1});
+    await collection.withdraw('original');
+    await collection.save('review', {'value': 2}, sourceReportId: 'original');
+    expect(items.created, hasLength(2));
+    expect(items.updated, isEmpty);
+    expect(MeshReportCollection.body((await collection.snapshot())['review']),
+        {'value': 1});
+  });
+
+  test('a review can arrive before its source PMCS', () async {
+    await collection.save('review', {'value': 1}, sourceReportId: 'original');
+    expect(items.created, hasLength(1));
+    expect((await collection.snapshot()).keys, ['review']);
+  });
+
   test('read failures never create a replacement item', () async {
     items.failList = true;
     await expectLater(collection.save('r', {}), throwsStateError);

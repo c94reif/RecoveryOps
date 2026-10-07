@@ -57,7 +57,6 @@ import 'package:circle_x/domain/services/id_generator.dart';
 import 'package:circle_x/domain/services/mesh_broadcaster_port.dart';
 import 'package:circle_x/domain/services/pmcs_catalog_source.dart';
 import 'package:circle_x/domain/services/pmcs_entity_port.dart';
-import 'package:circle_x/domain/services/queue_prompt_strategy.dart';
 import 'package:circle_x/domain/services/queue_worker_strategy.dart';
 import 'package:circle_x/domain/services/remote_report_source.dart';
 import 'package:circle_x/domain/services/report_codec.dart';
@@ -81,7 +80,6 @@ import 'package:circle_x/domain/usecases/session/complete_phase.dart';
 import 'package:circle_x/domain/usecases/session/load_open_sessions.dart';
 import 'package:circle_x/domain/usecases/session/record_check_result.dart';
 import 'package:circle_x/domain/usecases/session/start_session.dart';
-import 'package:circle_x/presentation/common/services/queue_prompt_controller.dart';
 import 'package:circle_x/presentation/common/services/fault_suggestion_controller.dart';
 import 'package:circle_x/presentation/home/home_view_model.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
@@ -177,9 +175,6 @@ void configureDependencies(
   );
   getIt.registerLazySingleton<CacScannerStrategy>(() => createCacScanner());
   getIt.registerFactory<BumperScannerStrategy>(() => createBumperScanner());
-  getIt.registerLazySingleton<QueuePromptStrategy>(
-    () => QueuePromptController.instance,
-  );
 
   getIt.registerLazySingleton<ReportStoreStrategy>(
     () => createReportStore(extensionContext,
@@ -204,7 +199,6 @@ void configureDependencies(
       repository: getIt<QueuedSubmissionsRepository>(),
       entityPort: getIt<PmcsEntityPort>(),
       meshPort: getIt<MeshBroadcasterPort>(),
-      promptStrategy: getIt<QueuePromptStrategy>(),
     ),
   );
 
@@ -321,6 +315,9 @@ void configureDependencies(
       queuedRepository: getIt<QueuedSubmissionsRepository>(),
       getIt<RemoteReportSource>(),
       getIt<PmcsEntityPort>(),
+      reportsRepository: getIt<ReportsRepository>(),
+      queueWorker: getIt<QueueWorkerStrategy>(),
+      codec: getIt<ReportCodec>(),
     ),
   );
   getIt.registerLazySingleton<ShowReportOnMap>(
@@ -338,7 +335,8 @@ void configureDependencies(
   );
   getIt.registerLazySingleton<HomeViewModel>(() => HomeViewModel());
   getIt.registerFactory<ProfileViewModel>(
-    () => ProfileViewModel(getIt<ProfileRepository>()),
+    () => ProfileViewModel(getIt<ProfileRepository>(),
+        onSaved: (_) => getIt<ReportsViewModel>().loadMyUic()),
   );
   getIt.registerLazySingleton<InspectionViewModel>(
     () => InspectionViewModel(

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
+import 'package:circle_x/core/constants/app_constants.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
 import 'package:circle_x/domain/services/report_codec.dart';
 import 'package:circle_x/domain/entities/pmcs_report.dart';
@@ -8,10 +9,12 @@ import 'package:circle_x/domain/services/mesh_broadcaster_port.dart';
 class SdkMeshBroadcaster implements MeshBroadcasterPort {
   final sdk.MessagingService _messaging;
   final ReportCodec _codec;
+  final Duration requestTimeout;
 
   SdkMeshBroadcaster({
     required sdk.MessagingService messaging,
     ReportCodec? codec,
+    this.requestTimeout = AppConstants.transportRequestTimeout,
   })  : _messaging = messaging,
         _codec = codec ?? const PmcsReportCodec();
 
@@ -32,7 +35,8 @@ class SdkMeshBroadcaster implements MeshBroadcasterPort {
 
   Future<bool> _broadcast(String payload, String label) async {
     try {
-      final report = await _messaging.broadcast(payload);
+      final report =
+          await _messaging.broadcast(payload).timeout(requestTimeout);
       debugPrint('[CircleX] Mesh $label: '
           '${report.successCount} delivered, ${report.failureCount} failed');
       return report.successCount > 0;

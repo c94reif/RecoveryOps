@@ -87,6 +87,7 @@ class SubmitMaintainerReview {
         phases: original.phases,
         faults: original.faults,
         signature: original.signature,
+        mileage: original.mileage,
         maintainerReview: batch,
         latitude: original.latitude,
         longitude: original.longitude,

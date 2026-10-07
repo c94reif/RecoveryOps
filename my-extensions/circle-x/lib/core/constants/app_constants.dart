@@ -23,5 +23,7 @@ class AppConstants {
 
   static const Duration transportProbeInterval = Duration(seconds: 45);
 
+  static const Duration transportRequestTimeout = Duration(seconds: 30);
+
   static const Duration cacCaptureTimeout = Duration(seconds: 120);
 }

@@ -27,7 +27,13 @@ void main() {
 
   Future<void> tap(WidgetTester tester, String label) async {
     final target = find.text(label);
+    if (target.evaluate().isEmpty) {
+      // Summary content can put sign-off below the lazy list's built children.
+      await tester.scrollUntilVisible(target, 150,
+          scrollable: find.byType(Scrollable).first);
+    }
     await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
     await tester.tap(target);
     await tester.pumpAndSettle();
   }

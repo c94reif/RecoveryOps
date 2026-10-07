@@ -82,6 +82,17 @@ class QueuedSubmission {
     }
   }
 
+  String? get reviewSourceReportId {
+    try {
+      final body = jsonDecode(payload);
+      final review = body is Map ? body['maintainerReview'] : null;
+      final source = review is Map ? review['sourceReportId'] : null;
+      return source is String ? source : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   String get summary =>
       '${isWithdrawal ? 'Withdraw ' : isMaintainerReview ? 'Maintainer review: ' : ''}$bumperNumber - $vehicleType';
 

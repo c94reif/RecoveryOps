@@ -101,14 +101,17 @@ void main() {
       expect(uicField(), findsOneWidget);
     });
 
-    testWidgets('there is no name and no rank to fill in any more',
+    testWidgets('unit labels do not replace CAC operator identity',
         (tester) async {
       // The operator's name and rank come off their CAC at sign-off now, so a
       // stale one typed here could never disagree with the 5988-E.
       await tester.pumpWidget(subject());
       await tester.pumpAndSettle();
 
-      expect(find.byType(CustomTextField), findsOneWidget);
+      expect(find.byType(CustomTextField), findsNWidgets(2));
+      expect(
+          find.widgetWithText(CustomTextField, 'Default unit name (optional)'),
+          findsOneWidget);
       expect(find.widgetWithText(CustomTextField, 'Name'), findsNothing);
       expect(find.text('RANK'), findsNothing);
     });

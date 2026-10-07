@@ -14,7 +14,8 @@ mixin _ReportsCollection on _ReportsState {
         .where((candidateReport) =>
             !candidateReport.isRead &&
             !candidateReport.isOutgoing &&
-            !candidateReport.isMaintainerReview)
+            !candidateReport.isMaintainerReview &&
+            isSameUnit(candidateReport))
         .length;
   }
 
@@ -26,8 +27,12 @@ mixin _ReportsCollection on _ReportsState {
       cachedExternal ??= List.unmodifiable(reports.where((candidateReport) =>
           !candidateReport.isOutgoing && !candidateReport.isMaintainerReview));
 
-  bool isSameUnit(PmcsReport report) =>
-      myUic.isEmpty || report.uic.trim().toUpperCase() == myUic;
+  bool isSameUnit(PmcsReport report) {
+    final uic = Uic.normalize(report.uic);
+    return reportUnits.isEmpty
+        ? myUic.isEmpty || uic == myUic
+        : reportUnits.any((unit) => unit.normalizedUic == uic);
+  }
 
   List<PmcsReport> get unitReports =>
       cachedUnit ??= List.unmodifiable(externalReports.where(isSameUnit));

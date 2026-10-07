@@ -43,6 +43,7 @@ class SessionsRepoImpl implements SessionsRepository {
       completedPhases: PmcsStorageCodec.encodePhases(session.completedPhases),
       status: session.status.wireName,
       signatureJson: PmcsStorageCodec.encodeSignature(session.signature),
+      mileageJson: PmcsStorageCodec.encodeMileage(session.mileage),
       latitude: session.latitude,
       longitude: session.longitude,
     );
@@ -61,6 +62,7 @@ class SessionsRepoImpl implements SessionsRepository {
       completedPhases: PmcsStorageCodec.encodePhases(session.completedPhases),
       status: session.status.wireName,
       signatureJson: PmcsStorageCodec.encodeSignature(session.signature),
+      mileageJson: PmcsStorageCodec.encodeMileage(session.mileage),
       latitude: session.latitude,
       longitude: session.longitude,
     );
@@ -91,6 +93,7 @@ class SessionsRepoImpl implements SessionsRepository {
       completedPhases: PmcsStorageCodec.decodePhases(row.completedPhases),
       status: tryStatus(row.status) ?? SessionStatus.inProgress,
       signature: PmcsStorageCodec.decodeSignature(row.signatureJson),
+      mileage: PmcsStorageCodec.decodeMileage(row.mileageJson),
       latitude: row.latitude,
       longitude: row.longitude,
     );

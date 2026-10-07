@@ -21,7 +21,6 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
   final QueuedSubmissionsRepository repository;
   final PmcsEntityPort entityPort;
   final MeshBroadcasterPort meshPort;
-  final QueuePromptStrategy promptStrategy;
   final UserNotificationSink snackBarService;
 
   final Duration probeInterval;
@@ -31,15 +30,18 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
   Timer? probeTimer;
   SendPort? toWorker;
   ReceivePort? fromWorker;
+  ReceivePort? _handshakePort;
   Completer<void>? readyCompleter;
   final waitingForStart = <int, QueuedSubmission>{};
   Future<void>? starting;
+  int _generation = 0;
 
   IsolateQueueWorker({
     required this.repository,
     required this.entityPort,
     required this.meshPort,
-    required this.promptStrategy,
+    // Retained for source compatibility; retries never ask for UI approval.
+    QueuePromptStrategy? promptStrategy,
     UserNotificationSink? snackBarService,
     Duration? probeInterval,
     DeliveryCoordinator? delivery,
@@ -48,14 +50,19 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
         probeInterval = probeInterval ?? AppConstants.transportProbeInterval;
 
   @override
-  Future<void> start() => starting ??= startWorker().whenComplete(() {
-        starting = null;
-      });
+  Future<void> start() {
+    final generation = _generation;
+    return starting ??= startWorker().whenComplete(() {
+      if (generation == _generation) starting = null;
+    });
+  }
 
   Future<void> startWorker() async {
     if (isolate != null) return;
 
+    final generation = _generation;
     final resumed = await repository.getAll();
+    if (generation != _generation) return;
     for (final submission in resumed) {
       delivery.update(
           submission.entityId, submission.transport, DeliveryStatus.queued,
@@ -64,28 +71,48 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
     }
 
     final handshakePort = ReceivePort();
+    _handshakePort = handshakePort;
+    final handshaking = handshakePort.first.then<SendPort?>(
+      (message) => message as SendPort,
+      onError: (Object error) {
+        if (generation != _generation) return null;
+        throw error;
+      },
+    );
     final fromWorkerPort = ReceivePort();
     fromWorker = fromWorkerPort;
-    readyCompleter = Completer<void>();
+    final ready = Completer<void>();
+    readyCompleter = ready;
 
     final setup = QueueWorkerSetup(
       toMain: fromWorkerPort.sendPort,
       handshake: handshakePort.sendPort,
     );
 
-    isolate = await Isolate.spawn<QueueWorkerSetup>(
+    final spawned = await Isolate.spawn<QueueWorkerSetup>(
       queueWorkerMain,
       setup,
       debugName: 'circle-x.queue_worker',
     );
 
-    final handshakeFirst = await handshakePort.first;
+    if (generation != _generation) {
+      spawned.kill(priority: Isolate.immediate);
+      handshakePort.close();
+      fromWorkerPort.close();
+      return;
+    }
+    isolate = spawned;
+    final workerPort = await handshaking;
     handshakePort.close();
-    toWorker = handshakeFirst as SendPort;
+    if (generation != _generation || workerPort == null) return;
+    _handshakePort = null;
+    toWorker = workerPort;
+    fromWorkerPort.listen((message) {
+      if (generation == _generation) handleWorkerMessage(message);
+    });
 
-    fromWorkerPort.listen(handleWorkerMessage);
-
-    await readyCompleter!.future;
+    await ready.future;
+    if (generation != _generation) return;
 
     toWorker!.send(
       mainHello(resumed.map((submission) => submission.toMap()).toList()),
@@ -103,6 +130,14 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
 
   @override
   Future<void> stop() async {
+    _generation++;
+    starting = null;
+    if (readyCompleter != null && !readyCompleter!.isCompleted) {
+      readyCompleter!.complete();
+    }
+    waitingForStart.clear();
+    _handshakePort?.close();
+    _handshakePort = null;
     probeTimer?.cancel();
     probeTimer = null;
     toWorker?.send(mainShutdown());
@@ -148,6 +183,9 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
   }
 
   @override
+  Future<void> retryNow() async => toWorker?.send(mainRetryNow());
+
+  @override
   Future<int> pendingCount() => repository.count();
 
   void handleWorkerMessage(dynamic message) {
@@ -162,6 +200,7 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
         readyCompleter?.complete();
         break;
       case QueueWireType.workerExecute:
+        final workerPort = toWorker;
         unawaited(handleExecute(
           map['submissionId'] as int,
           QueuedSubmission.fromMap(
@@ -169,23 +208,12 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
           ),
         ).catchError((Object error) {
           debugPrint('[CircleX] Queued execution failed: $error');
-          toWorker?.send(mainExecuteResult(
+          workerPort?.send(mainExecuteResult(
               submissionId: map['submissionId'] as int, success: false));
         }));
         break;
-      case QueueWireType.workerPrompt:
-        unawaited(handlePrompt(
-          map['submissionId'] as int,
-          QueuedSubmission.fromMap(
-            Map<String, Object?>.from(map['submission'] as Map),
-          ),
-        ).catchError((Object error) {
-          debugPrint('[CircleX] Queue prompt failed: $error');
-          toWorker?.send(mainPromptDeferred(map['submissionId'] as int));
-        }));
-        break;
       case QueueWireType.workerDelete:
-        handleDelete(map['submissionId'] as int);
+        unawaited(handleDelete(map['submissionId'] as int));
         break;
       case QueueWireType.workerLog:
         debugPrint('[CircleX] QueueWorker: ${map['message']}');
@@ -199,6 +227,20 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
     int submissionId,
     QueuedSubmission submission,
   ) async {
+    final generation = _generation;
+    final workerPort = toWorker;
+    final source = submission.reviewSourceReportId;
+    if (!submission.isWithdrawal &&
+        source != null &&
+        await delivery.isWithdrawn(source)) {
+      delivery.update(
+          submission.entityId, submission.transport, DeliveryStatus.discarded);
+      if (generation == _generation) {
+        workerPort?.send(
+            mainExecuteResult(submissionId: submissionId, success: true));
+      }
+      return;
+    }
     final success = delivery.status(submission.entityId, submission.transport,
                 withdrawal: submission.isWithdrawal) ==
             DeliveryStatus.sent ||
@@ -227,51 +269,26 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
           }
         }, queuedOnFailure: true, withdrawal: submission.isWithdrawal);
 
-    snackBarService.enqueue(
-      '${submission.transport.displayName}: '
-      '${success ? 'sent (queued)' : 'still FAILED'}',
-      isError: !success,
-    );
-
-    toWorker?.send(
+    if (generation != _generation) return;
+    workerPort?.send(
       mainExecuteResult(submissionId: submissionId, success: success),
     );
   }
 
-  Future<void> handlePrompt(
-    int submissionId,
-    QueuedSubmission submission,
-  ) async {
-    final alreadySent = delivery.status(
-            submission.entityId, submission.transport,
-            withdrawal: submission.isWithdrawal) ==
-        DeliveryStatus.sent;
-    final send = submission.isWithdrawal ||
-            alreadySent ||
-            await delivery.isWithdrawn(submission.entityId)
-        ? true
-        : await promptStrategy.ask(submission);
-    if (send == null) {
-      toWorker?.send(mainPromptDeferred(submissionId));
-      return;
-    }
-    if (!send) {
-      delivery.update(
-          submission.entityId, submission.transport, DeliveryStatus.discarded);
-    }
-    toWorker?.send(
-      mainPromptResponse(submissionId: submissionId, send: send),
-    );
-  }
-
   Future<void> handleDelete(int submissionId) async {
+    final generation = _generation;
+    final workerPort = toWorker;
+    var success = false;
     try {
       await repository.deleteById(submissionId);
+      success = true;
       delivery.queueChanged();
     } catch (error) {
       debugPrint(
-        '[CircleX] QueueWorker: delete failed for $submissionId: $error',
-      );
+          '[CircleX] QueueWorker: delete failed for $submissionId: $error');
     }
+    if (generation != _generation) return;
+    workerPort
+        ?.send(mainDeleteResult(submissionId: submissionId, success: success));
   }
 }

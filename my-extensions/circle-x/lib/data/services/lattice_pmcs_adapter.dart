@@ -9,10 +9,12 @@ import 'package:circle_x/domain/services/pmcs_entity_port.dart';
 class LatticePmcsAdapter implements PmcsEntityPort {
   final sdk.EntityService _entities;
   final PmcsEntityMapper _mapper;
+  final Duration requestTimeout;
 
   LatticePmcsAdapter({
     required sdk.EntityService entities,
     PmcsEntityMapper? mapper,
+    this.requestTimeout = AppConstants.transportRequestTimeout,
   })  : _entities = entities,
         _mapper = mapper ?? const PmcsEntityMapper();
 
@@ -39,7 +41,8 @@ class LatticePmcsAdapter implements PmcsEntityPort {
   @override
   Future<bool> deletePmcsEntity(String entityId) async {
     try {
-      final existing = await _entities.getEntity(entityId);
+      final existing =
+          await _entities.getEntity(entityId).timeout(requestTimeout);
       if (existing == null) {
         debugPrint('[CircleX] Deletion lattice: entity $entityId not on host '
             '— treating as already deleted');
@@ -49,9 +52,10 @@ class LatticePmcsAdapter implements PmcsEntityPort {
         isLive: false,
         expiryTime: DateTime.now().toUtc().add(AppConstants.entityTtl),
       );
-      await _entities.upsertEntity(tombstone);
+      await _entities.upsertEntity(tombstone).timeout(requestTimeout);
 
-      final persisted = await _entities.getEntity(entityId);
+      final persisted =
+          await _entities.getEntity(entityId).timeout(requestTimeout);
       if (persisted != null && persisted.isLive != false) {
         debugPrint('[CircleX] Deletion lattice: $entityId still live after '
             'tombstone — host did not persist');
@@ -67,8 +71,9 @@ class LatticePmcsAdapter implements PmcsEntityPort {
 
   Future<bool> _upsertVerified(sdk.Entity entity) async {
     try {
-      await _entities.upsertEntity(entity);
-      final persisted = await _entities.getEntity(entity.id);
+      await _entities.upsertEntity(entity).timeout(requestTimeout);
+      final persisted =
+          await _entities.getEntity(entity.id).timeout(requestTimeout);
       if (persisted == null ||
           persisted.id != entity.id ||
           persisted.description != entity.description ||

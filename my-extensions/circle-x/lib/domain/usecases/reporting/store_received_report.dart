@@ -31,6 +31,7 @@ Future<List<PmcsReport>> storeReceivedReport(
     phases: report.phases,
     faults: report.faults,
     signature: report.signature,
+    mileage: report.mileage,
     latitude: report.latitude,
     longitude: report.longitude,
     timestamp: report.timestamp,

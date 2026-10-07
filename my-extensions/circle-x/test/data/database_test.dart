@@ -249,8 +249,8 @@ void main() {
       await db.select(db.queuedSubmissions).get();
     });
 
-    test('schemaVersion is 6 — signed maintainer reviews persist locally', () {
-      expect(db.schemaVersion, 6);
+    test('schemaVersion is 8 — followed unit settings persist locally', () {
+      expect(db.schemaVersion, 8);
     });
   });
 

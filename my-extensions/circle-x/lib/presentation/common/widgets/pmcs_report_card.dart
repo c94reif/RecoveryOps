@@ -100,6 +100,10 @@ class PmcsReportCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 2),
+                      if (report.mileage case final mileage?)
+                        Text('Mileage: ${mileage.display}',
+                            style: const TextStyle(
+                                color: textSecondary, fontSize: 12)),
                       Row(
                         children: [
                           if (!report.isSignatureVerified) ...[

@@ -165,7 +165,7 @@ void main() {
       expect(find.byType(FaultTallyBar), findsNothing);
     });
 
-    testWidgets('a CIRCLE X restricts the vehicle rather than deadlining it',
+    testWidgets('an X restricts the vehicle rather than deadlining it',
         (tester) async {
       await walkPmcs(faults: [restricting]);
       await pumpPage(tester);
@@ -212,7 +212,7 @@ void main() {
       await pumpPage(tester);
 
       expect(find.text('RED X — 1'), findsOneWidget);
-      expect(find.text('CIRCLE X — 1'), findsOneWidget);
+      expect(find.text('X — 1'), findsOneWidget);
       expect(find.text('DASH — 1'), findsOneWidget);
       expect(find.byType(SeverityBadge), findsNWidgets(6));
     });
@@ -226,7 +226,7 @@ void main() {
       await pumpPage(tester);
 
       final redXAt = tester.getTopLeft(find.text('RED X — 1')).dy;
-      final circleXAt = tester.getTopLeft(find.text('CIRCLE X — 1')).dy;
+      final circleXAt = tester.getTopLeft(find.text('X — 1')).dy;
       final dashAt = tester.getTopLeft(find.text('DASH — 1')).dy;
 
       expect(redXAt, lessThan(circleXAt));
@@ -249,7 +249,7 @@ void main() {
       await pumpPage(tester);
 
       expect(find.text('RED X — 2'), findsOneWidget);
-      expect(find.text('CIRCLE X — 1'), findsOneWidget);
+      expect(find.text('X — 1'), findsOneWidget);
       expect(find.text('DASH — 1'), findsNothing);
     });
 
@@ -296,7 +296,7 @@ void main() {
 
       expect(find.text('3 FAULTS'), findsOneWidget);
       expect(find.text('RED X: 1'), findsOneWidget);
-      expect(find.text('CIRCLE X: 1'), findsOneWidget);
+      expect(find.text('X: 1'), findsOneWidget);
       expect(find.text('DASH: 1'), findsOneWidget);
     });
   });

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
 import 'package:circle_x/core/config/report_store_config.dart';
+import 'package:circle_x/core/constants/app_constants.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
 import 'package:circle_x/data/services/mesh_report_collection.dart';
 import 'package:circle_x/domain/entities/pmcs_report.dart';
@@ -14,12 +15,18 @@ class MeshItemReportStoreStrategy implements ReportStoreStrategy {
   MeshItemReportStoreStrategy(
       {required sdk.MeshItemService items,
       sdk.MeshDataTypePath type = ReportStoreConfig.itemType,
-      this.codec = const PmcsReportCodec()})
-      : collection = MeshReportCollection(items: items, type: type);
+      this.codec = const PmcsReportCodec(),
+      Duration requestTimeout = AppConstants.transportRequestTimeout})
+      : collection = MeshReportCollection(
+            items: items, type: type, requestTimeout: requestTimeout);
 
   @override
   Future<bool> publishPmcsReport(PmcsReport report) =>
-      _write(() => collection.save(report.entityId, codec.reportBody(report)));
+      _write(() => collection.save(
+            report.entityId,
+            codec.reportBody(report),
+            sourceReportId: report.maintainerReview?.sourceReportId,
+          ));
 
   @override
   Future<bool> publishEncodedReport(

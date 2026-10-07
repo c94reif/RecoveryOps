@@ -42,7 +42,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.test(super.executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -52,6 +52,7 @@ class AppDatabase extends _$AppDatabase {
             await migrator.alterTable(
               TableMigration(
                 profiles,
+                newColumns: [profiles.unitName, profiles.followedUnitsJson],
                 columnTransformer: {
                   profiles.uic: const CustomExpression<String>('unit'),
                 },
@@ -91,6 +92,15 @@ class AppDatabase extends _$AppDatabase {
           if (fromVersion < 6) {
             await migrator.addColumn(
                 pmcsReports, pmcsReports.maintainerReviewJson);
+          }
+          if (fromVersion < 7) {
+            await migrator.addColumn(pmcsSessions, pmcsSessions.mileageJson);
+            await migrator.addColumn(pmcsReports, pmcsReports.mileageJson);
+          }
+          // The v1 profile rebuild above already includes these default columns.
+          if (fromVersion >= 2 && fromVersion < 8) {
+            await migrator.addColumn(profiles, profiles.unitName);
+            await migrator.addColumn(profiles, profiles.followedUnitsJson);
           }
         },
       );

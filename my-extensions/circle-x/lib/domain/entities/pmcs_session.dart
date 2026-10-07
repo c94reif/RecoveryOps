@@ -1,4 +1,5 @@
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/entities/mileage_reading.dart';
 import 'package:circle_x/domain/entities/pmcs_signature.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
 
@@ -33,6 +34,7 @@ class PmcsSession {
   final SessionStatus status;
 
   final PmcsSignature? signature;
+  final MileageReading? mileage;
   final double? latitude;
   final double? longitude;
 
@@ -48,6 +50,7 @@ class PmcsSession {
     this.completedPhases = const [],
     this.status = SessionStatus.inProgress,
     this.signature,
+    this.mileage,
     this.latitude,
     this.longitude,
   });
@@ -68,6 +71,7 @@ class PmcsSession {
     List<PmcsPhase>? completedPhases,
     SessionStatus? status,
     PmcsSignature? signature,
+    MileageReading? mileage,
     double? latitude,
     double? longitude,
   }) {
@@ -83,6 +87,7 @@ class PmcsSession {
       completedPhases: completedPhases ?? this.completedPhases,
       status: status ?? this.status,
       signature: signature ?? this.signature,
+      mileage: mileage ?? this.mileage,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
     );

@@ -5,16 +5,21 @@ import 'package:le_sdk/le_sdk.dart';
 import 'package:circle_x/core/constants/app_constants.dart';
 import 'package:circle_x/core/di/injection.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/services/queue_prompt_strategy.dart';
 import 'package:circle_x/domain/services/queue_worker_strategy.dart';
 import 'package:circle_x/presentation/common/display_mode.dart';
 import 'package:circle_x/presentation/common/fullscreen.dart';
-import 'package:circle_x/presentation/common/widgets/queue_prompt_host.dart';
 import 'package:circle_x/presentation/home/home_page.dart';
 import 'package:circle_x/presentation/onboarding/onboarding_gate.dart';
+import 'package:circle_x/presentation/reports/reports_view_model.dart';
 
-class CircleXExtension extends LatticeEdgeExtension {
+class CircleXExtension extends LatticeEdgeExtension
+    with WidgetsBindingObserver {
   bool initialized = false;
+  bool _disposed = false;
+  QueueWorkerStrategy? _queue;
+  ReportsViewModel? _reports;
+  StreamSubscription<List<Peer>>? _peerSubscription;
+  Future<void>? _wakeInFlight;
 
   @override
   String get id => AppConstants.extensionId;
@@ -33,22 +38,71 @@ class CircleXExtension extends LatticeEdgeExtension {
       ExtensionOrientation.portrait;
 
   @override
+  void onInitializeWithContext(ExtensionContext context) =>
+      _initialize(context);
+
+  void _initialize(ExtensionContext context) {
+    if (initialized || _disposed) return;
+    configureDependencies(context);
+    initialized = true;
+    _queue = getIt<QueueWorkerStrategy>();
+    // This singleton owns peer reception and reconciliation independently of UI.
+    _reports = getIt<ReportsViewModel>();
+    WidgetsBinding.instance.addObserver(this);
+    _peerSubscription = context.messaging.onPeersChanged.listen((peers) {
+      if (peers.any((peer) => peer.isOnline)) _wakeDelivery();
+    }, onError: (Object error) {
+      debugPrint('[CircleX] peer connectivity update failed: $error');
+    });
+    _wakeDelivery();
+  }
+
+  void _wakeDelivery() {
+    if (!initialized || _disposed || _wakeInFlight != null) return;
+    _wakeInFlight = () async {
+      try {
+        await _queue!.start();
+        if (_disposed) return;
+        await Future.wait([
+          _queue!.retryNow(),
+          _reports!.syncRemoteLatticeReports(),
+        ]);
+      } catch (error) {
+        debugPrint('[CircleX] background delivery wake failed: $error');
+      } finally {
+        _wakeInFlight = null;
+      }
+    }();
+  }
+
+  @override
+  void onActivate() => _wakeDelivery();
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _wakeDelivery();
+  }
+
+  // Closing the panel or backgrounding the app leaves timers/listeners active.
+  // A stopped host restores persisted reports and queues on its next startup.
+  @override
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(_peerSubscription?.cancel());
+    _reports?.dispose();
+    unawaited(_queue?.stop());
+    super.dispose();
+  }
+
+  @override
   Widget build(ExtensionContext extensionContext) {
-    if (!initialized) {
-      configureDependencies(extensionContext);
-      unawaited(
-        getIt<QueueWorkerStrategy>().start().catchError((Object error) {
-          debugPrint('[CircleX] queue worker start failed: $error');
-        }),
-      );
-      initialized = true;
-    }
+    // Standalone/web hosts may only invoke build, without the native init hook.
+    _initialize(extensionContext);
     return Theme(
       data: appTheme,
-      child: QueuePromptHost(
-        promptStrategy: getIt<QueuePromptStrategy>(),
-        child: CircleXExtensionUI(extensionContext: extensionContext),
-      ),
+      child: CircleXExtensionUI(extensionContext: extensionContext),
     );
   }
 }

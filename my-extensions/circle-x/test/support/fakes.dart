@@ -1,3 +1,4 @@
+import 'package:circle_x/domain/entities/mileage_reading.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -429,6 +430,9 @@ class FakeMeshBroadcaster implements MeshBroadcasterPort {
 
 class FakeQueueWorker implements QueueWorkerStrategy {
   @override
+  Future<void> retryNow() async {}
+
+  @override
   void trackPersisted(QueuedSubmission submission) => enqueued.add(submission);
 
   final List<QueuedSubmission> enqueued = [];
@@ -520,6 +524,7 @@ PmcsSession buildSession({
   List<PmcsPhase> completedPhases = const [],
   SessionStatus status = SessionStatus.inProgress,
   PmcsSignature? signature,
+  MileageReading? mileage,
   double? latitude = 33.0,
   double? longitude = -84.0,
 }) {
@@ -534,6 +539,7 @@ PmcsSession buildSession({
     completedPhases: completedPhases,
     status: status,
     signature: signature,
+    mileage: mileage,
     latitude: latitude,
     longitude: longitude,
   );
@@ -574,6 +580,7 @@ PmcsReport buildReport({
   List<PmcsFault> faults = const [],
   List<PmcsPhase> phases = const [PmcsPhase.before],
   PmcsSignature? signature,
+  MileageReading? mileage,
   MaintainerReview? maintainerReview,
   bool isOutgoing = true,
   bool isRead = true,
@@ -590,6 +597,7 @@ PmcsReport buildReport({
     phases: phases,
     faults: faults,
     signature: signature,
+    mileage: mileage,
     maintainerReview: maintainerReview,
     latitude: 33.0,
     longitude: -84.0,
@@ -680,11 +688,16 @@ class FakeReportsViewModel extends ChangeNotifier implements ReportsViewModel {
   String myUic = '';
 
   @override
+  List<FollowedUnit> reportUnits = const [];
+
+  @override
   final List<QueuedSubmission> queued = [];
 
   @override
-  bool isSameUnit(PmcsReport report) =>
-      myUic.isEmpty || report.uic.trim().toUpperCase() == myUic;
+  bool isSameUnit(PmcsReport report) => reportUnits.isEmpty
+      ? myUic.isEmpty || report.uic.trim().toUpperCase() == myUic
+      : reportUnits
+          .any((unit) => unit.normalizedUic == report.uic.trim().toUpperCase());
 
   @override
   List<PmcsReport> get unitReports =>

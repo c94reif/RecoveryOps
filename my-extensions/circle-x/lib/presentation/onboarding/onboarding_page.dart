@@ -34,22 +34,20 @@ class OnboardingPageState extends State<OnboardingPage> {
 
   Future<void> submit() async {
     if (!canContinue) return;
+    FocusScope.of(context).unfocus();
     setState(() => isSaving = true);
+    var saved = false;
     try {
-      await viewModel.save(uicController.text);
+      saved = await viewModel.save(uicController.text);
     } catch (error) {
       debugPrint('[CircleX] onboarding save failed: $error');
-      if (!mounted) return;
-      setState(() => isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not save the UIC — try again')),
-      );
-      return;
     }
     if (!mounted) return;
     setState(() => isSaving = false);
-    if (!Uic.isValid(viewModel.savedUic)) {
-      final message = viewModel.snackBarMessage ?? 'UIC is required';
+    if (!saved || !Uic.isValid(viewModel.savedUic)) {
+      final message = viewModel.errorMessage ??
+          viewModel.snackBarMessage ??
+          'Could not save the UIC — try again';
       viewModel.snackBarMessage = null;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
@@ -63,6 +61,7 @@ class OnboardingPageState extends State<OnboardingPage> {
   @override
   void dispose() {
     uicController.dispose();
+    viewModel.dispose();
     super.dispose();
   }
 
@@ -109,9 +108,12 @@ class OnboardingPageState extends State<OnboardingPage> {
                   const SizedBox(height: 28),
                   const SectionLabel(text: 'INSPECTION DEFAULTS'),
                   const SizedBox(height: 8),
-                  UicTextField(
-                    controller: uicController,
-                    label: 'Default UIC',
+                  AbsorbPointer(
+                    absorbing: isSaving,
+                    child: UicTextField(
+                      controller: uicController,
+                      label: 'Default UIC',
+                    ),
                   ),
                   const SizedBox(height: 12),
                   const Text(

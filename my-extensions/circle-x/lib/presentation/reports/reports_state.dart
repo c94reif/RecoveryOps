@@ -18,6 +18,7 @@ abstract class _ReportsState extends ChangeNotifier {
   Timer? remoteSyncTimer;
   StreamSubscription<void>? deliverySubscription;
   Future<void>? syncInFlight;
+  bool syncAgain = false;
   Future<void>? queueRefreshInFlight;
   bool queueRefreshAgain = false;
   bool disposed = false;
@@ -33,6 +34,7 @@ abstract class _ReportsState extends ChangeNotifier {
   String? activeMarkerId;
 
   String myUic = '';
+  List<FollowedUnit> reportUnits = const [];
 
   final List<QueuedSubmission> queued = [];
 

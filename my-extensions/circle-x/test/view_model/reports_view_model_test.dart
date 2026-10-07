@@ -89,6 +89,45 @@ class CountingQueueWorker extends FakeQueueWorker {
   }
 }
 
+class GatedRelayInventory extends FakeRemoteReportSource {
+  final entered = Completer<void>();
+  final inventory = Completer<Set<String>>();
+  int calls = 0;
+
+  @override
+  Future<Set<String>> fetchKnownPmcsEntityIds() async {
+    if (++calls == 1) {
+      entered.complete();
+      return inventory.future;
+    }
+    return super.fetchKnownPmcsEntityIds();
+  }
+}
+
+class GatedInitialReports extends FakeReportsRepository {
+  final release = Completer<void>();
+
+  @override
+  Future<List<PmcsReport>> getAllReports() async {
+    await release.future;
+    return super.getAllReports();
+  }
+}
+
+class GatedFirstQueueRefresh extends FakeQueuedSubmissionsRepository {
+  final entered = Completer<void>();
+  final release = Completer<void>();
+
+  @override
+  Future<List<QueuedSubmission>> getAll() async {
+    if (!entered.isCompleted) {
+      entered.complete();
+      await release.future;
+    }
+    return super.getAll();
+  }
+}
+
 void main() {
   late FakeMessagingService messaging;
   late FakeReportsRepository repository;
@@ -155,6 +194,36 @@ void main() {
   });
 
   group('loading stored reports', () {
+    test(
+        'database rows loaded during an eager wake are relayed before it completes',
+        () async {
+      final initial = GatedInitialReports()
+        ..reports.add(
+            buildReport(entityId: 'stored-before-restart', isOutgoing: false));
+      final finishing = GatedFirstQueueRefresh();
+      repository = initial;
+      queuedRepository = finishing;
+      await start(syncOnStart: true);
+
+      // The extension can wake delivery while the view model is still loading.
+      final waking = viewModel.syncRemoteLatticeReports();
+      await finishing.entered.future;
+      expect(viewModel.reports, isEmpty);
+      expect(entityPort.published, isEmpty);
+
+      // Its first pass already snapshotted no reports and is refreshing the queue.
+      initial.release.complete();
+      await settle();
+      expect(viewModel.reports.single.entityId, 'stored-before-restart');
+      expect(entityPort.published, isEmpty);
+      finishing.release.complete();
+
+      await waking;
+      expect(entityPort.published.map((report) => report.entityId),
+          ['stored-before-restart']);
+      expect(meshPort.broadcast, isEmpty);
+    });
+
     test(
         'received review batches sync without becoming extra PMCS or unread vehicles',
         () async {
@@ -229,6 +298,40 @@ void main() {
   });
 
   group('inbound mesh traffic', () {
+    test('a transient peer stream error does not stop later reception',
+        () async {
+      await start();
+      messaging.controller.addError(StateError('Peer temporarily unavailable'));
+      await settle();
+      codec.decodeResult =
+          buildReport(entityId: 'peer-recovered', isOutgoing: false);
+      messaging.emit('{"type":"circle-x.report"}');
+      await settle();
+      expect(repository.reports.single.entityId, 'peer-recovered');
+      expect(viewModel.externalReports.single.entityId, 'peer-recovered');
+    });
+
+    test('a peer report arriving during reconciliation gets a follow-up pass',
+        () async {
+      final gated = GatedRelayInventory();
+      remoteSource = gated;
+      repository.reports.add(buildReport(entityId: 'existing'));
+      await start();
+      final reconciling = viewModel.syncRemoteLatticeReports();
+      await gated.entered.future;
+      await viewModel.storeIncomingReport(
+          buildReport(entityId: 'arrived-during-sync', isOutgoing: false));
+      expect(repository.reports, hasLength(2));
+      gated.inventory.complete({'existing'});
+      await reconciling;
+      expect(gated.calls, 2);
+      expect(
+          entityPort.published
+              .where((report) => report.entityId == 'arrived-during-sync'),
+          hasLength(1));
+      expect(meshPort.broadcast, isEmpty);
+    });
+
     test('a peer review arriving first restores its original PMCS snapshot',
         () async {
       await start();

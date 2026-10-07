@@ -29,7 +29,8 @@ import 'package:circle_x/domain/usecases/reporting/sync_local_reports_to_lattice
 import '../support/fakes.dart';
 import 'lattice_pmcs_adapter_test.dart' as entity_fake;
 import 'lattice_report_source_test.dart' as source_fake;
-import 'main_thread_queue_worker_test.dart' show FakeQueuePromptStrategy;
+import 'main_thread_queue_worker_test.dart'
+    show FakeQueuePromptStrategy, DeleteFailsRepository, GatedEntityPort;
 import 'sdk_mesh_broadcaster_test.dart' as mesh_fake;
 
 class FailingWithdrawalQueue extends QueuedSubmissionsRepoImpl {
@@ -261,7 +262,7 @@ void main() {
     expect(await reports.getWithdrawnIds(), {report.entityId});
   });
 
-  test('a blocked Lattice prompt does not block mesh retries on the web',
+  test('a legacy prompt that never answers cannot block automatic retries',
       () async {
     final prompt = BlockedPrompt();
     final independent = MainThreadQueueWorker(
@@ -282,9 +283,9 @@ void main() {
       }
     })()
         .timeout(const Duration(seconds: 3));
-    expect(entities.upserted, isEmpty);
-    prompt.answer.complete(true);
     await probing;
+    expect(entities.upserted, hasLength(1));
+    expect(prompt.answer.isCompleted, isFalse);
     expect(await queue.count(), 0);
     await independent.stop();
   });
@@ -341,4 +342,93 @@ void main() {
       }
     });
   }
+
+  Future<void> until(bool Function() ready) async {
+    await (() async {
+      while (!ready()) {
+        await Future<void>.delayed(const Duration(milliseconds: 1));
+      }
+    })()
+        .timeout(const Duration(seconds: 3));
+  }
+
+  test('native deletion failure retries durable settlement without resending',
+      () async {
+    final pending = DeleteFailsRepository();
+    final entity = FakePmcsEntityPort();
+    final native = IsolateQueueWorker(
+        repository: pending,
+        entityPort: entity,
+        meshPort: FakeMeshBroadcaster(),
+        probeInterval: const Duration(milliseconds: 10));
+    addTearDown(native.stop);
+    await native.enqueue(buildQueuedSubmission());
+    await native.start();
+    await until(() => entity.publishedPayloads.isNotEmpty);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    expect(pending.submissions, hasLength(1));
+    pending.failDelete = false;
+    await native.retryNow();
+    await until(() => pending.submissions.isEmpty);
+    expect(entity.publishedPayloads, hasLength(1));
+  });
+
+  test('native restart ignores stale callbacks and joins an existing send',
+      () async {
+    final pending = FakeQueuedSubmissionsRepository();
+    final entity = GatedEntityPort();
+    final native = IsolateQueueWorker(
+        repository: pending,
+        entityPort: entity,
+        meshPort: FakeMeshBroadcaster(),
+        probeInterval: const Duration(milliseconds: 10));
+    addTearDown(native.stop);
+    await native.enqueue(buildQueuedSubmission());
+    await native.start();
+    await until(() => entity.publishedPayloads.isNotEmpty);
+    await native.stop();
+    expect(pending.submissions, hasLength(1));
+    await native.start();
+    entity.gate.complete(true);
+    await until(() => pending.submissions.isEmpty);
+    expect(entity.publishedPayloads, hasLength(1));
+    expect(pending.deletedIds, [1]);
+  });
+
+  test(
+      'native stop during isolate startup completes and leaves no running worker',
+      () async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final native = IsolateQueueWorker(
+          repository: FakeQueuedSubmissionsRepository(),
+          entityPort: FakePmcsEntityPort(),
+          meshPort: FakeMeshBroadcaster());
+      final starting = native.start();
+      // Allow database loading to finish and isolate spawning to begin.
+      await Future<void>.value();
+      await native.stop();
+      await starting.timeout(const Duration(seconds: 3));
+      expect(native.isolate, isNull);
+      expect(native.probeTimer, isNull);
+      expect(native.fromWorker, isNull);
+    }
+  });
+
+  test(
+      'native queue suppresses reviews after source withdrawal without a prompt',
+      () async {
+    final pending = FakeQueuedSubmissionsRepository();
+    final entity = FakePmcsEntityPort();
+    final native = IsolateQueueWorker(
+        repository: pending,
+        entityPort: entity,
+        meshPort: FakeMeshBroadcaster());
+    addTearDown(native.stop);
+    native.delivery.suppressReport('original');
+    await native.enqueue(buildQueuedSubmission(
+        payload: '{"maintainerReview":{"sourceReportId":"original"}}'));
+    await native.start();
+    await until(() => pending.submissions.isEmpty);
+    expect(entity.publishedPayloads, isEmpty);
+  });
 }

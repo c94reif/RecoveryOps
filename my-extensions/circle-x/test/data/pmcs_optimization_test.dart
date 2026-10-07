@@ -171,6 +171,10 @@ void main() {
       SELECT entity_id, 'relay', bumper_number, vehicle_type, operator, uic,
         phases, '[]', latitude, longitude, timestamp + 1, 0, 1 FROM pmcs_reports
     """);
+    raw.execute('ALTER TABLE pmcs_sessions DROP COLUMN mileage_json');
+    raw.execute('ALTER TABLE pmcs_reports DROP COLUMN mileage_json');
+    raw.execute('ALTER TABLE profiles DROP COLUMN unit_name');
+    raw.execute('ALTER TABLE profiles DROP COLUMN followed_units_json');
     raw.userVersion = 2;
     raw.close();
     final migrated = AppDatabase.test(NativeDatabase(file));

@@ -61,7 +61,11 @@ void main() {
       expect(find.text('3 FAULTS'), findsOneWidget);
       expect(find.text('RED X: 1'), findsOneWidget);
       expect(find.text('DASH: 2'), findsOneWidget);
-      expect(find.textContaining('CIRCLE X'), findsNothing);
+      expect(
+          find.byWidgetPredicate((widget) =>
+              widget is SeverityBadge &&
+              widget.severity == FaultSeverity.circleX),
+          findsNothing);
       expect(find.byType(SeverityBadge), findsNWidgets(2));
     });
 

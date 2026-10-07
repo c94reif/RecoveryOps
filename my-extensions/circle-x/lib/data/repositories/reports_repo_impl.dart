@@ -48,6 +48,7 @@ class ReportsRepoImpl implements ReportsRepository {
       phases: PmcsStorageCodec.encodePhases(report.phases),
       faultsJson: PmcsStorageCodec.encodeFaults(report.faults),
       signatureJson: PmcsStorageCodec.encodeSignature(report.signature),
+      mileageJson: PmcsStorageCodec.encodeMileage(report.mileage),
       maintainerReviewJson: report.maintainerReview == null
           ? null
           : jsonEncode(report.maintainerReview!.toMap()),
@@ -114,6 +115,7 @@ class ReportsRepoImpl implements ReportsRepository {
       phases: PmcsStorageCodec.decodePhases(row.phases),
       faults: faults,
       signature: PmcsStorageCodec.decodeSignature(row.signatureJson),
+      mileage: PmcsStorageCodec.decodeMileage(row.mileageJson),
       maintainerReview: review,
       latitude: row.latitude,
       longitude: row.longitude,

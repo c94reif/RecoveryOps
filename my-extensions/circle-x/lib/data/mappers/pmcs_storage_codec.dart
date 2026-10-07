@@ -1,9 +1,22 @@
 import 'dart:convert';
+import 'package:circle_x/domain/entities/mileage_reading.dart';
 import 'package:circle_x/domain/entities/pmcs_fault.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
 import 'package:circle_x/domain/entities/pmcs_signature.dart';
 
 abstract final class PmcsStorageCodec {
+  static String? encodeMileage(MileageReading? mileage) =>
+      mileage == null ? null : jsonEncode(mileage.toMap());
+
+  static MileageReading? decodeMileage(String? json) {
+    if (json == null || json.isEmpty) return null;
+    try {
+      return MileageReading.fromMap(jsonDecode(json) as Map<String, Object?>);
+    } catch (_) {
+      return null;
+    }
+  }
+
   static String encodePhases(List<PmcsPhase> phases) =>
       phases.map((phase) => phase.wireName).join(',');
 

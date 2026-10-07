@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:circle_x/data/services/main_thread_queue_worker.dart';
 import 'package:circle_x/domain/entities/queued_submission.dart';
 import 'package:circle_x/domain/entities/transport_kind.dart';
@@ -10,632 +11,305 @@ import 'package:circle_x/presentation/common/widgets/custom_snack_bar.dart';
 
 import '../support/fakes.dart';
 
-/// Answers the queue's prompt from a script, so a test can say "send this one,
-/// discard the next" without standing up a widget tree.
+// Kept for existing callers; automatic workers must never invoke this object.
 class FakeQueuePromptStrategy implements QueuePromptStrategy {
   final List<QueuedSubmission> asked = [];
   final List<bool> answers = [];
   bool defaultAnswer = true;
-
   @override
   Stream<QueuePromptRequest> get prompts => const Stream.empty();
-
   @override
   Future<bool> ask(QueuedSubmission submission) async {
     asked.add(submission);
-    if (answers.isEmpty) return defaultAnswer;
-    return answers.removeAt(0);
+    return answers.isEmpty ? defaultAnswer : answers.removeAt(0);
   }
 }
 
-/// A database that takes the delete call and then loses it — the drain has to
-/// carry on regardless.
 class DeleteFailsRepository extends FakeQueuedSubmissionsRepository {
+  bool failDelete = true;
   @override
   Future<void> deleteById(int id) async {
-    deletedIds.add(id);
-    throw StateError('database gone');
+    if (failDelete) throw StateError('database unavailable');
+    await super.deleteById(id);
   }
 }
 
-/// Lets every microtask the worker chained off an unawaited drain run out.
+class GatedEntityPort extends FakePmcsEntityPort {
+  final gate = Completer<bool>();
+  @override
+  Future<bool> publishEncodedReport(
+      {required String entityId,
+      required String payload,
+      required LatLng position}) {
+    publishedPayloads.add(payload);
+    return gate.future;
+  }
+}
+
+class GatedQueue extends FakeQueuedSubmissionsRepository {
+  final loaded = Completer<List<QueuedSubmission>>();
+  @override
+  Future<List<QueuedSubmission>> getAll() => loaded.future;
+}
+
 Future<void> pumpQueue() => Future<void>.delayed(Duration.zero);
 
 void main() {
-  const probeInterval = Duration(seconds: 5);
-
+  const interval = Duration(seconds: 5);
   late FakeQueuedSubmissionsRepository repository;
-  late FakePmcsEntityPort entityPort;
-  late FakeMeshBroadcaster meshPort;
-  late FakeQueuePromptStrategy promptStrategy;
+  late FakePmcsEntityPort entity;
+  late FakeMeshBroadcaster mesh;
+  late FakeQueuePromptStrategy prompt;
   late MainThreadQueueWorker worker;
 
-  MainThreadQueueWorker buildWorker({
-    FakeQueuedSubmissionsRepository? withRepository,
-  }) =>
-      MainThreadQueueWorker(
-        snackBarService: SnackBarService.instance,
-        repository: withRepository ?? repository,
-        entityPort: entityPort,
-        meshPort: meshPort,
-        promptStrategy: promptStrategy,
-        probeInterval: probeInterval,
-      );
-
-  List<String> messages() =>
-      SnackBarService.instance.queue.map((m) => m.message).toList();
+  MainThreadQueueWorker buildWorker() => MainThreadQueueWorker(
+      repository: repository,
+      entityPort: entity,
+      meshPort: mesh,
+      promptStrategy: prompt,
+      probeInterval: interval,
+      snackBarService: SnackBarService.instance);
 
   setUp(() {
     repository = FakeQueuedSubmissionsRepository();
-    entityPort = FakePmcsEntityPort();
-    meshPort = FakeMeshBroadcaster();
-    promptStrategy = FakeQueuePromptStrategy();
+    entity = FakePmcsEntityPort();
+    mesh = FakeMeshBroadcaster();
+    prompt = FakeQueuePromptStrategy()..defaultAnswer = false;
     worker = buildWorker();
     SnackBarService.instance.queue.clear();
   });
-
   tearDown(() async {
     await worker.stop();
     SnackBarService.instance.queue.clear();
   });
 
-  group('enqueue', () {
-    test('parks the submission on disk so a killed app can resume it',
-        () async {
-      await worker
-          .enqueue(buildQueuedSubmission(entityId: 'a', payload: 'encoded:a'));
+  Future<void> enqueueBoth() async {
+    for (final transport in TransportKind.values) {
+      await worker.enqueue(buildQueuedSubmission(transport: transport));
+    }
+  }
 
-      expect(repository.submissions, hasLength(1));
-      expect(repository.submissions.single.payload, 'encoded:a');
-      expect(repository.submissions.single.id, isNotNull);
-    });
-
-    test('holds the stored row, with its id, in the transport backlog',
-        () async {
-      await worker.enqueue(buildQueuedSubmission());
-
-      expect(worker.pending['lattice']!.single.id, 1);
-    });
-
-    test('marks that transport down', () async {
-      await worker.enqueue(buildQueuedSubmission());
-
-      expect(worker.connected['lattice'], isFalse);
-    });
-
-    test('tells the operator the submission was queued, not lost', () async {
-      await worker.enqueue(buildQueuedSubmission());
-
-      final notice = SnackBarService.instance.queue.single;
-      expect(notice.message,
-          'Lattice unreachable — queued, will send on reconnect');
-      expect(notice.isError, isTrue);
-    });
-
-    test('parking a Lattice submission does not take the mesh leg down',
-        () async {
-      await worker.enqueue(buildQueuedSubmission());
-
-      expect(worker.connected['mesh'], isTrue);
-      expect(worker.pending['mesh'], isEmpty);
-    });
-
-    test('keeps each transport backlog separate', () async {
-      await worker.enqueue(buildQueuedSubmission(payload: 'encoded:lattice'));
-      await worker.enqueue(
-        buildQueuedSubmission(
-          payload: 'encoded:mesh',
-          transport: TransportKind.mesh,
-        ),
-      );
-
-      expect(worker.pending['lattice']!.single.payload, 'encoded:lattice');
-      expect(worker.pending['mesh']!.single.payload, 'encoded:mesh');
-    });
+  test('persists exact payload and row id before tracking a failed send',
+      () async {
+    await worker
+        .enqueue(buildQueuedSubmission(payload: 'original signed data'));
+    expect(repository.submissions.single.payload, 'original signed data');
+    expect(
+        worker.pending['lattice']!.single.id, repository.submissions.single.id);
+    expect(await worker.pendingCount(), 1);
+    expect(worker.connected['lattice'], isFalse);
+    expect(worker.connected['mesh'], isTrue);
+    expect(SnackBarService.instance.queue.single.message, contains('queued'));
   });
 
-  group('reportTransportOutcome', () {
-    test('a live send that lands starts draining that backlog', () async {
-      await worker.enqueue(buildQueuedSubmission(payload: 'encoded:parked'));
-
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
-
-      expect(entityPort.publishedPayloads, ['encoded:parked']);
-      expect(repository.submissions, isEmpty);
-    });
-
-    test('a live send that fails leaves the leg down and the backlog parked',
-        () async {
-      await worker.enqueue(buildQueuedSubmission());
-
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: false,
-      );
-      await pumpQueue();
-
-      expect(worker.connected['lattice'], isFalse);
-      expect(promptStrategy.asked, isEmpty);
-      expect(repository.submissions, hasLength(1));
-    });
-
-    test('a mesh success drains mesh and leaves the Lattice backlog parked',
-        () async {
-      await worker.enqueue(buildQueuedSubmission(payload: 'encoded:lattice'));
-      await worker.enqueue(
-        buildQueuedSubmission(
-          payload: 'encoded:mesh',
-          transport: TransportKind.mesh,
-        ),
-      );
-
-      worker.reportTransportOutcome(
-        transport: TransportKind.mesh,
-        success: true,
-      );
-      await pumpQueue();
-
-      expect(meshPort.broadcastPayloads, ['encoded:mesh']);
-      expect(entityPort.publishedPayloads, isEmpty);
-      expect(
-        repository.submissions.single.transport,
-        TransportKind.lattice,
-      );
-      expect(worker.connected['lattice'], isFalse);
-    });
-
-    test('a success with nothing parked is harmless', () async {
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
-
-      expect(worker.connected['lattice'], isTrue);
-      expect(promptStrategy.asked, isEmpty);
-      expect(entityPort.publishedPayloads, isEmpty);
-    });
+  test('successful transport outcome automatically drains FIFO without prompts',
+      () async {
+    for (final id in ['a', 'b', 'c']) {
+      await worker.enqueue(buildQueuedSubmission(entityId: id, payload: id));
+    }
+    SnackBarService.instance.queue.clear();
+    worker.reportTransportOutcome(
+        transport: TransportKind.lattice, success: true);
+    await pumpQueue();
+    expect(entity.publishedPayloads, ['a', 'b', 'c']);
+    expect(prompt.asked, isEmpty);
+    expect(repository.submissions, isEmpty);
+    expect(SnackBarService.instance.queue, isEmpty);
   });
 
-  group('draining a leg that came back', () {
-    test('asks the operator before re-sending anything', () async {
-      await worker.enqueue(buildQueuedSubmission(payload: 'encoded:parked'));
-      promptStrategy.defaultAnswer = false;
+  test('failed outcome retains durable queue without sending or prompting',
+      () async {
+    await enqueueBoth();
+    worker.reportTransportOutcome(
+        transport: TransportKind.lattice, success: false);
+    await pumpQueue();
+    expect(repository.submissions, hasLength(2));
+    expect(entity.publishedPayloads, isEmpty);
+    expect(prompt.asked, isEmpty);
+  });
 
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
+  test('mesh success only drains mesh', () async {
+    await enqueueBoth();
+    worker.reportTransportOutcome(transport: TransportKind.mesh, success: true);
+    await pumpQueue();
+    expect(mesh.broadcastPayloads, hasLength(1));
+    expect(entity.publishedPayloads, isEmpty);
+    expect(repository.submissions.single.transport, TransportKind.lattice);
+  });
 
-      expect(promptStrategy.asked.single.payload, 'encoded:parked');
-    });
+  test('startup immediately drains durable rows without blocking on sends',
+      () async {
+    final gated = GatedEntityPort();
+    entity = gated;
+    worker = buildWorker();
+    await repository.insert(buildQueuedSubmission());
+    await worker.start().timeout(const Duration(seconds: 1));
+    await pumpQueue();
+    expect(entity.publishedPayloads, hasLength(1));
+    expect(repository.submissions, hasLength(1));
+    gated.gate.complete(true);
+    await worker.onProbeTick();
+    expect(repository.submissions, isEmpty);
+    expect(prompt.asked, isEmpty);
+  });
 
-    test('a send answer publishes the submission and drops the row', () async {
-      await worker.enqueue(buildQueuedSubmission(payload: 'encoded:parked'));
-      promptStrategy.answers.add(true);
+  test('one blocked transport cannot block the other transport', () async {
+    final gated = GatedEntityPort();
+    entity = gated;
+    worker = buildWorker();
+    await enqueueBoth();
+    await worker.start();
+    await pumpQueue();
+    expect(mesh.broadcastPayloads, hasLength(1));
+    expect(repository.submissions.single.transport, TransportKind.lattice);
+    gated.gate.complete(true);
+    await worker.onProbeTick();
+    expect(repository.submissions, isEmpty);
+  });
 
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
+  test('concurrent probes join one send and duplicate tracking is harmless',
+      () async {
+    final gated = GatedEntityPort();
+    entity = gated;
+    worker = buildWorker();
+    await worker.enqueue(buildQueuedSubmission());
+    worker.trackPersisted(repository.submissions.single);
+    final first = worker.nudge(TransportKind.lattice);
+    final second = worker.nudge(TransportKind.lattice);
+    await pumpQueue();
+    expect(entity.publishedPayloads, hasLength(1));
+    gated.gate.complete(true);
+    await Future.wait([first, second]);
+    expect(repository.submissions, isEmpty);
+  });
 
-      expect(entityPort.publishedPayloads, ['encoded:parked']);
-      expect(repository.deletedIds, [1]);
-      expect(worker.pending['lattice'], isEmpty);
-    });
+  test('failure stops only its transport and retains all its rows', () async {
+    await enqueueBoth();
+    await worker.enqueue(buildQueuedSubmission(entityId: 'another'));
+    entity.publishSucceeds = false;
+    await worker.onProbeTick();
+    expect(entity.publishedPayloads, hasLength(1));
+    expect(mesh.broadcastPayloads, hasLength(1));
+    expect(repository.submissions, hasLength(2));
+    expect(
+        repository.submissions
+            .every((row) => row.transport == TransportKind.lattice),
+        isTrue);
+  });
 
-    test('a discard answer drops the row without publishing it', () async {
-      await worker.enqueue(buildQueuedSubmission());
-      promptStrategy.answers.add(false);
-
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
-
-      expect(entityPort.publishedPayloads, isEmpty);
-      expect(repository.deletedIds, [1]);
-      expect(repository.submissions, isEmpty);
-    });
-
-    test('re-sends the stored payload verbatim rather than rebuilding it',
-        () async {
-      await worker.enqueue(
-        buildQueuedSubmission(payload: 'encoded:from-an-hour-ago'),
-      );
-
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
-
-      expect(entityPort.publishedPayloads, ['encoded:from-an-hour-ago']);
-      expect(entityPort.published, isEmpty);
-    });
-
-    test('keeps draining while the leg holds up', () async {
-      await worker
-          .enqueue(buildQueuedSubmission(entityId: 'a', payload: 'encoded:a'));
-      await worker
-          .enqueue(buildQueuedSubmission(entityId: 'b', payload: 'encoded:b'));
-      await worker
-          .enqueue(buildQueuedSubmission(entityId: 'c', payload: 'encoded:c'));
-
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
-
-      expect(promptStrategy.asked, hasLength(3));
-      expect(
-        entityPort.publishedPayloads,
-        ['encoded:a', 'encoded:b', 'encoded:c'],
-      );
-      expect(repository.submissions, isEmpty);
-    });
-
-    test('offers the oldest parked submission first', () async {
-      await worker.enqueue(buildQueuedSubmission(payload: 'encoded:oldest'));
-      await worker.enqueue(buildQueuedSubmission(payload: 'encoded:newer'));
-      promptStrategy.answers.addAll([false, false]);
-
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
-
-      expect(
-        promptStrategy.asked.map((s) => s.payload),
-        ['encoded:oldest', 'encoded:newer'],
-      );
-    });
-
-    test('a send that fails mid-drain stops that leg and parks the rest',
-        () async {
-      await worker
-          .enqueue(buildQueuedSubmission(entityId: 'a', payload: 'encoded:a'));
-      await worker
-          .enqueue(buildQueuedSubmission(entityId: 'b', payload: 'encoded:b'));
-      entityPort.publishSucceeds = false;
-
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
-
-      expect(promptStrategy.asked, hasLength(1));
-      expect(entityPort.publishedPayloads, ['encoded:a']);
-      expect(repository.submissions, hasLength(2));
-      expect(repository.deletedIds, isEmpty);
-      expect(worker.connected['lattice'], isFalse);
-    });
-
-    test('a failed drain leaves the leg ready to be offered again', () async {
-      await worker
-          .enqueue(buildQueuedSubmission(entityId: 'a', payload: 'encoded:a'));
-      entityPort.publishSucceeds = false;
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
-
-      entityPort.publishSucceeds = true;
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
-
-      expect(promptStrategy.asked, hasLength(2));
-      expect(entityPort.publishedPayloads, ['encoded:a', 'encoded:a']);
-      expect(repository.submissions, isEmpty);
-    });
-
-    test('tells the operator when a queued submission finally lands', () async {
-      await worker.enqueue(buildQueuedSubmission());
+  test(
+      'periodic offline retries use bounded exponential backoff and remain quiet',
+      () {
+    fakeAsync((async) {
+      entity.publishSucceeds = false;
+      unawaited(worker.enqueue(buildQueuedSubmission()));
+      async.flushMicrotasks();
       SnackBarService.instance.queue.clear();
-
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
-
-      expect(messages(), ['Lattice: sent (queued)']);
-      expect(SnackBarService.instance.queue.single.isError, isFalse);
-    });
-
-    test('tells the operator when the re-send fails', () async {
-      await worker.enqueue(buildQueuedSubmission());
-      entityPort.publishSucceeds = false;
-      SnackBarService.instance.queue.clear();
-
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
-
-      expect(messages(), ['Lattice: still FAILED']);
-      expect(SnackBarService.instance.queue.single.isError, isTrue);
-    });
-
-    test('does not offer a discarded submission a second time', () async {
-      await worker.enqueue(buildQueuedSubmission());
-      promptStrategy.defaultAnswer = false;
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
-
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
-
-      expect(promptStrategy.asked, hasLength(1));
-    });
-
-    test('keeps draining when the row delete fails', () async {
-      final failing = DeleteFailsRepository();
-      final other = buildWorker(withRepository: failing);
-      await other
-          .enqueue(buildQueuedSubmission(entityId: 'a', payload: 'encoded:a'));
-      await other
-          .enqueue(buildQueuedSubmission(entityId: 'b', payload: 'encoded:b'));
-
-      other.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
-
-      expect(entityPort.publishedPayloads, ['encoded:a', 'encoded:b']);
-      expect(other.pending['lattice'], isEmpty);
-      // TODO: a delete that throws leaves the row on disk, so the next start()
-      // resumes a PMCS that has already been delivered.
-      expect(failing.submissions, hasLength(2));
+      unawaited(worker.start());
+      async.flushMicrotasks();
+      expect(entity.publishedPayloads, hasLength(1));
+      for (final attempts in [2, 2, 3, 3, 3, 3, 4]) {
+        async.elapse(interval);
+        expect(entity.publishedPayloads, hasLength(attempts));
+      }
+      entity.publishSucceeds = true;
+      unawaited(worker.retryNow());
+      async.flushMicrotasks();
+      expect(repository.submissions, isEmpty);
+      expect(SnackBarService.instance.queue, isEmpty);
+      unawaited(worker.stop());
+      async.flushMicrotasks();
     });
   });
 
-  group('probing a down leg', () {
-    test('re-sends the oldest parked submission when the interval elapses', () {
-      fakeAsync((async) {
-        unawaited(worker.start());
-        async.flushMicrotasks();
-        unawaited(worker.enqueue(
-            buildQueuedSubmission(entityId: 'a', payload: 'encoded:a')));
-        async.flushMicrotasks();
-
-        async.elapse(probeInterval);
-        async.flushMicrotasks();
-
-        expect(entityPort.publishedPayloads, ['encoded:a']);
-        expect(repository.submissions, isEmpty);
-
-        unawaited(worker.stop());
-        async.flushMicrotasks();
-      });
-    });
-
-    test('does not ask the operator about the submission it probes with', () {
-      fakeAsync((async) {
-        unawaited(worker.start());
-        async.flushMicrotasks();
-        unawaited(worker.enqueue(buildQueuedSubmission()));
-        async.flushMicrotasks();
-
-        async.elapse(probeInterval);
-        async.flushMicrotasks();
-
-        expect(promptStrategy.asked, isEmpty);
-
-        unawaited(worker.stop());
-        async.flushMicrotasks();
-      });
-    });
-
-    test('leaves everything parked, and stays quiet, when the probe fails', () {
-      fakeAsync((async) {
-        unawaited(worker.start());
-        async.flushMicrotasks();
-        unawaited(worker.enqueue(buildQueuedSubmission()));
-        async.flushMicrotasks();
-        entityPort.publishSucceeds = false;
-        SnackBarService.instance.queue.clear();
-
-        async.elapse(probeInterval * 3);
-        async.flushMicrotasks();
-
-        expect(repository.submissions, hasLength(1));
-        expect(worker.connected['lattice'], isFalse);
-        expect(messages(), isEmpty);
-
-        unawaited(worker.stop());
-        async.flushMicrotasks();
-      });
-    });
-
-    test('retries a down leg on every tick until it gets through', () {
-      fakeAsync((async) {
-        unawaited(worker.start());
-        async.flushMicrotasks();
-        unawaited(worker.enqueue(
-            buildQueuedSubmission(entityId: 'a', payload: 'encoded:a')));
-        async.flushMicrotasks();
-        entityPort.publishSucceeds = false;
-
-        async.elapse(probeInterval * 2);
-        async.flushMicrotasks();
-        expect(entityPort.publishedPayloads, hasLength(2));
-
-        entityPort.publishSucceeds = true;
-        async.elapse(probeInterval);
-        async.flushMicrotasks();
-
-        expect(repository.submissions, isEmpty);
-
-        unawaited(worker.stop());
-        async.flushMicrotasks();
-      });
-    });
-
-    test('offers the rest of the backlog once a probe gets through', () {
-      fakeAsync((async) {
-        unawaited(worker.start());
-        async.flushMicrotasks();
-        unawaited(worker.enqueue(
-            buildQueuedSubmission(entityId: 'a', payload: 'encoded:a')));
-        async.flushMicrotasks();
-        unawaited(worker.enqueue(
-            buildQueuedSubmission(entityId: 'b', payload: 'encoded:b')));
-        async.flushMicrotasks();
-
-        async.elapse(probeInterval);
-        async.flushMicrotasks();
-
-        expect(promptStrategy.asked.map((s) => s.payload), ['encoded:b']);
-        expect(entityPort.publishedPayloads, ['encoded:a', 'encoded:b']);
-        expect(repository.submissions, isEmpty);
-
-        unawaited(worker.stop());
-        async.flushMicrotasks();
-      });
-    });
-
-    test('never probes a leg with nothing parked', () {
-      fakeAsync((async) {
-        unawaited(worker.start());
-        async.flushMicrotasks();
-
-        async.elapse(probeInterval * 5);
-        async.flushMicrotasks();
-
-        expect(entityPort.publishedPayloads, isEmpty);
-        expect(meshPort.broadcastPayloads, isEmpty);
-
-        unawaited(worker.stop());
-        async.flushMicrotasks();
-      });
-    });
+  test('connectivity success bypasses retry backoff immediately', () async {
+    await worker.enqueue(buildQueuedSubmission());
+    entity.publishSucceeds = false;
+    await worker.onProbeTick();
+    await worker.onProbeTick();
+    entity.publishSucceeds = true;
+    worker.reportTransportOutcome(
+        transport: TransportKind.lattice, success: true);
+    await pumpQueue();
+    expect(entity.publishedPayloads, hasLength(3));
+    expect(repository.submissions, isEmpty);
   });
 
-  group('start and stop', () {
-    test('resumes rows left on disk by a previous run', () async {
-      repository.submissions.addAll([
-        buildQueuedSubmission(id: 1, payload: 'encoded:a'),
-        buildQueuedSubmission(
-          id: 2,
-          payload: 'encoded:b',
-          transport: TransportKind.mesh,
-        ),
-      ]);
+  test('failed local deletion remains tracked and retries without another send',
+      () async {
+    final failing = DeleteFailsRepository();
+    repository = failing;
+    worker = buildWorker();
+    await worker.enqueue(buildQueuedSubmission());
+    await worker.onProbeTick();
+    expect(repository.submissions, hasLength(1));
+    expect(worker.pending['lattice'], hasLength(1));
+    failing.failDelete = false;
+    await worker.retryNow();
+    expect(repository.submissions, isEmpty);
+    expect(entity.publishedPayloads, hasLength(1));
+  });
 
-      await worker.start();
+  test('restart resumes durable rows and second start does not duplicate sends',
+      () async {
+    await worker.enqueue(buildQueuedSubmission());
+    await worker.stop();
+    expect(repository.submissions, hasLength(1));
+    await worker.start();
+    await worker.start();
+    await worker.onProbeTick();
+    expect(entity.publishedPayloads, hasLength(1));
+    expect(repository.submissions, isEmpty);
+  });
 
-      expect(worker.pending['lattice']!.single.payload, 'encoded:a');
-      expect(worker.pending['mesh']!.single.payload, 'encoded:b');
-    });
+  test('stop during startup prevents late timer installation', () async {
+    final gated = GatedQueue();
+    repository = gated;
+    worker = buildWorker();
+    final starting = worker.start();
+    await worker.stop();
+    gated.loaded.complete([buildQueuedSubmission(id: 1)]);
+    await starting;
+    expect(worker.probeTimer, isNull);
+    expect(entity.publishedPayloads, isEmpty);
+  });
 
-    test('offers a resumed row on the first tick, assuming the leg is up', () {
-      repository.submissions.add(
-        buildQueuedSubmission(id: 1, payload: 'encoded:a'),
-      );
+  test(
+      'stop during send leaves durable row for restart and ignores stale drain',
+      () async {
+    final gated = GatedEntityPort();
+    entity = gated;
+    worker = buildWorker();
+    await worker.enqueue(buildQueuedSubmission());
+    final sending = worker.onProbeTick();
+    await pumpQueue();
+    await worker.stop();
+    gated.gate.complete(true);
+    await sending;
+    expect(repository.submissions, hasLength(1));
+    expect(worker.pending.values.expand((rows) => rows), isEmpty);
+  });
 
-      fakeAsync((async) {
-        unawaited(worker.start());
-        async.flushMicrotasks();
+  test('withdrawn review source suppresses queued review payload', () async {
+    await worker.enqueue(buildQueuedSubmission(
+        payload: '{"maintainerReview":{"sourceReportId":"original"}}'));
+    worker.delivery.suppressReport('original');
+    await worker.onProbeTick();
+    expect(repository.submissions, isEmpty);
+    expect(entity.publishedPayloads, isEmpty);
+  });
 
-        async.elapse(probeInterval);
-        async.flushMicrotasks();
-
-        expect(promptStrategy.asked.single.payload, 'encoded:a');
-        expect(entityPort.publishedPayloads, ['encoded:a']);
-        expect(repository.submissions, isEmpty);
-
-        unawaited(worker.stop());
-        async.flushMicrotasks();
-      });
-    });
-
-    test('a second start does not resume the same rows twice', () async {
-      repository.submissions.add(buildQueuedSubmission(id: 1));
-
-      await worker.start();
-      await worker.start();
-
-      expect(worker.pending['lattice'], hasLength(1));
-    });
-
-    test('stop cancels the probe timer', () {
-      fakeAsync((async) {
-        unawaited(worker.start());
-        async.flushMicrotasks();
-        unawaited(worker.stop());
-        async.flushMicrotasks();
-
-        unawaited(worker.enqueue(buildQueuedSubmission()));
-        async.flushMicrotasks();
-        async.elapse(probeInterval * 5);
-        async.flushMicrotasks();
-
-        expect(worker.probeTimer, isNull);
-        expect(entityPort.publishedPayloads, isEmpty);
-      });
-    });
-
-    test('stop leaves the rows on disk so a restart can resume them', () async {
-      await worker
-          .enqueue(buildQueuedSubmission(entityId: 'a', payload: 'encoded:a'));
-
-      await worker.stop();
-
-      expect(worker.pending['lattice'], isEmpty);
+  test('stop cancels automatic probes', () {
+    fakeAsync((async) {
+      unawaited(worker.start());
+      async.flushMicrotasks();
+      unawaited(worker.stop());
+      async.flushMicrotasks();
+      unawaited(worker.enqueue(buildQueuedSubmission()));
+      async.flushMicrotasks();
+      async.elapse(interval * 20);
+      expect(entity.publishedPayloads, isEmpty);
       expect(repository.submissions, hasLength(1));
-
-      await worker.start();
-
-      expect(worker.pending['lattice']!.single.payload, 'encoded:a');
-    });
-  });
-
-  group('pendingCount', () {
-    test('reports what is on disk, not what the worker has in memory',
-        () async {
-      repository.submissions.addAll([
-        buildQueuedSubmission(id: 1),
-        buildQueuedSubmission(id: 2, transport: TransportKind.mesh),
-      ]);
-
-      expect(await worker.pendingCount(), 2);
-      expect(worker.pending['lattice'], isEmpty);
-    });
-
-    test('drops back to zero once the backlog drains', () async {
-      await worker.enqueue(buildQueuedSubmission());
-      expect(await worker.pendingCount(), 1);
-
-      worker.reportTransportOutcome(
-        transport: TransportKind.lattice,
-        success: true,
-      );
-      await pumpQueue();
-
-      expect(await worker.pendingCount(), 0);
     });
   });
 }

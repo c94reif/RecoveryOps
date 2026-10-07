@@ -602,6 +602,9 @@ void main() {
       await tester.pumpWidget(subject());
       await tester.pumpAndSettle();
 
+      // Mount the last card below the expanded filter controls.
+      await tester.drag(find.byType(ListView), const Offset(0, -200));
+      await tester.pumpAndSettle();
       final headers = tester
           .widgetList<Text>(find.byType(Text))
           .map((t) => t.data)
@@ -641,7 +644,7 @@ void main() {
       expect(find.text('OTHER UNITS'), findsNothing);
     });
 
-    testWidgets('a PMCS from another unit is set apart, not dropped',
+    testWidgets('other units stay accessible through the unit selector',
         (tester) async {
       viewModel.myUic = 'WJ8TAA';
       viewModel.reports.addAll([
@@ -666,7 +669,12 @@ void main() {
       await openTab(tester, ReportsTab.unit);
 
       expect(find.text('B-22 - Stryker'), findsOneWidget);
-      expect(find.text('OTHER UNITS'), findsOneWidget);
+      expect(find.text('Z-99 - Stryker'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('report-unit-selector')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Other units').last);
+      await tester.pumpAndSettle();
+      expect(find.text('B-22 - Stryker'), findsNothing);
       expect(find.text('Z-99 - Stryker'), findsOneWidget);
     });
 
@@ -700,7 +708,7 @@ void main() {
 
       await openTab(tester, ReportsTab.unit);
       expect(
-        find.text('No PMCS from other crews in your unit yet'),
+        find.text('No PMCS from other crews in the selected units yet'),
         findsOneWidget,
       );
 

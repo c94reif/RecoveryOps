@@ -1,24 +1,30 @@
 import 'dart:async';
 
 import 'package:le_sdk/le_sdk.dart' as sdk;
+import 'package:circle_x/core/constants/app_constants.dart';
 
 /// Resolves stable report IDs to server-assigned item paths on every write.
 /// Kept inside each extension so its source package remains self-contained.
 class MeshReportCollection {
   final sdk.MeshItemService items;
   final sdk.MeshDataTypePath type;
+  final Duration requestTimeout;
   final Map<String, Future<void>> _pending = {};
 
-  MeshReportCollection({required this.items, required this.type});
+  MeshReportCollection({
+    required this.items,
+    required this.type,
+    this.requestTimeout = AppConstants.transportRequestTimeout,
+  });
 
   Future<List<sdk.MeshItem>> _list() async {
     // Do not interpret an unavailable/unregistered collection as an empty one.
-    if (await items.getDataType(type) == null) {
+    if (await items.getDataType(type).timeout(requestTimeout) == null) {
       throw StateError('Register mesh item schema '
           '${type.namespace}/${type.domain}/${type.dataType}/${type.version}');
     }
     // Read the typed collection, without relying on upstream filter dialects.
-    return items.listItems(type);
+    return items.listItems(type).timeout(requestTimeout);
   }
 
   /// Withdrawal records are immutable and dominate all live duplicates.
@@ -42,22 +48,41 @@ class MeshReportCollection {
   }
 
   Future<void> save(String reportId, Map<String, Object?> report,
-          {bool merge = false}) =>
+          {bool merge = false, String? sourceReportId}) =>
       _serial(reportId, () async {
-        final existing = (await snapshot())[reportId];
+        final records = await snapshot();
+        final existing = records[reportId];
         if (existing != null && withdrawn(existing)) return;
+        // A queued review can run before this device imports remote withdrawals.
+        // Check its source in this same snapshot before persisting the review.
+        final source = records[sourceReportId];
+        if (source != null && withdrawn(source)) return;
+        final bodyToSave = <String, Object?>{
+          if (merge) ...?body(existing),
+          ...report,
+        };
+        final updatedAt = existing?.data['updatedAt'];
+        if (existing != null &&
+            existing.data['withdrawn'] == false &&
+            updatedAt is String &&
+            DateTime.tryParse(updatedAt) != null &&
+            _equal(body(existing), bodyToSave)) {
+          // Another relay may already have committed this immutable report.
+          // Verify it without rewriting updatedAt or producing replication churn.
+          await _verify(existing, existing.data);
+          return;
+        }
         final data = <String, Object?>{
           'reportId': reportId,
           'withdrawn': false,
           'updatedAt': DateTime.now().toUtc().toIso8601String(),
-          'report': {
-            if (merge) ...?body(existing),
-            ...report,
-          },
+          'report': bodyToSave,
         };
         final saved = existing == null
-            ? await items.createItem(type, data)
-            : await items.updateItem(existing.path, data);
+            ? await items.createItem(type, data).timeout(requestTimeout)
+            : await items
+                .updateItem(existing.path, data)
+                .timeout(requestTimeout);
         await _verify(saved, data);
       });
 
@@ -71,7 +96,8 @@ class MeshReportCollection {
           'withdrawn': true,
           'updatedAt': DateTime.now().toUtc().toIso8601String(),
         };
-        final saved = await items.createItem(type, data);
+        final saved =
+            await items.createItem(type, data).timeout(requestTimeout);
         await _verify(saved, data);
       });
 
@@ -79,7 +105,7 @@ class MeshReportCollection {
     if (saved.path.id.isEmpty || !_sameType(saved.path.type)) {
       throw StateError('Mesh item store returned an invalid item path');
     }
-    final persisted = await items.getItem(saved.path);
+    final persisted = await items.getItem(saved.path).timeout(requestTimeout);
     if (persisted == null || !_equal(persisted.data, data)) {
       throw StateError('Mesh item store did not persist the report');
     }
@@ -127,6 +153,8 @@ class MeshReportCollection {
     try {
       await operation();
     } finally {
+      // A timed-out bridge write may still commit. Release the local lock so a
+      // retry can resolve the stable report ID and verify the remote outcome.
       done.complete();
       if (identical(_pending[id], done.future)) _pending.remove(id);
     }

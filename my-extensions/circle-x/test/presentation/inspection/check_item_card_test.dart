@@ -95,6 +95,11 @@ void main() {
       // Low and Empty are DASH on this item; Reservoir Cracked deadlines it.
       expect(find.text('DASH'), findsNWidgets(2));
       expect(find.text('RED X'), findsOneWidget);
+
+      classifier = FakeFaultClassifier();
+      await tester.pumpWidget(createWidgetUnderTest());
+      expect(find.text('X'), findsOneWidget);
+      expect(find.text('RED X'), findsNothing);
     });
 
     testWidgets('sets the serviceable option apart from the fault options',

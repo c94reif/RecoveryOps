@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:circle_x/domain/entities/fault_severity.dart';
 
 class ReportVehicleFilters extends StatelessWidget {
   final TextEditingController searchController;
@@ -12,6 +13,8 @@ class ReportVehicleFilters extends StatelessWidget {
   final ValueChanged<bool> onFaultsChanged;
   final ValueChanged<bool> onUnreadChanged;
   final VoidCallback onClearFilters;
+  final FaultSeverity? severity;
+  final ValueChanged<FaultSeverity?>? onSeverityChanged;
 
   const ReportVehicleFilters({
     super.key,
@@ -26,6 +29,8 @@ class ReportVehicleFilters extends StatelessWidget {
     required this.onFaultsChanged,
     required this.onUnreadChanged,
     required this.onClearFilters,
+    this.severity,
+    this.onSeverityChanged,
   });
 
   @override
@@ -66,6 +71,27 @@ class ReportVehicleFilters extends StatelessWidget {
             TextButton(
                 onPressed: onClearFilters, child: const Text('Clear filters')),
         ]),
+        if (onSeverityChanged != null) ...[
+          const SizedBox(height: 8),
+          const Text('Severity'),
+          const SizedBox(height: 4),
+          Wrap(spacing: 8, runSpacing: 4, children: [
+            ChoiceChip(
+              key: const ValueKey('severity-all'),
+              label: const Text('All severities'),
+              selected: severity == null,
+              onSelected: (_) => onSeverityChanged!(null),
+            ),
+            for (final value in FaultSeverity.values)
+              ChoiceChip(
+                key: ValueKey('severity-${value.wireName}'),
+                label: Text(value.label),
+                selected: severity == value,
+                onSelected: (selected) =>
+                    onSeverityChanged!(selected ? value : null),
+              ),
+          ]),
+        ],
       ]),
     );
   }

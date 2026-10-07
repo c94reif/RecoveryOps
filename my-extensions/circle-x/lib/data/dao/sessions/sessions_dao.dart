@@ -35,6 +35,7 @@ class SessionsDao extends DatabaseAccessor<AppDatabase>
     required String completedPhases,
     required String status,
     String? signatureJson,
+    String? mileageJson,
     double? latitude,
     double? longitude,
   }) async {
@@ -50,6 +51,7 @@ class SessionsDao extends DatabaseAccessor<AppDatabase>
         completedPhases: Value(completedPhases),
         status: Value(status),
         signatureJson: Value(signatureJson),
+        mileageJson: Value(mileageJson),
         latitude: Value(latitude),
         longitude: Value(longitude),
       ),
@@ -66,6 +68,7 @@ class SessionsDao extends DatabaseAccessor<AppDatabase>
     required String completedPhases,
     required String status,
     String? signatureJson,
+    String? mileageJson,
     double? latitude,
     double? longitude,
   }) async {
@@ -81,6 +84,7 @@ class SessionsDao extends DatabaseAccessor<AppDatabase>
         completedPhases: Value(completedPhases),
         status: Value(status),
         signatureJson: Value(signatureJson),
+        mileageJson: Value(mileageJson),
         latitude: Value.absentIfNull(latitude),
         longitude: Value.absentIfNull(longitude),
       ),

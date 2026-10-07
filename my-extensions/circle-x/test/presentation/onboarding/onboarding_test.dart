@@ -25,6 +25,16 @@ class ExplodingProfileRepository implements ProfileRepository {
       throw StateError('store is down');
 }
 
+class RetryableProfileRepository extends FakeProfileRepository {
+  bool failSave = true;
+
+  @override
+  Future<void> saveProfile(Profile profile) async {
+    if (failSave) throw StateError('disk unavailable');
+    await super.saveProfile(profile);
+  }
+}
+
 void main() {
   late FakeProfileRepository repository;
 
@@ -187,8 +197,48 @@ void main() {
       await tester.tap(continueButton());
       await tester.pumpAndSettle();
 
-      expect(find.text('Could not save the UIC — try again'), findsOneWidget);
+      expect(find.text('Could not save your unit settings. Try again.'),
+          findsOneWidget);
       expect(find.byType(OnboardingPage), findsOneWidget);
+    });
+
+    testWidgets('a failed save cannot complete using an older valid cached UIC',
+        (tester) async {
+      final retryable = RetryableProfileRepository()
+        ..profile = const Profile(
+            uic: 'WJ8TAA',
+            unitName: 'Headquarters',
+            followedUnits: [FollowedUnit(uic: 'WAB4C0', name: 'Alpha')]);
+      final viewModel = ProfileViewModel(retryable);
+      await viewModel.loadProfile();
+      getIt.registerFactory<ProfileViewModel>(() => viewModel);
+      var completed = 0;
+      await tester.pumpWidget(MaterialApp(
+        theme: appTheme,
+        home: OnboardingPage(onComplete: () => completed++),
+      ));
+      await tester.pumpAndSettle();
+      await tester.enterText(uicField(), 'W12ABC');
+      await tester.pumpAndSettle();
+      await tester.tap(continueButton());
+      await tester.pumpAndSettle();
+
+      expect(completed, 0);
+      expect(viewModel.savedUic, 'WJ8TAA');
+      expect(find.byType(OnboardingPage), findsOneWidget);
+      expect(
+          tester.widget<CustomButton>(continueButton()).onPressed, isNotNull);
+      expect(find.text('Could not save your unit settings. Try again.'),
+          findsOneWidget);
+
+      retryable.failSave = false;
+      await tester.tap(continueButton());
+      await tester.pumpAndSettle();
+
+      expect(completed, 1);
+      expect(retryable.profile!.uic, 'W12ABC');
+      expect(retryable.profile!.unitName, 'Headquarters');
+      expect(retryable.profile!.followedUnits.single.uic, 'WAB4C0');
     });
   });
 }

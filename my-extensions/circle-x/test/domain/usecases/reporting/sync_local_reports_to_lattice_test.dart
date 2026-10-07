@@ -30,13 +30,15 @@ void main() {
     expect(entityPort.published, isEmpty);
   });
 
-  test('ignores reports received from other crews', () async {
+  test('relays reports received from other crews without changing ownership',
+      () async {
     final count = await usecase([
       buildReport(entityId: 'theirs-1', isOutgoing: false),
     ]);
 
-    expect(count, 0);
-    expect(entityPort.published, isEmpty);
+    expect(count, 1);
+    expect(entityPort.published.single.entityId, 'theirs-1');
+    expect(entityPort.published.single.isOutgoing, isFalse);
   });
 
   test('a rejected re-publish is not counted', () async {

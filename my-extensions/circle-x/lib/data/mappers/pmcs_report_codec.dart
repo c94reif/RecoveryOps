@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:circle_x/domain/entities/mileage_reading.dart';
 
 import 'package:circle_x/core/constants/app_constants.dart';
 import 'package:circle_x/domain/entities/pmcs_fault.dart';
@@ -31,6 +32,7 @@ class PmcsReportCodec implements ReportCodec {
         'uic': Uic.normalize(report.uic),
         'phases': [for (final phase in report.phases) phase.wireName],
         'faults': [for (final fault in report.faults) fault.toMap()],
+        if (report.mileage != null) 'mileage': report.mileage!.toMap(),
         if (report.signature != null) 'signature': report.signature!.toMap(),
         if (report.maintainerReview != null)
           'maintainerReview': report.maintainerReview!.toMap(),
@@ -100,6 +102,10 @@ class PmcsReportCodec implements ReportCodec {
         phases: _decodePhases(body['phases']),
         faults: _decodeFaults(entityId, body['faults']),
         signature: _decodeSignature(body['signature']),
+        mileage: body['mileage'] == null
+            ? null
+            : MileageReading.fromMap(
+                (body['mileage'] as Map).cast<String, Object?>()),
         maintainerReview: body['maintainerReview'] == null
             ? null
             : MaintainerReview.fromMap(

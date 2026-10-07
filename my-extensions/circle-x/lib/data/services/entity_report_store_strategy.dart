@@ -1,5 +1,6 @@
 import 'package:latlong2/latlong.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
+import 'package:circle_x/core/constants/app_constants.dart';
 import 'package:circle_x/data/services/lattice_pmcs_adapter.dart';
 import 'package:circle_x/data/services/lattice_report_source.dart';
 import 'package:circle_x/domain/entities/pmcs_report.dart';
@@ -10,9 +11,12 @@ class EntityReportStoreStrategy implements ReportStoreStrategy {
   final LatticePmcsAdapter writer;
   final LatticeReportSource reader;
 
-  EntityReportStoreStrategy(sdk.EntityService entities)
-      : writer = LatticePmcsAdapter(entities: entities),
-        reader = LatticeReportSource(entities: entities);
+  EntityReportStoreStrategy(sdk.EntityService entities,
+      {Duration requestTimeout = AppConstants.transportRequestTimeout})
+      : writer = LatticePmcsAdapter(
+            entities: entities, requestTimeout: requestTimeout),
+        reader = LatticeReportSource(
+            entities: entities, requestTimeout: requestTimeout);
 
   @override
   Future<bool> publishPmcsReport(PmcsReport report) =>

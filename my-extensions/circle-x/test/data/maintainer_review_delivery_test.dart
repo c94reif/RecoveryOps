@@ -13,6 +13,7 @@ import 'package:circle_x/data/services/main_thread_queue_worker.dart';
 import 'package:circle_x/data/services/isolate_queue_worker.dart';
 import 'package:circle_x/data/services/mesh_item_report_store_strategy.dart';
 import 'package:circle_x/domain/entities/maintainer_review.dart';
+import 'package:circle_x/domain/entities/mileage_reading.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
 import 'package:circle_x/domain/entities/queued_submission.dart';
 import 'package:circle_x/domain/entities/transport_kind.dart';
@@ -77,6 +78,7 @@ void main() {
         delivery: delivery);
     await reports.insertReport(buildReport(
       entityId: 'original',
+      mileage: MileageReading(value: 43210.5, unit: MileageUnit.kilometers),
       signature: buildSignature(),
       faults: [
         buildFault(itemId: 'engine', note: 'Original operator note'),
@@ -125,6 +127,7 @@ void main() {
         codec.reportBody(original));
     expect(record.maintainerReview!.signature.dodId, '1087987499');
     expect(record.signature!.dodId, original.signature!.dodId);
+    expect(record.mileage!.toMap(), original.mileage!.toMap());
 
     final outcome = await publisher().publishPersisted(record);
     await Future<void>.delayed(const Duration(milliseconds: 20));
@@ -134,6 +137,7 @@ void main() {
     final remote = (await store.fetchRemotePmcsReports()).single;
     expect(remote.maintainerReview!.toMap(), record.maintainerReview!.toMap());
     expect(remote.faults.first.note, 'Original operator note');
+    expect(remote.mileage!.toMap(), original.mileage!.toMap());
 
     final otherDevice = FakeReportsRepository();
     await SyncRemoteReports(store, otherDevice)([]);
@@ -148,6 +152,8 @@ void main() {
     expect(
         otherDevice.reports.singleWhere((r) => !r.isMaintainerReview).entityId,
         'original');
+    expect(otherDevice.reports.every((r) => r.mileage?.display == '43210.5 km'),
+        isTrue);
   });
 
   test(
@@ -182,10 +188,13 @@ void main() {
     expect(await queue.count(), 0);
     expect((await store.fetchRemotePmcsReports()).single.entityId,
         'offline-review');
+    expect((await store.fetchRemotePmcsReports()).single.mileage!.toMap(),
+        record.mileage!.toMap());
     final peerCopy = codec.decodeReport(peers.broadcastPayloads.single,
         fromCallsign: 'peer')!;
     expect(
         peerCopy.maintainerReview!.toMap(), record.maintainerReview!.toMap());
+    expect(peerCopy.mileage!.toMap(), record.mileage!.toMap());
   });
 
   test('a failed outbox write rolls back the batch and both queue rows',

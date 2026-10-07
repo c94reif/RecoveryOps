@@ -11,7 +11,7 @@ enum FaultSeverity {
 
   String get label => switch (this) {
         FaultSeverity.redX => 'RED X',
-        FaultSeverity.circleX => 'CIRCLE X',
+        FaultSeverity.circleX => 'X',
         FaultSeverity.dash => 'DASH',
       };
 

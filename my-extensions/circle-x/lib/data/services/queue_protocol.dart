@@ -2,15 +2,14 @@ class QueueWireType {
   static const String mainHello = 'main.hello';
   static const String mainEnqueue = 'main.enqueue';
   static const String mainOutcome = 'main.outcome';
-  static const String mainPromptResponse = 'main.promptResponse';
-  static const String mainPromptDeferred = 'main.promptDeferred';
+  static const String mainDeleteResult = 'main.deleteResult';
   static const String mainExecuteResult = 'main.executeResult';
   static const String mainProbe = 'main.probe';
+  static const String mainRetryNow = 'main.retryNow';
   static const String mainShutdown = 'main.shutdown';
 
   static const String workerReady = 'worker.ready';
   static const String workerExecute = 'worker.execute';
-  static const String workerPrompt = 'worker.prompt';
   static const String workerDelete = 'worker.delete';
   static const String workerLog = 'worker.log';
 }
@@ -35,19 +34,14 @@ Map<String, Object?> mainOutcome({
       'success': success,
     };
 
-Map<String, Object?> mainPromptResponse({
+Map<String, Object?> mainDeleteResult({
   required int submissionId,
-  required bool send,
+  required bool success,
 }) =>
     {
-      'type': QueueWireType.mainPromptResponse,
+      'type': QueueWireType.mainDeleteResult,
       'submissionId': submissionId,
-      'send': send,
-    };
-
-Map<String, Object?> mainPromptDeferred(int submissionId) => {
-      'type': QueueWireType.mainPromptDeferred,
-      'submissionId': submissionId,
+      'success': success,
     };
 
 Map<String, Object?> mainExecuteResult({
@@ -59,6 +53,8 @@ Map<String, Object?> mainExecuteResult({
       'submissionId': submissionId,
       'success': success,
     };
+
+Map<String, Object?> mainRetryNow() => {'type': QueueWireType.mainRetryNow};
 
 Map<String, Object?> mainProbe() => {'type': QueueWireType.mainProbe};
 
@@ -72,16 +68,6 @@ Map<String, Object?> workerExecute({
 }) =>
     {
       'type': QueueWireType.workerExecute,
-      'submissionId': submissionId,
-      'submission': submission,
-    };
-
-Map<String, Object?> workerPrompt({
-  required int submissionId,
-  required Map<String, Object?> submission,
-}) =>
-    {
-      'type': QueueWireType.workerPrompt,
       'submissionId': submissionId,
       'submission': submission,
     };

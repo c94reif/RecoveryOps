@@ -58,6 +58,23 @@
           "maxLength": 6,
           "pattern": "^[A-Z0-9]{6}$"
         },
+        "mileage": {
+          "description": "Operator-confirmed odometer reading in the dashboard's displayed units.",
+          "type": "object",
+          "required": ["value", "unit"],
+          "properties": {
+            "value": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 9999999.9
+            },
+            "unit": {
+              "type": "string",
+              "enum": ["mi", "km"]
+            }
+          },
+          "additionalProperties": false
+        },
         "phases": {
           "type": "array",
           "items": {

@@ -1,6 +1,29 @@
 part of 'inspection_view_model.dart';
 
 mixin _InspectionSession on _InspectionState {
+  Future<bool> saveMileage(MileageReading mileage) async {
+    final current = session;
+    if (current == null || isBusy || stage != InspectionStage.summary) {
+      return false;
+    }
+    isBusy = true;
+    notifyListeners();
+    try {
+      final updated = current.copyWith(mileage: mileage);
+      await startSession.repository.update(updated);
+      session = updated;
+      return true;
+    } catch (error) {
+      debugPrint('[CircleX] save mileage failed: $error');
+      snackBarService.enqueue('Could not save mileage. Please try again.',
+          isError: true);
+      return false;
+    } finally {
+      isBusy = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> load() async {
     isBusy = true;
     notifyListeners();

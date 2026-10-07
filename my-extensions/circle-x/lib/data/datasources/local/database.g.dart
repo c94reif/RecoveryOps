@@ -23,8 +23,24 @@ class $ProfilesTable extends Profiles
   late final GeneratedColumn<String> uic = GeneratedColumn<String>(
       'uic', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _unitNameMeta =
+      const VerificationMeta('unitName');
   @override
-  List<GeneratedColumn> get $columns => [id, uic];
+  late final GeneratedColumn<String> unitName = GeneratedColumn<String>(
+      'unit_name', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _followedUnitsJsonMeta =
+      const VerificationMeta('followedUnitsJson');
+  @override
+  late final GeneratedColumn<String> followedUnitsJson =
+      GeneratedColumn<String>('followed_units_json', aliasedName, false,
+          type: DriftSqlType.string,
+          requiredDuringInsert: false,
+          defaultValue: const Constant('[]'));
+  @override
+  List<GeneratedColumn> get $columns => [id, uic, unitName, followedUnitsJson];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -44,6 +60,16 @@ class $ProfilesTable extends Profiles
     } else if (isInserting) {
       context.missing(_uicMeta);
     }
+    if (data.containsKey('unit_name')) {
+      context.handle(_unitNameMeta,
+          unitName.isAcceptableOrUnknown(data['unit_name']!, _unitNameMeta));
+    }
+    if (data.containsKey('followed_units_json')) {
+      context.handle(
+          _followedUnitsJsonMeta,
+          followedUnitsJson.isAcceptableOrUnknown(
+              data['followed_units_json']!, _followedUnitsJsonMeta));
+    }
     return context;
   }
 
@@ -57,6 +83,10 @@ class $ProfilesTable extends Profiles
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
       uic: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}uic'])!,
+      unitName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}unit_name'])!,
+      followedUnitsJson: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}followed_units_json'])!,
     );
   }
 
@@ -69,12 +99,20 @@ class $ProfilesTable extends Profiles
 class ProfileData extends DataClass implements Insertable<ProfileData> {
   final int id;
   final String uic;
-  const ProfileData({required this.id, required this.uic});
+  final String unitName;
+  final String followedUnitsJson;
+  const ProfileData(
+      {required this.id,
+      required this.uic,
+      required this.unitName,
+      required this.followedUnitsJson});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['uic'] = Variable<String>(uic);
+    map['unit_name'] = Variable<String>(unitName);
+    map['followed_units_json'] = Variable<String>(followedUnitsJson);
     return map;
   }
 
@@ -82,6 +120,8 @@ class ProfileData extends DataClass implements Insertable<ProfileData> {
     return ProfilesCompanion(
       id: Value(id),
       uic: Value(uic),
+      unitName: Value(unitName),
+      followedUnitsJson: Value(followedUnitsJson),
     );
   }
 
@@ -91,6 +131,8 @@ class ProfileData extends DataClass implements Insertable<ProfileData> {
     return ProfileData(
       id: serializer.fromJson<int>(json['id']),
       uic: serializer.fromJson<String>(json['uic']),
+      unitName: serializer.fromJson<String>(json['unitName']),
+      followedUnitsJson: serializer.fromJson<String>(json['followedUnitsJson']),
     );
   }
   @override
@@ -99,17 +141,30 @@ class ProfileData extends DataClass implements Insertable<ProfileData> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'uic': serializer.toJson<String>(uic),
+      'unitName': serializer.toJson<String>(unitName),
+      'followedUnitsJson': serializer.toJson<String>(followedUnitsJson),
     };
   }
 
-  ProfileData copyWith({int? id, String? uic}) => ProfileData(
+  ProfileData copyWith(
+          {int? id,
+          String? uic,
+          String? unitName,
+          String? followedUnitsJson}) =>
+      ProfileData(
         id: id ?? this.id,
         uic: uic ?? this.uic,
+        unitName: unitName ?? this.unitName,
+        followedUnitsJson: followedUnitsJson ?? this.followedUnitsJson,
       );
   ProfileData copyWithCompanion(ProfilesCompanion data) {
     return ProfileData(
       id: data.id.present ? data.id.value : this.id,
       uic: data.uic.present ? data.uic.value : this.uic,
+      unitName: data.unitName.present ? data.unitName.value : this.unitName,
+      followedUnitsJson: data.followedUnitsJson.present
+          ? data.followedUnitsJson.value
+          : this.followedUnitsJson,
     );
   }
 
@@ -117,44 +172,66 @@ class ProfileData extends DataClass implements Insertable<ProfileData> {
   String toString() {
     return (StringBuffer('ProfileData(')
           ..write('id: $id, ')
-          ..write('uic: $uic')
+          ..write('uic: $uic, ')
+          ..write('unitName: $unitName, ')
+          ..write('followedUnitsJson: $followedUnitsJson')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, uic);
+  int get hashCode => Object.hash(id, uic, unitName, followedUnitsJson);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is ProfileData && other.id == this.id && other.uic == this.uic);
+      (other is ProfileData &&
+          other.id == this.id &&
+          other.uic == this.uic &&
+          other.unitName == this.unitName &&
+          other.followedUnitsJson == this.followedUnitsJson);
 }
 
 class ProfilesCompanion extends UpdateCompanion<ProfileData> {
   final Value<int> id;
   final Value<String> uic;
+  final Value<String> unitName;
+  final Value<String> followedUnitsJson;
   const ProfilesCompanion({
     this.id = const Value.absent(),
     this.uic = const Value.absent(),
+    this.unitName = const Value.absent(),
+    this.followedUnitsJson = const Value.absent(),
   });
   ProfilesCompanion.insert({
     this.id = const Value.absent(),
     required String uic,
+    this.unitName = const Value.absent(),
+    this.followedUnitsJson = const Value.absent(),
   }) : uic = Value(uic);
   static Insertable<ProfileData> custom({
     Expression<int>? id,
     Expression<String>? uic,
+    Expression<String>? unitName,
+    Expression<String>? followedUnitsJson,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (uic != null) 'uic': uic,
+      if (unitName != null) 'unit_name': unitName,
+      if (followedUnitsJson != null) 'followed_units_json': followedUnitsJson,
     });
   }
 
-  ProfilesCompanion copyWith({Value<int>? id, Value<String>? uic}) {
+  ProfilesCompanion copyWith(
+      {Value<int>? id,
+      Value<String>? uic,
+      Value<String>? unitName,
+      Value<String>? followedUnitsJson}) {
     return ProfilesCompanion(
       id: id ?? this.id,
       uic: uic ?? this.uic,
+      unitName: unitName ?? this.unitName,
+      followedUnitsJson: followedUnitsJson ?? this.followedUnitsJson,
     );
   }
 
@@ -167,6 +244,12 @@ class ProfilesCompanion extends UpdateCompanion<ProfileData> {
     if (uic.present) {
       map['uic'] = Variable<String>(uic.value);
     }
+    if (unitName.present) {
+      map['unit_name'] = Variable<String>(unitName.value);
+    }
+    if (followedUnitsJson.present) {
+      map['followed_units_json'] = Variable<String>(followedUnitsJson.value);
+    }
     return map;
   }
 
@@ -174,7 +257,9 @@ class ProfilesCompanion extends UpdateCompanion<ProfileData> {
   String toString() {
     return (StringBuffer('ProfilesCompanion(')
           ..write('id: $id, ')
-          ..write('uic: $uic')
+          ..write('uic: $uic, ')
+          ..write('unitName: $unitName, ')
+          ..write('followedUnitsJson: $followedUnitsJson')
           ..write(')'))
         .toString();
   }
@@ -259,6 +344,12 @@ class $PmcsSessionsTable extends PmcsSessions
   late final GeneratedColumn<String> signatureJson = GeneratedColumn<String>(
       'signature_json', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _mileageJsonMeta =
+      const VerificationMeta('mileageJson');
+  @override
+  late final GeneratedColumn<String> mileageJson = GeneratedColumn<String>(
+      'mileage_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _latitudeMeta =
       const VerificationMeta('latitude');
   @override
@@ -284,6 +375,7 @@ class $PmcsSessionsTable extends PmcsSessions
         completedPhases,
         status,
         signatureJson,
+        mileageJson,
         latitude,
         longitude
       ];
@@ -362,6 +454,12 @@ class $PmcsSessionsTable extends PmcsSessions
           signatureJson.isAcceptableOrUnknown(
               data['signature_json']!, _signatureJsonMeta));
     }
+    if (data.containsKey('mileage_json')) {
+      context.handle(
+          _mileageJsonMeta,
+          mileageJson.isAcceptableOrUnknown(
+              data['mileage_json']!, _mileageJsonMeta));
+    }
     if (data.containsKey('latitude')) {
       context.handle(_latitudeMeta,
           latitude.isAcceptableOrUnknown(data['latitude']!, _latitudeMeta));
@@ -401,6 +499,8 @@ class $PmcsSessionsTable extends PmcsSessions
           .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
       signatureJson: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}signature_json']),
+      mileageJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}mileage_json']),
       latitude: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}latitude']),
       longitude: attachedDatabase.typeMapping
@@ -426,6 +526,7 @@ class PmcsSessionData extends DataClass implements Insertable<PmcsSessionData> {
   final String completedPhases;
   final String status;
   final String? signatureJson;
+  final String? mileageJson;
   final double? latitude;
   final double? longitude;
   const PmcsSessionData(
@@ -440,6 +541,7 @@ class PmcsSessionData extends DataClass implements Insertable<PmcsSessionData> {
       required this.completedPhases,
       required this.status,
       this.signatureJson,
+      this.mileageJson,
       this.latitude,
       this.longitude});
   @override
@@ -459,6 +561,9 @@ class PmcsSessionData extends DataClass implements Insertable<PmcsSessionData> {
     map['status'] = Variable<String>(status);
     if (!nullToAbsent || signatureJson != null) {
       map['signature_json'] = Variable<String>(signatureJson);
+    }
+    if (!nullToAbsent || mileageJson != null) {
+      map['mileage_json'] = Variable<String>(mileageJson);
     }
     if (!nullToAbsent || latitude != null) {
       map['latitude'] = Variable<double>(latitude);
@@ -486,6 +591,9 @@ class PmcsSessionData extends DataClass implements Insertable<PmcsSessionData> {
       signatureJson: signatureJson == null && nullToAbsent
           ? const Value.absent()
           : Value(signatureJson),
+      mileageJson: mileageJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mileageJson),
       latitude: latitude == null && nullToAbsent
           ? const Value.absent()
           : Value(latitude),
@@ -510,6 +618,7 @@ class PmcsSessionData extends DataClass implements Insertable<PmcsSessionData> {
       completedPhases: serializer.fromJson<String>(json['completedPhases']),
       status: serializer.fromJson<String>(json['status']),
       signatureJson: serializer.fromJson<String?>(json['signatureJson']),
+      mileageJson: serializer.fromJson<String?>(json['mileageJson']),
       latitude: serializer.fromJson<double?>(json['latitude']),
       longitude: serializer.fromJson<double?>(json['longitude']),
     );
@@ -529,6 +638,7 @@ class PmcsSessionData extends DataClass implements Insertable<PmcsSessionData> {
       'completedPhases': serializer.toJson<String>(completedPhases),
       'status': serializer.toJson<String>(status),
       'signatureJson': serializer.toJson<String?>(signatureJson),
+      'mileageJson': serializer.toJson<String?>(mileageJson),
       'latitude': serializer.toJson<double?>(latitude),
       'longitude': serializer.toJson<double?>(longitude),
     };
@@ -546,6 +656,7 @@ class PmcsSessionData extends DataClass implements Insertable<PmcsSessionData> {
           String? completedPhases,
           String? status,
           Value<String?> signatureJson = const Value.absent(),
+          Value<String?> mileageJson = const Value.absent(),
           Value<double?> latitude = const Value.absent(),
           Value<double?> longitude = const Value.absent()}) =>
       PmcsSessionData(
@@ -561,6 +672,7 @@ class PmcsSessionData extends DataClass implements Insertable<PmcsSessionData> {
         status: status ?? this.status,
         signatureJson:
             signatureJson.present ? signatureJson.value : this.signatureJson,
+        mileageJson: mileageJson.present ? mileageJson.value : this.mileageJson,
         latitude: latitude.present ? latitude.value : this.latitude,
         longitude: longitude.present ? longitude.value : this.longitude,
       );
@@ -585,6 +697,8 @@ class PmcsSessionData extends DataClass implements Insertable<PmcsSessionData> {
       signatureJson: data.signatureJson.present
           ? data.signatureJson.value
           : this.signatureJson,
+      mileageJson:
+          data.mileageJson.present ? data.mileageJson.value : this.mileageJson,
       latitude: data.latitude.present ? data.latitude.value : this.latitude,
       longitude: data.longitude.present ? data.longitude.value : this.longitude,
     );
@@ -604,6 +718,7 @@ class PmcsSessionData extends DataClass implements Insertable<PmcsSessionData> {
           ..write('completedPhases: $completedPhases, ')
           ..write('status: $status, ')
           ..write('signatureJson: $signatureJson, ')
+          ..write('mileageJson: $mileageJson, ')
           ..write('latitude: $latitude, ')
           ..write('longitude: $longitude')
           ..write(')'))
@@ -623,6 +738,7 @@ class PmcsSessionData extends DataClass implements Insertable<PmcsSessionData> {
       completedPhases,
       status,
       signatureJson,
+      mileageJson,
       latitude,
       longitude);
   @override
@@ -640,6 +756,7 @@ class PmcsSessionData extends DataClass implements Insertable<PmcsSessionData> {
           other.completedPhases == this.completedPhases &&
           other.status == this.status &&
           other.signatureJson == this.signatureJson &&
+          other.mileageJson == this.mileageJson &&
           other.latitude == this.latitude &&
           other.longitude == this.longitude);
 }
@@ -656,6 +773,7 @@ class PmcsSessionsCompanion extends UpdateCompanion<PmcsSessionData> {
   final Value<String> completedPhases;
   final Value<String> status;
   final Value<String?> signatureJson;
+  final Value<String?> mileageJson;
   final Value<double?> latitude;
   final Value<double?> longitude;
   const PmcsSessionsCompanion({
@@ -670,6 +788,7 @@ class PmcsSessionsCompanion extends UpdateCompanion<PmcsSessionData> {
     this.completedPhases = const Value.absent(),
     this.status = const Value.absent(),
     this.signatureJson = const Value.absent(),
+    this.mileageJson = const Value.absent(),
     this.latitude = const Value.absent(),
     this.longitude = const Value.absent(),
   });
@@ -685,6 +804,7 @@ class PmcsSessionsCompanion extends UpdateCompanion<PmcsSessionData> {
     this.completedPhases = const Value.absent(),
     this.status = const Value.absent(),
     this.signatureJson = const Value.absent(),
+    this.mileageJson = const Value.absent(),
     this.latitude = const Value.absent(),
     this.longitude = const Value.absent(),
   })  : sessionId = Value(sessionId),
@@ -705,6 +825,7 @@ class PmcsSessionsCompanion extends UpdateCompanion<PmcsSessionData> {
     Expression<String>? completedPhases,
     Expression<String>? status,
     Expression<String>? signatureJson,
+    Expression<String>? mileageJson,
     Expression<double>? latitude,
     Expression<double>? longitude,
   }) {
@@ -720,6 +841,7 @@ class PmcsSessionsCompanion extends UpdateCompanion<PmcsSessionData> {
       if (completedPhases != null) 'completed_phases': completedPhases,
       if (status != null) 'status': status,
       if (signatureJson != null) 'signature_json': signatureJson,
+      if (mileageJson != null) 'mileage_json': mileageJson,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
     });
@@ -737,6 +859,7 @@ class PmcsSessionsCompanion extends UpdateCompanion<PmcsSessionData> {
       Value<String>? completedPhases,
       Value<String>? status,
       Value<String?>? signatureJson,
+      Value<String?>? mileageJson,
       Value<double?>? latitude,
       Value<double?>? longitude}) {
     return PmcsSessionsCompanion(
@@ -751,6 +874,7 @@ class PmcsSessionsCompanion extends UpdateCompanion<PmcsSessionData> {
       completedPhases: completedPhases ?? this.completedPhases,
       status: status ?? this.status,
       signatureJson: signatureJson ?? this.signatureJson,
+      mileageJson: mileageJson ?? this.mileageJson,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
     );
@@ -792,6 +916,9 @@ class PmcsSessionsCompanion extends UpdateCompanion<PmcsSessionData> {
     if (signatureJson.present) {
       map['signature_json'] = Variable<String>(signatureJson.value);
     }
+    if (mileageJson.present) {
+      map['mileage_json'] = Variable<String>(mileageJson.value);
+    }
     if (latitude.present) {
       map['latitude'] = Variable<double>(latitude.value);
     }
@@ -815,6 +942,7 @@ class PmcsSessionsCompanion extends UpdateCompanion<PmcsSessionData> {
           ..write('completedPhases: $completedPhases, ')
           ..write('status: $status, ')
           ..write('signatureJson: $signatureJson, ')
+          ..write('mileageJson: $mileageJson, ')
           ..write('latitude: $latitude, ')
           ..write('longitude: $longitude')
           ..write(')'))
@@ -1894,6 +2022,12 @@ class $PmcsReportsTable extends PmcsReports
   late final GeneratedColumn<String> signatureJson = GeneratedColumn<String>(
       'signature_json', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _mileageJsonMeta =
+      const VerificationMeta('mileageJson');
+  @override
+  late final GeneratedColumn<String> mileageJson = GeneratedColumn<String>(
+      'mileage_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _maintainerReviewJsonMeta =
       const VerificationMeta('maintainerReviewJson');
   @override
@@ -1949,6 +2083,7 @@ class $PmcsReportsTable extends PmcsReports
         phases,
         faultsJson,
         signatureJson,
+        mileageJson,
         maintainerReviewJson,
         latitude,
         longitude,
@@ -2031,6 +2166,12 @@ class $PmcsReportsTable extends PmcsReports
           signatureJson.isAcceptableOrUnknown(
               data['signature_json']!, _signatureJsonMeta));
     }
+    if (data.containsKey('mileage_json')) {
+      context.handle(
+          _mileageJsonMeta,
+          mileageJson.isAcceptableOrUnknown(
+              data['mileage_json']!, _mileageJsonMeta));
+    }
     if (data.containsKey('maintainer_review_json')) {
       context.handle(
           _maintainerReviewJsonMeta,
@@ -2094,6 +2235,8 @@ class $PmcsReportsTable extends PmcsReports
           .read(DriftSqlType.string, data['${effectivePrefix}faults_json'])!,
       signatureJson: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}signature_json']),
+      mileageJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}mileage_json']),
       maintainerReviewJson: attachedDatabase.typeMapping.read(
           DriftSqlType.string,
           data['${effectivePrefix}maintainer_review_json']),
@@ -2127,6 +2270,7 @@ class PmcsReportData extends DataClass implements Insertable<PmcsReportData> {
   final String phases;
   final String faultsJson;
   final String? signatureJson;
+  final String? mileageJson;
   final String? maintainerReviewJson;
   final double latitude;
   final double longitude;
@@ -2144,6 +2288,7 @@ class PmcsReportData extends DataClass implements Insertable<PmcsReportData> {
       required this.phases,
       required this.faultsJson,
       this.signatureJson,
+      this.mileageJson,
       this.maintainerReviewJson,
       required this.latitude,
       required this.longitude,
@@ -2164,6 +2309,9 @@ class PmcsReportData extends DataClass implements Insertable<PmcsReportData> {
     map['faults_json'] = Variable<String>(faultsJson);
     if (!nullToAbsent || signatureJson != null) {
       map['signature_json'] = Variable<String>(signatureJson);
+    }
+    if (!nullToAbsent || mileageJson != null) {
+      map['mileage_json'] = Variable<String>(mileageJson);
     }
     if (!nullToAbsent || maintainerReviewJson != null) {
       map['maintainer_review_json'] = Variable<String>(maintainerReviewJson);
@@ -2190,6 +2338,9 @@ class PmcsReportData extends DataClass implements Insertable<PmcsReportData> {
       signatureJson: signatureJson == null && nullToAbsent
           ? const Value.absent()
           : Value(signatureJson),
+      mileageJson: mileageJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mileageJson),
       maintainerReviewJson: maintainerReviewJson == null && nullToAbsent
           ? const Value.absent()
           : Value(maintainerReviewJson),
@@ -2215,6 +2366,7 @@ class PmcsReportData extends DataClass implements Insertable<PmcsReportData> {
       phases: serializer.fromJson<String>(json['phases']),
       faultsJson: serializer.fromJson<String>(json['faultsJson']),
       signatureJson: serializer.fromJson<String?>(json['signatureJson']),
+      mileageJson: serializer.fromJson<String?>(json['mileageJson']),
       maintainerReviewJson:
           serializer.fromJson<String?>(json['maintainerReviewJson']),
       latitude: serializer.fromJson<double>(json['latitude']),
@@ -2238,6 +2390,7 @@ class PmcsReportData extends DataClass implements Insertable<PmcsReportData> {
       'phases': serializer.toJson<String>(phases),
       'faultsJson': serializer.toJson<String>(faultsJson),
       'signatureJson': serializer.toJson<String?>(signatureJson),
+      'mileageJson': serializer.toJson<String?>(mileageJson),
       'maintainerReviewJson': serializer.toJson<String?>(maintainerReviewJson),
       'latitude': serializer.toJson<double>(latitude),
       'longitude': serializer.toJson<double>(longitude),
@@ -2258,6 +2411,7 @@ class PmcsReportData extends DataClass implements Insertable<PmcsReportData> {
           String? phases,
           String? faultsJson,
           Value<String?> signatureJson = const Value.absent(),
+          Value<String?> mileageJson = const Value.absent(),
           Value<String?> maintainerReviewJson = const Value.absent(),
           double? latitude,
           double? longitude,
@@ -2276,6 +2430,7 @@ class PmcsReportData extends DataClass implements Insertable<PmcsReportData> {
         faultsJson: faultsJson ?? this.faultsJson,
         signatureJson:
             signatureJson.present ? signatureJson.value : this.signatureJson,
+        mileageJson: mileageJson.present ? mileageJson.value : this.mileageJson,
         maintainerReviewJson: maintainerReviewJson.present
             ? maintainerReviewJson.value
             : this.maintainerReviewJson,
@@ -2305,6 +2460,8 @@ class PmcsReportData extends DataClass implements Insertable<PmcsReportData> {
       signatureJson: data.signatureJson.present
           ? data.signatureJson.value
           : this.signatureJson,
+      mileageJson:
+          data.mileageJson.present ? data.mileageJson.value : this.mileageJson,
       maintainerReviewJson: data.maintainerReviewJson.present
           ? data.maintainerReviewJson.value
           : this.maintainerReviewJson,
@@ -2330,6 +2487,7 @@ class PmcsReportData extends DataClass implements Insertable<PmcsReportData> {
           ..write('phases: $phases, ')
           ..write('faultsJson: $faultsJson, ')
           ..write('signatureJson: $signatureJson, ')
+          ..write('mileageJson: $mileageJson, ')
           ..write('maintainerReviewJson: $maintainerReviewJson, ')
           ..write('latitude: $latitude, ')
           ..write('longitude: $longitude, ')
@@ -2352,6 +2510,7 @@ class PmcsReportData extends DataClass implements Insertable<PmcsReportData> {
       phases,
       faultsJson,
       signatureJson,
+      mileageJson,
       maintainerReviewJson,
       latitude,
       longitude,
@@ -2372,6 +2531,7 @@ class PmcsReportData extends DataClass implements Insertable<PmcsReportData> {
           other.phases == this.phases &&
           other.faultsJson == this.faultsJson &&
           other.signatureJson == this.signatureJson &&
+          other.mileageJson == this.mileageJson &&
           other.maintainerReviewJson == this.maintainerReviewJson &&
           other.latitude == this.latitude &&
           other.longitude == this.longitude &&
@@ -2391,6 +2551,7 @@ class PmcsReportsCompanion extends UpdateCompanion<PmcsReportData> {
   final Value<String> phases;
   final Value<String> faultsJson;
   final Value<String?> signatureJson;
+  final Value<String?> mileageJson;
   final Value<String?> maintainerReviewJson;
   final Value<double> latitude;
   final Value<double> longitude;
@@ -2408,6 +2569,7 @@ class PmcsReportsCompanion extends UpdateCompanion<PmcsReportData> {
     this.phases = const Value.absent(),
     this.faultsJson = const Value.absent(),
     this.signatureJson = const Value.absent(),
+    this.mileageJson = const Value.absent(),
     this.maintainerReviewJson = const Value.absent(),
     this.latitude = const Value.absent(),
     this.longitude = const Value.absent(),
@@ -2426,6 +2588,7 @@ class PmcsReportsCompanion extends UpdateCompanion<PmcsReportData> {
     required String phases,
     required String faultsJson,
     this.signatureJson = const Value.absent(),
+    this.mileageJson = const Value.absent(),
     this.maintainerReviewJson = const Value.absent(),
     required double latitude,
     required double longitude,
@@ -2454,6 +2617,7 @@ class PmcsReportsCompanion extends UpdateCompanion<PmcsReportData> {
     Expression<String>? phases,
     Expression<String>? faultsJson,
     Expression<String>? signatureJson,
+    Expression<String>? mileageJson,
     Expression<String>? maintainerReviewJson,
     Expression<double>? latitude,
     Expression<double>? longitude,
@@ -2472,6 +2636,7 @@ class PmcsReportsCompanion extends UpdateCompanion<PmcsReportData> {
       if (phases != null) 'phases': phases,
       if (faultsJson != null) 'faults_json': faultsJson,
       if (signatureJson != null) 'signature_json': signatureJson,
+      if (mileageJson != null) 'mileage_json': mileageJson,
       if (maintainerReviewJson != null)
         'maintainer_review_json': maintainerReviewJson,
       if (latitude != null) 'latitude': latitude,
@@ -2493,6 +2658,7 @@ class PmcsReportsCompanion extends UpdateCompanion<PmcsReportData> {
       Value<String>? phases,
       Value<String>? faultsJson,
       Value<String?>? signatureJson,
+      Value<String?>? mileageJson,
       Value<String?>? maintainerReviewJson,
       Value<double>? latitude,
       Value<double>? longitude,
@@ -2510,6 +2676,7 @@ class PmcsReportsCompanion extends UpdateCompanion<PmcsReportData> {
       phases: phases ?? this.phases,
       faultsJson: faultsJson ?? this.faultsJson,
       signatureJson: signatureJson ?? this.signatureJson,
+      mileageJson: mileageJson ?? this.mileageJson,
       maintainerReviewJson: maintainerReviewJson ?? this.maintainerReviewJson,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
@@ -2552,6 +2719,9 @@ class PmcsReportsCompanion extends UpdateCompanion<PmcsReportData> {
     if (signatureJson.present) {
       map['signature_json'] = Variable<String>(signatureJson.value);
     }
+    if (mileageJson.present) {
+      map['mileage_json'] = Variable<String>(mileageJson.value);
+    }
     if (maintainerReviewJson.present) {
       map['maintainer_review_json'] =
           Variable<String>(maintainerReviewJson.value);
@@ -2587,6 +2757,7 @@ class PmcsReportsCompanion extends UpdateCompanion<PmcsReportData> {
           ..write('phases: $phases, ')
           ..write('faultsJson: $faultsJson, ')
           ..write('signatureJson: $signatureJson, ')
+          ..write('mileageJson: $mileageJson, ')
           ..write('maintainerReviewJson: $maintainerReviewJson, ')
           ..write('latitude: $latitude, ')
           ..write('longitude: $longitude, ')
@@ -3526,10 +3697,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 typedef $$ProfilesTableCreateCompanionBuilder = ProfilesCompanion Function({
   Value<int> id,
   required String uic,
+  Value<String> unitName,
+  Value<String> followedUnitsJson,
 });
 typedef $$ProfilesTableUpdateCompanionBuilder = ProfilesCompanion Function({
   Value<int> id,
   Value<String> uic,
+  Value<String> unitName,
+  Value<String> followedUnitsJson,
 });
 
 class $$ProfilesTableFilterComposer
@@ -3546,6 +3721,13 @@ class $$ProfilesTableFilterComposer
 
   ColumnFilters<String> get uic => $composableBuilder(
       column: $table.uic, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get unitName => $composableBuilder(
+      column: $table.unitName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get followedUnitsJson => $composableBuilder(
+      column: $table.followedUnitsJson,
+      builder: (column) => ColumnFilters(column));
 }
 
 class $$ProfilesTableOrderingComposer
@@ -3562,6 +3744,13 @@ class $$ProfilesTableOrderingComposer
 
   ColumnOrderings<String> get uic => $composableBuilder(
       column: $table.uic, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get unitName => $composableBuilder(
+      column: $table.unitName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get followedUnitsJson => $composableBuilder(
+      column: $table.followedUnitsJson,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$ProfilesTableAnnotationComposer
@@ -3578,6 +3767,12 @@ class $$ProfilesTableAnnotationComposer
 
   GeneratedColumn<String> get uic =>
       $composableBuilder(column: $table.uic, builder: (column) => column);
+
+  GeneratedColumn<String> get unitName =>
+      $composableBuilder(column: $table.unitName, builder: (column) => column);
+
+  GeneratedColumn<String> get followedUnitsJson => $composableBuilder(
+      column: $table.followedUnitsJson, builder: (column) => column);
 }
 
 class $$ProfilesTableTableManager extends RootTableManager<
@@ -3605,18 +3800,26 @@ class $$ProfilesTableTableManager extends RootTableManager<
           updateCompanionCallback: ({
             Value<int> id = const Value.absent(),
             Value<String> uic = const Value.absent(),
+            Value<String> unitName = const Value.absent(),
+            Value<String> followedUnitsJson = const Value.absent(),
           }) =>
               ProfilesCompanion(
             id: id,
             uic: uic,
+            unitName: unitName,
+            followedUnitsJson: followedUnitsJson,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
             required String uic,
+            Value<String> unitName = const Value.absent(),
+            Value<String> followedUnitsJson = const Value.absent(),
           }) =>
               ProfilesCompanion.insert(
             id: id,
             uic: uic,
+            unitName: unitName,
+            followedUnitsJson: followedUnitsJson,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (
@@ -3654,6 +3857,7 @@ typedef $$PmcsSessionsTableCreateCompanionBuilder = PmcsSessionsCompanion
   Value<String> completedPhases,
   Value<String> status,
   Value<String?> signatureJson,
+  Value<String?> mileageJson,
   Value<double?> latitude,
   Value<double?> longitude,
 });
@@ -3670,6 +3874,7 @@ typedef $$PmcsSessionsTableUpdateCompanionBuilder = PmcsSessionsCompanion
   Value<String> completedPhases,
   Value<String> status,
   Value<String?> signatureJson,
+  Value<String?> mileageJson,
   Value<double?> latitude,
   Value<double?> longitude,
 });
@@ -3716,6 +3921,9 @@ class $$PmcsSessionsTableFilterComposer
 
   ColumnFilters<String> get signatureJson => $composableBuilder(
       column: $table.signatureJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get mileageJson => $composableBuilder(
+      column: $table.mileageJson, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<double> get latitude => $composableBuilder(
       column: $table.latitude, builder: (column) => ColumnFilters(column));
@@ -3769,6 +3977,9 @@ class $$PmcsSessionsTableOrderingComposer
       column: $table.signatureJson,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get mileageJson => $composableBuilder(
+      column: $table.mileageJson, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<double> get latitude => $composableBuilder(
       column: $table.latitude, builder: (column) => ColumnOrderings(column));
 
@@ -3818,6 +4029,9 @@ class $$PmcsSessionsTableAnnotationComposer
   GeneratedColumn<String> get signatureJson => $composableBuilder(
       column: $table.signatureJson, builder: (column) => column);
 
+  GeneratedColumn<String> get mileageJson => $composableBuilder(
+      column: $table.mileageJson, builder: (column) => column);
+
   GeneratedColumn<double> get latitude =>
       $composableBuilder(column: $table.latitude, builder: (column) => column);
 
@@ -3862,6 +4076,7 @@ class $$PmcsSessionsTableTableManager extends RootTableManager<
             Value<String> completedPhases = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<String?> signatureJson = const Value.absent(),
+            Value<String?> mileageJson = const Value.absent(),
             Value<double?> latitude = const Value.absent(),
             Value<double?> longitude = const Value.absent(),
           }) =>
@@ -3877,6 +4092,7 @@ class $$PmcsSessionsTableTableManager extends RootTableManager<
             completedPhases: completedPhases,
             status: status,
             signatureJson: signatureJson,
+            mileageJson: mileageJson,
             latitude: latitude,
             longitude: longitude,
           ),
@@ -3892,6 +4108,7 @@ class $$PmcsSessionsTableTableManager extends RootTableManager<
             Value<String> completedPhases = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<String?> signatureJson = const Value.absent(),
+            Value<String?> mileageJson = const Value.absent(),
             Value<double?> latitude = const Value.absent(),
             Value<double?> longitude = const Value.absent(),
           }) =>
@@ -3907,6 +4124,7 @@ class $$PmcsSessionsTableTableManager extends RootTableManager<
             completedPhases: completedPhases,
             status: status,
             signatureJson: signatureJson,
+            mileageJson: mileageJson,
             latitude: latitude,
             longitude: longitude,
           ),
@@ -4438,6 +4656,7 @@ typedef $$PmcsReportsTableCreateCompanionBuilder = PmcsReportsCompanion
   required String phases,
   required String faultsJson,
   Value<String?> signatureJson,
+  Value<String?> mileageJson,
   Value<String?> maintainerReviewJson,
   required double latitude,
   required double longitude,
@@ -4457,6 +4676,7 @@ typedef $$PmcsReportsTableUpdateCompanionBuilder = PmcsReportsCompanion
   Value<String> phases,
   Value<String> faultsJson,
   Value<String?> signatureJson,
+  Value<String?> mileageJson,
   Value<String?> maintainerReviewJson,
   Value<double> latitude,
   Value<double> longitude,
@@ -4503,6 +4723,9 @@ class $$PmcsReportsTableFilterComposer
 
   ColumnFilters<String> get signatureJson => $composableBuilder(
       column: $table.signatureJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get mileageJson => $composableBuilder(
+      column: $table.mileageJson, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get maintainerReviewJson => $composableBuilder(
       column: $table.maintainerReviewJson,
@@ -4566,6 +4789,9 @@ class $$PmcsReportsTableOrderingComposer
       column: $table.signatureJson,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get mileageJson => $composableBuilder(
+      column: $table.mileageJson, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get maintainerReviewJson => $composableBuilder(
       column: $table.maintainerReviewJson,
       builder: (column) => ColumnOrderings(column));
@@ -4625,6 +4851,9 @@ class $$PmcsReportsTableAnnotationComposer
   GeneratedColumn<String> get signatureJson => $composableBuilder(
       column: $table.signatureJson, builder: (column) => column);
 
+  GeneratedColumn<String> get mileageJson => $composableBuilder(
+      column: $table.mileageJson, builder: (column) => column);
+
   GeneratedColumn<String> get maintainerReviewJson => $composableBuilder(
       column: $table.maintainerReviewJson, builder: (column) => column);
 
@@ -4680,6 +4909,7 @@ class $$PmcsReportsTableTableManager extends RootTableManager<
             Value<String> phases = const Value.absent(),
             Value<String> faultsJson = const Value.absent(),
             Value<String?> signatureJson = const Value.absent(),
+            Value<String?> mileageJson = const Value.absent(),
             Value<String?> maintainerReviewJson = const Value.absent(),
             Value<double> latitude = const Value.absent(),
             Value<double> longitude = const Value.absent(),
@@ -4698,6 +4928,7 @@ class $$PmcsReportsTableTableManager extends RootTableManager<
             phases: phases,
             faultsJson: faultsJson,
             signatureJson: signatureJson,
+            mileageJson: mileageJson,
             maintainerReviewJson: maintainerReviewJson,
             latitude: latitude,
             longitude: longitude,
@@ -4716,6 +4947,7 @@ class $$PmcsReportsTableTableManager extends RootTableManager<
             required String phases,
             required String faultsJson,
             Value<String?> signatureJson = const Value.absent(),
+            Value<String?> mileageJson = const Value.absent(),
             Value<String?> maintainerReviewJson = const Value.absent(),
             required double latitude,
             required double longitude,
@@ -4734,6 +4966,7 @@ class $$PmcsReportsTableTableManager extends RootTableManager<
             phases: phases,
             faultsJson: faultsJson,
             signatureJson: signatureJson,
+            mileageJson: mileageJson,
             maintainerReviewJson: maintainerReviewJson,
             latitude: latitude,
             longitude: longitude,

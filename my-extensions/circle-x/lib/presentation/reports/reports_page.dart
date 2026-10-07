@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
+import 'package:circle_x/domain/entities/fault_severity.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
 import 'package:circle_x/presentation/maintainer/maintainer_review_summary.dart';
 import 'package:circle_x/core/di/service_locator.dart';
 import 'package:circle_x/presentation/common/widgets/pmcs_report_card.dart';
 import 'package:circle_x/presentation/common/widgets/fault_history_widgets.dart';
 import 'package:circle_x/presentation/common/widgets/confirm_dialog.dart';
-import 'package:circle_x/presentation/common/widgets/section_label.dart';
 import 'package:circle_x/presentation/home/home_view_model.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
 import 'package:circle_x/presentation/reports/controllers/new_pmcs_controller.dart';
@@ -15,6 +15,7 @@ import 'package:circle_x/presentation/reports/widgets/report_navigation.dart';
 import 'package:circle_x/presentation/reports/widgets/report_queue_widgets.dart';
 import 'package:circle_x/presentation/reports/widgets/report_vehicle_card.dart';
 import 'package:circle_x/presentation/reports/widgets/report_vehicle_filters.dart';
+import 'package:circle_x/presentation/reports/widgets/report_unit_selector.dart';
 
 class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
@@ -29,12 +30,38 @@ class ReportsPageState extends State<ReportsPage> {
   final Set<String> expandedIds = {};
 
   ReportsTab selectedTab = ReportsTab.yours;
+  String selectedUnit = ReportUnitSelector.all;
   ReportVehicleKey? selectedVehicle;
   late final NewPmcsController newPmcs;
   late final ReportBrowser browser;
   final searchController = TextEditingController();
   bool faultsOnly = false;
   bool unreadOnly = false;
+  FaultSeverity? selectedSeverity;
+
+  String get effectiveUnit => selectedUnit == ReportUnitSelector.other ||
+          viewModel.reportUnits
+              .any((unit) => unit.normalizedUic == selectedUnit)
+      ? selectedUnit
+      : ReportUnitSelector.all;
+
+  List<PmcsReport> get selectedUnitReports {
+    final unit = effectiveUnit;
+    if (unit == ReportUnitSelector.other) return viewModel.otherUnitReports;
+    if (unit == ReportUnitSelector.all) return viewModel.unitReports;
+    return viewModel.unitReports
+        .where((report) => report.uic.trim().toUpperCase() == unit)
+        .toList();
+  }
+
+  Widget buildUnitSelector() => ReportUnitSelector(
+        units: viewModel.reportUnits,
+        selected: effectiveUnit,
+        onChanged: (unit) => setState(() {
+          selectedUnit = unit;
+          selectedVehicle = null;
+        }),
+      );
 
   @override
   void initState() {
@@ -78,6 +105,7 @@ class ReportsPageState extends State<ReportsPage> {
   bool get hasVehicleFilters =>
       searchController.text.trim().isNotEmpty ||
       faultsOnly ||
+      selectedSeverity != null ||
       (selectedTab == ReportsTab.unit && unreadOnly);
 
   Map<ReportVehicleKey, List<PmcsReport>> filteredGroups(
@@ -88,6 +116,7 @@ class ReportsPageState extends State<ReportsPage> {
         search: searchController.text,
         faultsOnly: faultsOnly,
         unreadOnly: selectedTab == ReportsTab.unit && unreadOnly,
+        severity: selectedSeverity,
       );
 
   void clearVehicleFilters() {
@@ -95,6 +124,7 @@ class ReportsPageState extends State<ReportsPage> {
       searchController.clear();
       faultsOnly = false;
       unreadOnly = false;
+      selectedSeverity = null;
     });
   }
 
@@ -103,11 +133,13 @@ class ReportsPageState extends State<ReportsPage> {
         faultsOnly: faultsOnly,
         unreadOnly: unreadOnly,
         showUnread: selectedTab == ReportsTab.unit,
+        severity: selectedSeverity,
         hasVehicleFilters: hasVehicleFilters,
         onSearchChanged: (_) => setState(() {}),
         onClearSearch: () => setState(searchController.clear),
         onFaultsChanged: (value) => setState(() => faultsOnly = value),
         onUnreadChanged: (value) => setState(() => unreadOnly = value),
+        onSeverityChanged: (value) => setState(() => selectedSeverity = value),
         onClearFilters: clearVehicleFilters,
       );
 
@@ -229,32 +261,21 @@ class ReportsPageState extends State<ReportsPage> {
       }
       return rows;
     }
+    if (selectedTab == ReportsTab.unit) rows.add(buildUnitSelector);
     rows.add(buildVehicleFilters);
-    final own = filteredGroups(selectedTab == ReportsTab.yours
+    final groups = filteredGroups(selectedTab == ReportsTab.yours
         ? viewModel.yourReports
-        : viewModel.unitReports);
-    final others = selectedTab == ReportsTab.unit
-        ? filteredGroups(viewModel.otherUnitReports)
-        : <ReportVehicleKey, List<PmcsReport>>{};
-    if (own.isEmpty && others.isEmpty) {
+        : selectedUnitReports);
+    if (groups.isEmpty) {
       rows.add(() => ReportEmptyLine(
           message: hasVehicleFilters
               ? 'No vehicles match your search or filters.'
               : selectedTab == ReportsTab.yours
                   ? 'No PMCS submitted from this device yet'
-                  : 'No PMCS from other crews in your unit yet'));
+                  : 'No PMCS from other crews in the selected units yet'));
     }
-    for (final entry in own.entries) {
+    for (final entry in groups.entries) {
       rows.add(() => buildVehicleCard(entry.key, entry.value));
-    }
-    if (others.isNotEmpty) {
-      rows.add(() => const Padding(
-            padding: EdgeInsets.only(top: 22, bottom: 2),
-            child: SectionLabel(text: 'OTHER UNITS'),
-          ));
-      for (final entry in others.entries) {
-        rows.add(() => buildVehicleCard(entry.key, entry.value));
-      }
     }
     return rows;
   }
@@ -306,7 +327,7 @@ class ReportsPageState extends State<ReportsPage> {
                 backgroundColor: surface,
                 onRefresh: viewModel.syncRemoteLatticeReports,
                 child: ListView.builder(
-                  key: PageStorageKey((selectedTab, vehicle)),
+                  key: PageStorageKey((selectedTab, vehicle, effectiveUnit)),
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),

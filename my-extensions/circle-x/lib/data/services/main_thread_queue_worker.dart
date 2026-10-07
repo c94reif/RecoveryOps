@@ -18,7 +18,6 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
   final QueuedSubmissionsRepository repository;
   final PmcsEntityPort entityPort;
   final MeshBroadcasterPort meshPort;
-  final QueuePromptStrategy promptStrategy;
   final UserNotificationSink snackBarService;
   final Duration probeInterval;
   final DeliveryCoordinator delivery;
@@ -38,12 +37,17 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
 
   Timer? probeTimer;
   Future<void>? starting;
+  final _drains = <String, Future<void>>{};
+  final _failures = <String, int>{};
+  final _skipProbes = <String, int>{};
+  int _generation = 0;
 
   MainThreadQueueWorker({
     required this.repository,
     required this.entityPort,
     required this.meshPort,
-    required this.promptStrategy,
+    // Retained for source compatibility; retries never ask for UI approval.
+    QueuePromptStrategy? promptStrategy,
     UserNotificationSink? snackBarService,
     Duration? probeInterval,
     DeliveryCoordinator? delivery,
@@ -52,14 +56,19 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
         probeInterval = probeInterval ?? AppConstants.transportProbeInterval;
 
   @override
-  Future<void> start() => starting ??= startWorker().whenComplete(() {
-        starting = null;
-      });
+  Future<void> start() {
+    final generation = _generation;
+    return starting ??= startWorker().whenComplete(() {
+      if (generation == _generation) starting = null;
+    });
+  }
 
   Future<void> startWorker() async {
     if (probeTimer != null) return;
 
+    final generation = _generation;
     final resumed = await repository.getAll();
+    if (generation != _generation) return;
     for (final submission in resumed) {
       delivery.update(
           submission.entityId, submission.transport, DeliveryStatus.queued,
@@ -76,10 +85,17 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
     debugPrint('[CircleX] QueueWorker: resumed ${resumed.length} pending');
 
     probeTimer = Timer.periodic(probeInterval, (_) => onProbeTick());
+    // Startup must not wait for an SDK request to finish.
+    unawaited(onProbeTick());
   }
 
   @override
   Future<void> stop() async {
+    _generation++;
+    starting = null;
+    _drains.clear();
+    _failures.clear();
+    _skipProbes.clear();
     probeTimer?.cancel();
     probeTimer = null;
     for (final parked in pending.values) {
@@ -126,6 +142,8 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
       return;
     }
     connected[key] = true;
+    _failures.remove(key);
+    _skipProbes.remove(key);
     unawaited(drainNext(transport).catchError((Object error) {
       debugPrint('[CircleX] Queue drain failed: $error');
     }));
@@ -134,88 +152,88 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
   @override
   Future<int> pendingCount() => repository.count();
 
+  @override
+  Future<void> retryNow() async {
+    _failures.clear();
+    _skipProbes.clear();
+    await onProbeTick();
+  }
+
   Future<void> onProbeTick() async {
-    await Future.wait(TransportKind.values
-        .map((transport) => nudge(transport).catchError((Object error) {
-              debugPrint('[CircleX] Queue probe failed: $error');
-            })));
-  }
-
-  Future<void> nudge(TransportKind transport) async {
-    final key = transport.wireName;
-    if (draining[key] == true) return;
-    if (pending[key]!.isEmpty) return;
-    if (connected[key] == true) {
-      await drainNext(transport);
-      return;
-    }
-    await probe(transport);
-  }
-
-  Future<void> probe(TransportKind transport) async {
-    final key = transport.wireName;
-    final oldest = pending[key]!.first;
-
-    draining[key] = true;
-    try {
-      final success = await attemptSend(oldest);
-      if (!success) return;
-      connected[key] = true;
-      await settle(oldest);
-      snackBarService.enqueue('${transport.displayName}: sent (queued)');
-    } finally {
-      draining[key] = false;
-    }
-    await drainNext(transport);
-  }
-
-  Future<void> drainNext(TransportKind transport) async {
-    final key = transport.wireName;
-    if (draining[key] == true) return;
-    if (connected[key] != true) return;
-    final parked = pending[key]!;
-    if (parked.isEmpty) return;
-
-    final next = parked.first;
-    draining[key] = true;
-    try {
-      final alreadySent = delivery.status(next.entityId, next.transport,
-              withdrawal: next.isWithdrawal) ==
-          DeliveryStatus.sent;
-      final shouldSend = next.isWithdrawal ||
-              alreadySent ||
-              await delivery.isWithdrawn(next.entityId)
-          ? true
-          : await promptStrategy.ask(next);
-      if (shouldSend == null) {
+    await Future.wait(TransportKind.values.map((transport) async {
+      final key = transport.wireName;
+      final skipped = _skipProbes[key] ?? 0;
+      if (skipped > 0) {
+        _skipProbes[key] = skipped - 1;
         return;
       }
-      if (!shouldSend) {
-        delivery.update(
-            next.entityId, next.transport, DeliveryStatus.discarded);
-        await settle(next);
-      } else {
+      await nudge(transport);
+    }));
+  }
+
+  Future<void> nudge(TransportKind transport) => drainNext(transport);
+
+  Future<void> probe(TransportKind transport) => drainNext(transport);
+
+  Future<void> drainNext(TransportKind transport) {
+    final key = transport.wireName;
+    final active = _drains[key];
+    if (active != null) return active;
+    final generation = _generation;
+    final drain = _drain(transport, generation).whenComplete(() {
+      if (generation == _generation) _drains.remove(key);
+    });
+    _drains[key] = drain;
+    return drain;
+  }
+
+  Future<void> _drain(TransportKind transport, int generation) async {
+    final key = transport.wireName;
+    draining[key] = true;
+    try {
+      while (generation == _generation && pending[key]!.isNotEmpty) {
+        final next = pending[key]!.first;
         final success = await attemptSend(next);
-        snackBarService.enqueue(
-          '${transport.displayName}: '
-          '${success ? 'sent (queued)' : 'still FAILED'}',
-          isError: !success,
-        );
+        if (generation != _generation) return;
         if (!success) {
-          connected[key] = false;
+          _backOff(key);
+          return;
+        }
+        final settled = await settle(next, generation: generation);
+        if (generation != _generation) return;
+        if (!settled) {
+          _backOff(key);
           return;
         }
         connected[key] = true;
-        await settle(next);
+        _failures.remove(key);
+        _skipProbes.remove(key);
       }
+    } catch (error) {
+      if (generation == _generation) _backOff(key);
+      debugPrint('[CircleX] Queue drain failed: $error');
     } finally {
-      draining[key] = false;
+      if (generation == _generation) draining[key] = false;
     }
+  }
 
-    await drainNext(transport);
+  void _backOff(String key) {
+    connected[key] = false;
+    final failures = ((_failures[key] ?? 0) + 1).clamp(1, 5);
+    _failures[key] = failures;
+    // Retry after 1, 2, 4, 8, then at most 16 probe intervals.
+    _skipProbes[key] = (1 << (failures - 1)) - 1;
   }
 
   Future<bool> attemptSend(QueuedSubmission submission) async {
+    final source = submission.reviewSourceReportId;
+    if (!submission.isWithdrawal &&
+        source != null &&
+        await delivery.isWithdrawn(source)) {
+      delivery.update(
+          submission.entityId, submission.transport, DeliveryStatus.discarded);
+      return true;
+    }
     if (delivery.status(submission.entityId, submission.transport,
             withdrawal: submission.isWithdrawal) ==
         DeliveryStatus.sent) {
@@ -246,16 +264,20 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
     }, queuedOnFailure: true, withdrawal: submission.isWithdrawal);
   }
 
-  Future<void> settle(QueuedSubmission submission) async {
+  Future<bool> settle(QueuedSubmission submission, {int? generation}) async {
     final id = submission.id;
-    pending[submission.transport.wireName]!
-        .removeWhere((pendingSubmission) => pendingSubmission.id == id);
-    if (id == null) return;
     try {
-      await repository.deleteById(id);
+      if (id != null) await repository.deleteById(id);
+      if (generation != null && generation != _generation) return false;
+      pending[submission.transport.wireName]!
+          .removeWhere((row) => row.id == id);
       delivery.queueChanged();
+      return true;
     } catch (error) {
+      // Keep the row tracked until local settlement succeeds; the coordinator
+      // remembers delivery so retrying a failed delete does not resend it.
       debugPrint('[CircleX] QueueWorker: delete failed for $id: $error');
+      return false;
     }
   }
 }

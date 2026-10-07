@@ -134,14 +134,74 @@ void main() {
     return db;
   }
 
-  test('a v1 database opens at v6', () async {
+  test('a v1 database opens at v8', () async {
     seedV1();
 
     final db = await openMigrated();
     addTearDown(db.close);
 
     final version = await db.customSelect('PRAGMA user_version').getSingle();
-    expect(version.data.values.first, 6);
+    expect(version.data.values.first, 8);
+  });
+
+  test(
+      'a v7 upgrade preserves mileage and the default UIC with empty unit preferences',
+      () async {
+    seedV1();
+    final seeded = await openMigrated();
+    const mileage = '{"value":12345.6,"unit":"miles"}';
+    await seeded.customStatement(
+        'UPDATE pmcs_sessions SET mileage_json = ?', [mileage]);
+    await seeded
+        .customStatement('UPDATE pmcs_reports SET mileage_json = ?', [mileage]);
+    final originalSession =
+        await SessionsDao(seeded).getBySessionId('session-1');
+    final originalReport =
+        (await PmcsReportsDao(seeded).getAllReports()).single;
+    await seeded.close();
+    final raw = sqlite3.open(file.path);
+    raw.execute('ALTER TABLE profiles DROP COLUMN unit_name');
+    raw.execute('ALTER TABLE profiles DROP COLUMN followed_units_json');
+    raw.userVersion = 7;
+    raw.close();
+
+    final upgraded = await openMigrated();
+    addTearDown(upgraded.close);
+    final profile = (await ProfileDao(upgraded).getProfile())!;
+    expect(profile.uic, 'WJ8TAA');
+    expect(profile.unitName, isEmpty);
+    expect(profile.followedUnitsJson, '[]');
+    expect(await SessionsDao(upgraded).getBySessionId('session-1'),
+        originalSession);
+    expect((await PmcsReportsDao(upgraded).getAllReports()).single,
+        originalReport);
+  });
+
+  test(
+      'a v6 upgrade adds mileage without changing existing sessions or reports',
+      () async {
+    seedV1();
+    final seeded = await openMigrated();
+    final originalSession =
+        await SessionsDao(seeded).getBySessionId('session-1');
+    final originalReport =
+        (await PmcsReportsDao(seeded).getAllReports()).single;
+    await seeded.close();
+    final raw = sqlite3.open(file.path);
+    raw.execute('ALTER TABLE pmcs_sessions DROP COLUMN mileage_json');
+    raw.execute('ALTER TABLE pmcs_reports DROP COLUMN mileage_json');
+    raw.execute('ALTER TABLE profiles DROP COLUMN unit_name');
+    raw.execute('ALTER TABLE profiles DROP COLUMN followed_units_json');
+    raw.userVersion = 6;
+    raw.close();
+
+    final upgraded = await openMigrated();
+    addTearDown(upgraded.close);
+    expect(await SessionsDao(upgraded).getBySessionId('session-1'),
+        originalSession);
+    final report = (await PmcsReportsDao(upgraded).getAllReports()).single;
+    expect(report, originalReport);
+    expect(report.mileageJson, isNull);
   });
 
   test('a v3 upgrade preserves reports and both transport queues', () async {
@@ -159,6 +219,10 @@ void main() {
     final reportCount = raw
         .select('SELECT COUNT(*) AS count FROM pmcs_reports')
         .single['count'];
+    raw.execute('ALTER TABLE pmcs_sessions DROP COLUMN mileage_json');
+    raw.execute('ALTER TABLE pmcs_reports DROP COLUMN mileage_json');
+    raw.execute('ALTER TABLE profiles DROP COLUMN unit_name');
+    raw.execute('ALTER TABLE profiles DROP COLUMN followed_units_json');
     raw.userVersion = 3;
     raw.close();
     final upgraded = await openMigrated();
@@ -180,6 +244,10 @@ void main() {
     await seeded.close();
     final raw = sqlite3.open(file.path);
     raw.execute('ALTER TABLE pmcs_reports DROP COLUMN maintainer_review_json');
+    raw.execute('ALTER TABLE pmcs_sessions DROP COLUMN mileage_json');
+    raw.execute('ALTER TABLE pmcs_reports DROP COLUMN mileage_json');
+    raw.execute('ALTER TABLE profiles DROP COLUMN unit_name');
+    raw.execute('ALTER TABLE profiles DROP COLUMN followed_units_json');
     raw.userVersion = 5;
     raw.close();
 
@@ -203,6 +271,10 @@ void main() {
         .select('SELECT * FROM pmcs_reports')
         .map((row) => Map<String, Object?>.from(row))
         .toList();
+    raw.execute('ALTER TABLE pmcs_sessions DROP COLUMN mileage_json');
+    raw.execute('ALTER TABLE pmcs_reports DROP COLUMN mileage_json');
+    raw.execute('ALTER TABLE profiles DROP COLUMN unit_name');
+    raw.execute('ALTER TABLE profiles DROP COLUMN followed_units_json');
     raw.userVersion = 4;
     raw.execute('ALTER TABLE pmcs_reports DROP COLUMN maintainer_review_json');
     raw.close();
@@ -301,7 +373,7 @@ void main() {
     expect(reports.single.signatureJson, isNull);
   });
 
-  test('a fresh install creates v6 directly, with no migration to run',
+  test('a fresh install creates v8 directly, with no migration to run',
       () async {
     final db = AppDatabase.test(NativeDatabase(file));
     addTearDown(db.close);

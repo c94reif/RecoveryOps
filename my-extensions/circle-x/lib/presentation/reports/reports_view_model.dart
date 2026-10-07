@@ -6,6 +6,8 @@ import 'package:circle_x/domain/services/report_message_source.dart';
 
 import 'package:circle_x/core/constants/app_constants.dart';
 import 'package:circle_x/domain/entities/pmcs_report.dart';
+import 'package:circle_x/domain/entities/followed_unit.dart';
+import 'package:circle_x/domain/entities/uic.dart';
 import 'package:circle_x/domain/entities/queued_submission.dart';
 import 'package:circle_x/domain/repositories/profile_repo.dart';
 import 'package:circle_x/domain/repositories/queued_submissions_repo.dart';
@@ -37,7 +39,7 @@ typedef ReportVehicleKey = ({String bumperNumber, String uic});
 enum ReportsTab {
   yours('YOURS'),
 
-  unit('MY UNIT'),
+  unit('MY UNITS'),
 
   queued('QUEUED');
 
@@ -76,7 +78,7 @@ class ReportsViewModel extends _ReportsState
   final bool _ownsSuggestions;
 
   static const String bucketNotMissionCapable = 'NOT MISSION CAPABLE';
-  static const String bucketLimited = 'LIMITED — CIRCLE X';
+  static const String bucketLimited = 'LIMITED — X';
   static const String bucketMissionCapable = 'MISSION CAPABLE';
 
   static const List<String> statusBuckets = [
@@ -108,7 +110,10 @@ class ReportsViewModel extends _ReportsState
         snackBarService = snackBarService ?? SnackBarService.instance {
     unawaited(this.suggestions.load());
     deliverySubscription = delivery?.changes.listen((_) => refreshQueued());
-    messageSubscription = messaging.messages.listen(onMessage);
+    messageSubscription =
+        messaging.messages.listen(onMessage, onError: (Object error) {
+      debugPrint('[CircleX] Peer reception error: $error');
+    });
     unawaited(() async {
       try {
         await loadFromDb();

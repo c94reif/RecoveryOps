@@ -37,7 +37,7 @@ void main() {
       expect(tally.worst, FaultSeverity.redX);
     });
 
-    test('CIRCLE X alone does not deadline', () {
+    test('X alone does not deadline', () {
       final tally = FaultTally.from([
         buildFault(severity: FaultSeverity.circleX),
       ]);
@@ -70,6 +70,8 @@ void main() {
     });
 
     test('round-trips through its wire name', () {
+      expect(FaultSeverity.circleX.wireName, 'CIRCLE_X');
+      expect(FaultSeverity.fromWireName('CIRCLE_X'), FaultSeverity.circleX);
       for (final severity in FaultSeverity.values) {
         expect(FaultSeverity.fromWireName(severity.wireName), severity);
       }
@@ -97,7 +99,7 @@ void main() {
       expect(tally.missionCapabilityLabel, 'FMC (DASH)');
     });
 
-    test('CIRCLE X limits the vehicle to mission-essential runs', () {
+    test('X limits the vehicle to mission-essential runs', () {
       final tally = FaultTally.from([
         buildFault(severity: FaultSeverity.circleX),
         buildFault(itemId: 'b', severity: FaultSeverity.dash),

@@ -23,6 +23,7 @@ class BuildSessionReport {
       phases: session.completedPhases,
       faults: faults,
       signature: session.signature,
+      mileage: session.mileage,
       latitude: session.latitude ?? 0,
       longitude: session.longitude ?? 0,
       timestamp: clock.nowUtc(),

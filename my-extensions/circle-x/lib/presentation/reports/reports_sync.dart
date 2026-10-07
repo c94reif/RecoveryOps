@@ -8,10 +8,16 @@ mixin _ReportsSync on _ReportsState {
     if (disposed) return;
     final knownEntityIds =
         reports.map((candidateReport) => candidateReport.entityId).toSet();
+    var addedReports = false;
     for (final row in rows) {
       if (withdrawn.contains(row.entityId)) continue;
-      if (knownEntityIds.add(row.entityId)) reports.add(row);
+      if (knownEntityIds.add(row.entityId)) {
+        reports.add(row);
+        addedReports = true;
+      }
     }
+    // An eager lifecycle wake may already have snapshotted the empty list.
+    if (addedReports && syncInFlight != null) syncAgain = true;
     await loadMyUic();
     if (disposed) return;
     updateUnread();
@@ -23,8 +29,11 @@ mixin _ReportsSync on _ReportsState {
   Future<void> loadMyUic() async {
     try {
       final profile = await profileRepository.getProfile();
-      myUic = (profile?.uic ?? '').trim().toUpperCase();
-      invalidateReportViews();
+      if (disposed) return;
+      myUic = Uic.normalize(profile?.uic ?? '');
+      reportUnits = profile?.reportUnits ?? const [];
+      updateUnread();
+      notifyListeners();
     } catch (error) {
       debugPrint('[CircleX] could not read UIC for report filtering: $error');
     }
@@ -44,6 +53,7 @@ mixin _ReportsSync on _ReportsState {
   }
 
   Future<void> storeIncomingReport(PmcsReport report) async {
+    if (disposed) return;
     try {
       final stored = await storeReceivedReport(repository, report);
       final withdrawn = await repository.getWithdrawnIds();
@@ -56,6 +66,10 @@ mixin _ReportsSync on _ReportsState {
       }
       updateUnread();
       notifyListeners();
+      // Received records are durable before relay. Reconcile even when this
+      // screen is not mounted, without rebroadcasting the peer's report.
+      syncAgain = true;
+      unawaited(syncRemoteLatticeReports());
     } on ReportWithdrawn {
       return;
     } catch (error) {
@@ -64,6 +78,7 @@ mixin _ReportsSync on _ReportsState {
   }
 
   Future<void> applyRemoteDeletion(String entityId) async {
+    if (disposed) return;
     try {
       await repository.withdrawReport(entityId);
       if (disposed) return;
@@ -71,6 +86,8 @@ mixin _ReportsSync on _ReportsState {
           (candidateReport) => candidateReport.entityId == entityId);
       updateUnread();
       notifyListeners();
+      syncAgain = true;
+      unawaited(syncRemoteLatticeReports());
     } catch (error) {
       debugPrint('[CircleX] Could not store withdrawal: $error');
     }
@@ -85,13 +102,28 @@ mixin _ReportsSync on _ReportsState {
     );
   }
 
-  Future<void> syncRemoteLatticeReports() =>
-      syncInFlight ??= performRemoteSync().whenComplete(() {
-        syncInFlight = null;
-      });
+  Future<void> syncRemoteLatticeReports() {
+    if (disposed) return Future.value();
+    return syncInFlight ??= reconcileUntilCurrent().whenComplete(() {
+      syncInFlight = null;
+    });
+  }
+
+  Future<void> reconcileUntilCurrent() async {
+    do {
+      syncAgain = false;
+      try {
+        await performRemoteSync();
+      } catch (error) {
+        debugPrint('[CircleX] Report reconciliation failed: $error');
+      }
+    } while (syncAgain && !disposed);
+  }
 
   Future<void> performRemoteSync() async {
+    if (disposed) return;
     final newReports = await syncRemoteReports(reports);
+    if (disposed) return;
     final withdrawn = await repository.getWithdrawnIds();
     if (disposed) return;
     if (newReports.isNotEmpty || withdrawn.isNotEmpty) {

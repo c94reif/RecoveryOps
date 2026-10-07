@@ -12,15 +12,27 @@ class ProfileDao extends DatabaseAccessor<AppDatabase> with _$ProfileDaoMixin {
     return (select(profiles)..limit(1)).getSingleOrNull();
   }
 
-  Future<void> saveProfile({required String uic}) async {
+  Future<void> saveProfile({
+    required String uic,
+    String unitName = '',
+    String followedUnitsJson = '[]',
+  }) async {
     final existing = await getProfile();
     if (existing != null) {
       await (update(profiles)..where((table) => table.id.equals(existing.id)))
           .write(
-        ProfilesCompanion(uic: Value(uic)),
+        ProfilesCompanion(
+          uic: Value(uic),
+          unitName: Value(unitName),
+          followedUnitsJson: Value(followedUnitsJson),
+        ),
       );
     } else {
-      await into(profiles).insert(ProfilesCompanion.insert(uic: uic));
+      await into(profiles).insert(ProfilesCompanion.insert(
+        uic: uic,
+        unitName: Value(unitName),
+        followedUnitsJson: Value(followedUnitsJson),
+      ));
     }
   }
 }

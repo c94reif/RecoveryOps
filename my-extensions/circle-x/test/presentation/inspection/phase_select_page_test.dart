@@ -258,7 +258,7 @@ void main() {
       expect(find.byIcon(Icons.cancel), findsOneWidget);
     });
 
-    testWidgets('a CIRCLE X does not earn it — the vehicle can still roll',
+    testWidgets('an X does not earn it — the vehicle can still roll',
         (tester) async {
       harness.faults.byPhase['session-1|${PmcsPhase.before.wireName}'] = [
         buildFault(severity: FaultSeverity.circleX, phase: PmcsPhase.before),

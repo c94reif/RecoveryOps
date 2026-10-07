@@ -1,4 +1,5 @@
 import 'package:circle_x/domain/entities/fault_severity.dart';
+import 'package:circle_x/domain/entities/mileage_reading.dart';
 import 'package:circle_x/domain/entities/maintainer_review.dart';
 import 'package:circle_x/domain/entities/pmcs_fault.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
@@ -20,6 +21,7 @@ class PmcsReport {
   final List<PmcsFault> faults;
 
   final PmcsSignature? signature;
+  final MileageReading? mileage;
   final MaintainerReview? maintainerReview;
   final double latitude;
   final double longitude;
@@ -38,6 +40,7 @@ class PmcsReport {
     this.phases = const [],
     this.faults = const [],
     this.signature,
+    this.mileage,
     this.maintainerReview,
     required this.latitude,
     required this.longitude,
@@ -77,6 +80,7 @@ class PmcsReport {
       phases: phases,
       faults: faults ?? this.faults,
       signature: signature,
+      mileage: mileage,
       maintainerReview: maintainerReview,
       latitude: latitude,
       longitude: longitude,

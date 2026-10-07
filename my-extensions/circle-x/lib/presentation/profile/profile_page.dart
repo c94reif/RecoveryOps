@@ -3,10 +3,12 @@ import 'package:circle_x/core/di/service_locator.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
 import 'package:circle_x/domain/entities/uic.dart';
 import 'package:circle_x/presentation/common/widgets/custom_button.dart';
+import 'package:circle_x/presentation/common/widgets/custom_text_field.dart';
 import 'package:circle_x/presentation/common/widgets/uic_text_field.dart';
 import 'package:circle_x/presentation/common/widgets/section_label.dart';
 import 'package:circle_x/presentation/maintainer/maintainer_page.dart';
 import 'package:circle_x/presentation/profile/profile_view_model.dart';
+import 'package:circle_x/presentation/profile/followed_units_card.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -18,6 +20,7 @@ class ProfilePage extends StatefulWidget {
 class ProfilePageState extends State<ProfilePage> {
   late final ProfileViewModel viewModel;
   final uicController = TextEditingController();
+  final unitNameController = TextEditingController();
   bool maintainerMode = false;
 
   @override
@@ -26,19 +29,21 @@ class ProfilePageState extends State<ProfilePage> {
     viewModel = getIt<ProfileViewModel>();
 
     uicController.addListener(onFieldChanged);
+    unitNameController.addListener(onFieldChanged);
 
     viewModel.addListener(handleSnackBar);
 
     viewModel.loadProfile().then((_) {
       if (!mounted) return;
       uicController.text = viewModel.savedUic;
+      unitNameController.text = viewModel.savedUnitName;
       setState(() {});
       onFieldChanged();
     });
   }
 
   void onFieldChanged() {
-    viewModel.checkDirty(uicController.text);
+    viewModel.checkDirty(uicController.text, unitName: unitNameController.text);
     setState(() {});
   }
 
@@ -56,6 +61,8 @@ class ProfilePageState extends State<ProfilePage> {
   void dispose() {
     viewModel.removeListener(handleSnackBar);
     uicController.dispose();
+    unitNameController.dispose();
+    viewModel.dispose();
     super.dispose();
   }
 
@@ -111,13 +118,27 @@ class ProfilePageState extends State<ProfilePage> {
                             subtitle: 'Saved on this device',
                           ),
                           const SizedBox(height: 24),
-                          UicTextField(
-                            controller: uicController,
-                            label: 'Default UIC',
+                          AbsorbPointer(
+                            absorbing: viewModel.isSaving,
+                            child: UicTextField(
+                              controller: uicController,
+                              label: 'Default UIC',
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          AbsorbPointer(
+                            absorbing: viewModel.isSaving,
+                            child: CustomTextField(
+                              controller: unitNameController,
+                              label: 'Default unit name (optional)',
+                              hint: 'Headquarters',
+                              helperText: 'A local label for this device',
+                              textCapitalization: TextCapitalization.words,
+                            ),
                           ),
                           const SizedBox(height: 16),
                           const Text(
-                            'Automatically filled in for a new PMCS. You can '
+                            'The default UIC is filled in for a new PMCS. You can '
                             'change it during setup for each inspection.',
                             style: _bodyStyle,
                           ),
@@ -149,10 +170,26 @@ class ProfilePageState extends State<ProfilePage> {
                             CustomButton(
                               text: 'Save default UIC',
                               icon: Icons.check,
-                              onPressed: Uic.isValid(uicController.text)
-                                  ? () {
+                              onPressed: !viewModel.isSaving &&
+                                      Uic.isValid(uicController.text)
+                                  ? () async {
                                       FocusScope.of(context).unfocus();
-                                      viewModel.save(uicController.text);
+                                      final submittedUic = uicController.text;
+                                      final submittedName =
+                                          unitNameController.text;
+                                      final saved = await viewModel.save(
+                                          submittedUic,
+                                          unitName: submittedName);
+                                      if (!mounted || !saved) return;
+                                      if (uicController.text == submittedUic) {
+                                        uicController.text = viewModel.savedUic;
+                                      }
+                                      if (unitNameController.text ==
+                                          submittedName) {
+                                        unitNameController.text =
+                                            viewModel.savedUnitName;
+                                      }
+                                      onFieldChanged();
                                     }
                                   : null,
                             ),
@@ -160,6 +197,8 @@ class ProfilePageState extends State<ProfilePage> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    FollowedUnitsCard(viewModel: viewModel),
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 24),
                       child: Row(

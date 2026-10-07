@@ -17,6 +17,7 @@ class PmcsSessions extends Table {
   TextColumn get status => text().withDefault(const Constant('IN_PROGRESS'))();
 
   TextColumn get signatureJson => text().nullable()();
+  TextColumn get mileageJson => text().nullable()();
 
   RealColumn get latitude => real().nullable()();
   RealColumn get longitude => real().nullable()();

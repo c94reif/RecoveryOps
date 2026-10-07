@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
+import 'package:circle_x/presentation/inspection/vehicle_platform_card.dart';
 
 class VehicleManualPicker extends StatefulWidget {
   final List<VehicleType> vehicles;
@@ -42,27 +43,30 @@ class _VehicleManualPickerState extends State<VehicleManualPicker> {
       }
     }
     return [
-      for (final entry in groups.entries) ...[entry.key, ...entry.value],
+      for (final entry in groups.entries) ...[
+        if (entry.value.length > 1) entry.key,
+        ...entry.value,
+      ],
     ];
   }
 
   @override
   Widget build(BuildContext context) {
     final rows = filteredRows();
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     return FractionallySizedBox(
-      heightFactor: .85,
+      heightFactor: keyboardInset > 0 ? 1 : .85,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(
-            16, 8, 16, 12 + MediaQuery.viewInsetsOf(context).bottom),
+        padding: EdgeInsets.fromLTRB(16, 8, 16, 12 + keyboardInset),
         child:
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
             const Expanded(
-                child: Text('Choose vehicle & TM',
+                child: Text('Choose platform',
                     style: TextStyle(
                         color: textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700))),
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800))),
             IconButton(
                 tooltip: 'Close vehicle picker',
                 onPressed: () => Navigator.of(context).pop(),
@@ -73,8 +77,10 @@ class _VehicleManualPickerState extends State<VehicleManualPicker> {
             key: const ValueKey('vehicle-manual-search'),
             controller: search,
             onChanged: (_) => setState(() {}),
+            textInputAction: TextInputAction.search,
+            onSubmitted: (_) => FocusScope.of(context).unfocus(),
             decoration: InputDecoration(
-              labelText: 'Search vehicle, variant, or TM',
+              hintText: 'Search platform, variant or TM',
               prefixIcon: const Icon(Icons.search),
               suffixIcon: search.text.isEmpty
                   ? null
@@ -97,13 +103,17 @@ class _VehicleManualPickerState extends State<VehicleManualPicker> {
                     itemCount: rows.length,
                     itemBuilder: (context, index) => switch (rows[index]) {
                       final String family => Padding(
-                          padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
-                          child: Text(family.toUpperCase(),
-                              style: const TextStyle(
-                                  color: textSecondary,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1))),
+                          padding: const EdgeInsets.fromLTRB(2, 16, 2, 10),
+                          child: Row(children: [
+                            Text(family.toUpperCase(),
+                                style: const TextStyle(
+                                    color: textSecondary,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1.4)),
+                            const SizedBox(width: 12),
+                            const Expanded(child: Divider()),
+                          ])),
                       final VehicleType vehicle => buildOption(vehicle),
                       _ => const SizedBox.shrink(),
                     },
@@ -117,27 +127,11 @@ class _VehicleManualPickerState extends State<VehicleManualPicker> {
   Widget buildOption(VehicleType vehicle) {
     final selected = vehicle == widget.selected;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: VehiclePlatformCard(
         key: ValueKey(('vehicle-manual-option', vehicle.wireName)),
+        vehicle: vehicle,
         selected: selected,
-        selectedColor: textPrimary,
-        textColor: textPrimary,
-        tileColor: surfaceLight,
-        selectedTileColor: greenGlow,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: BorderSide(color: selected ? serviceableGreen : border)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        title: Text(vehicle.variant,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-        subtitle: Text(vehicle.technicalManual,
-            style: const TextStyle(
-                color: textSecondary, fontSize: 11, height: 1.5)),
-        trailing: Icon(
-            selected ? Icons.check_circle : Icons.radio_button_unchecked,
-            color: selected ? serviceableGreen : textSecondary,
-            size: 22),
         onTap: () => Navigator.of(context).pop(vehicle),
       ),
     );

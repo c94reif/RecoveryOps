@@ -19,6 +19,7 @@ class PmcsReports extends Table {
   TextColumn get faultsJson => text()();
 
   TextColumn get signatureJson => text().nullable()();
+  TextColumn get mileageJson => text().nullable()();
   TextColumn get maintainerReviewJson => text().nullable()();
 
   RealColumn get latitude => real()();

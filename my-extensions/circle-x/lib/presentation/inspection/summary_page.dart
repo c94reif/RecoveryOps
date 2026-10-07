@@ -10,6 +10,7 @@ import 'package:circle_x/presentation/common/widgets/section_label.dart';
 import 'package:circle_x/presentation/common/widgets/inspection_fault_card.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
 import 'package:circle_x/presentation/inspection/sign_off_card.dart';
+import 'package:circle_x/presentation/inspection/mileage_card.dart';
 
 class SummaryPage extends StatefulWidget {
   const SummaryPage({super.key});
@@ -84,6 +85,8 @@ class SummaryPageState extends State<SummaryPage> {
                   suggestions: viewModel.summarySuggestions,
                   controller: viewModel.suggestions),
             ],
+            const SizedBox(height: 12),
+            MileageCard(viewModel: viewModel),
             const SizedBox(height: 12),
             SignOffCard(viewModel: viewModel),
             const SizedBox(height: 10),

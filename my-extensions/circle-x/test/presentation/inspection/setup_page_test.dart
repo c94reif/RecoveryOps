@@ -203,7 +203,12 @@ void main() {
       expect(find.text('Stryker'), findsOneWidget);
       expect(find.text('TM 9-2355-311-10'), findsOneWidget);
       await openManuals(tester);
-      expect(find.text('STRYKER'), findsOneWidget);
+      expect(
+          find.descendant(
+              of: find
+                  .byKey(const ValueKey(('vehicle-manual-option', 'STRYKER'))),
+              matching: find.text('Stryker')),
+          findsOneWidget);
       expect(find.text('JLTV'), findsOneWidget);
       expect(find.text('TM 9-2320-400-10'), findsOneWidget);
     });
