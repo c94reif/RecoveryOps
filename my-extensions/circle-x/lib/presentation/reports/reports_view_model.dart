@@ -14,6 +14,8 @@ import 'package:circle_x/domain/repositories/queued_submissions_repo.dart';
 import 'package:circle_x/domain/repositories/reports_repo.dart';
 import 'package:circle_x/domain/services/delivery_coordinator.dart';
 import 'package:circle_x/domain/services/queue_worker_strategy.dart';
+import 'package:circle_x/domain/services/pmcs_notification_port.dart';
+import 'package:circle_x/domain/services/pmcs_report_notifier.dart';
 import 'package:circle_x/domain/usecases/map/show_report_on_map.dart';
 import 'package:circle_x/domain/usecases/publishing/publish_pmcs_deletion.dart';
 import 'package:circle_x/domain/usecases/reporting/parse_incoming_deletion.dart';
@@ -74,6 +76,8 @@ class ReportsViewModel extends _ReportsState
   final QueuedSubmissionsRepository queuedRepository;
   @override
   final UserNotificationSink snackBarService;
+  @override
+  final PmcsReportNotifier reportNotifier;
   final FaultSuggestionController suggestions;
   final bool _ownsSuggestions;
 
@@ -103,7 +107,12 @@ class ReportsViewModel extends _ReportsState
     DeliveryCoordinator? delivery,
     bool syncOnStart = true,
     FaultSuggestionController? suggestions,
-  })  : suggestions = suggestions ??
+    PmcsNotificationPort notificationPort = const SilentPmcsNotificationPort(),
+  })  : reportNotifier = PmcsReportNotifier(
+            reportsRepository: repository,
+            profileRepository: profileRepository,
+            notifications: notificationPort),
+        suggestions = suggestions ??
             FaultSuggestionController(repository,
                 notifications: snackBarService),
         _ownsSuggestions = suggestions == null,
@@ -127,6 +136,7 @@ class ReportsViewModel extends _ReportsState
 
   @override
   void dispose() {
+    reportNotifier.dispose();
     if (_ownsSuggestions) suggestions.dispose();
     disposed = true;
     deliverySubscription?.cancel();

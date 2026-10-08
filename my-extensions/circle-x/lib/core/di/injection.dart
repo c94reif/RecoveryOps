@@ -10,6 +10,8 @@ import 'package:circle_x/domain/services/report_map_port.dart';
 import 'package:circle_x/domain/services/report_message_source.dart';
 import 'package:circle_x/domain/services/transaction_runner.dart';
 import 'package:circle_x/domain/services/user_notification_sink.dart';
+import 'package:circle_x/domain/services/pmcs_notification_port.dart';
+import 'package:circle_x/data/services/android_pmcs_notifications.dart';
 import 'package:circle_x/presentation/common/services/snack_bar_service.dart';
 import 'package:circle_x/core/di/service_locator.dart';
 export 'package:circle_x/core/di/service_locator.dart';
@@ -113,6 +115,7 @@ void configureDependencies(
   getIt.registerLazySingleton<UserNotificationSink>(
     () => SnackBarService.instance,
   );
+  getIt.registerLazySingleton<PmcsNotificationPort>(createPmcsNotifications);
   getIt.registerLazySingleton<ReportMapPort>(
     () => SdkReportMapAdapter(getIt<sdk.MapService>()),
   );
@@ -374,6 +377,7 @@ void configureDependencies(
       getIt<ShowReportOnMap>(),
       getIt<PublishPmcsDeletion>(),
       getIt<QueueWorkerStrategy>(),
+      notificationPort: getIt<PmcsNotificationPort>(),
       snackBarService: getIt<UserNotificationSink>(),
       profileRepository: getIt<ProfileRepository>(),
       queuedRepository: getIt<QueuedSubmissionsRepository>(),

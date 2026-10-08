@@ -13,6 +13,7 @@ abstract class _ReportsState extends ChangeNotifier {
   ProfileRepository get profileRepository;
   QueuedSubmissionsRepository get queuedRepository;
   UserNotificationSink get snackBarService;
+  PmcsReportNotifier get reportNotifier;
 
   StreamSubscription<IncomingReportMessage>? messageSubscription;
   Timer? remoteSyncTimer;

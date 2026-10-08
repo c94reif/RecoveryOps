@@ -36,11 +36,19 @@ android {
     defaultConfig {
         minSdk = 21
     }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
+    implementation("androidx.core:core:1.15.0")
     implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
     implementation("com.google.mlkit:text-recognition-devanagari:16.0.1")
     implementation("com.google.mlkit:text-recognition-japanese:16.0.1")
     implementation("com.google.mlkit:text-recognition-korean:16.0.1")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.16.1")
+    testImplementation("org.mockito:mockito-core:5.2.0")
 }

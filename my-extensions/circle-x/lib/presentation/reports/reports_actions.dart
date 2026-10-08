@@ -21,20 +21,22 @@ mixin _ReportsActions on _ReportsState {
     if (report.id != null) {
       await repository.markAsRead(report.id!);
     }
+    unawaited(reportNotifier.remember([report.entityId]));
     notifyListeners();
   }
 
   Future<void> markAllAsRead() async {
-    var changed = false;
+    final readIds = <String>[];
     for (var reportIndex = 0; reportIndex < reports.length; reportIndex++) {
       if (!reports[reportIndex].isRead) {
+        readIds.add(reports[reportIndex].entityId);
         reports[reportIndex] = reports[reportIndex].copyWith(isRead: true);
-        changed = true;
       }
     }
-    if (changed) {
+    if (readIds.isNotEmpty) {
       updateUnread();
       await repository.markAllAsRead();
+      unawaited(reportNotifier.remember(readIds));
       notifyListeners();
     }
   }
@@ -57,6 +59,7 @@ mixin _ReportsActions on _ReportsState {
     } else if (report.id != null) {
       await repository.deleteReport(report.id!);
     }
+    unawaited(reportNotifier.remember([report.entityId]));
     if (disposed) return;
     reports.removeWhere(
         (candidateReport) => candidateReport.entityId == report.entityId);

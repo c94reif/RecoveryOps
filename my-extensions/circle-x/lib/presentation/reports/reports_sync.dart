@@ -66,11 +66,13 @@ mixin _ReportsSync on _ReportsState {
       }
       updateUnread();
       notifyListeners();
+      unawaited(reportNotifier.received(stored));
       // Received records are durable before relay. Reconcile even when this
       // screen is not mounted, without rebroadcasting the peer's report.
       syncAgain = true;
       unawaited(syncRemoteLatticeReports());
     } on ReportWithdrawn {
+      unawaited(reportNotifier.remember([report.entityId]));
       return;
     } catch (error) {
       debugPrint('[CircleX] Could not store incoming report: $error');
@@ -81,6 +83,7 @@ mixin _ReportsSync on _ReportsState {
     if (disposed) return;
     try {
       await repository.withdrawReport(entityId);
+      unawaited(reportNotifier.remember([entityId]));
       if (disposed) return;
       reports.removeWhere(
           (candidateReport) => candidateReport.entityId == entityId);
@@ -126,6 +129,8 @@ mixin _ReportsSync on _ReportsState {
     if (disposed) return;
     final withdrawn = await repository.getWithdrawnIds();
     if (disposed) return;
+    unawaited(reportNotifier.remember(withdrawn));
+    unawaited(reportNotifier.received(newReports));
     if (newReports.isNotEmpty || withdrawn.isNotEmpty) {
       reports.removeWhere(
           (candidateReport) => withdrawn.contains(candidateReport.entityId));

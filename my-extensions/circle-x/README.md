@@ -281,6 +281,42 @@ other UICs too, so removing a followed unit does not delete its saved reports or
 interrupt distributed delivery. Local database version 8 adds these preferences
 while preserving existing mileage, reports, and the default UIC.
 
+## Silent Android PMCS notifications
+
+In **Profile → Silent PMCS notifications**, turn on phone notifications for new
+PMCS reports from your default UIC and followed units. On Android 13 and later,
+the switch requests notification permission. If permission or the notification
+channel is blocked, **Open notification settings** opens the phone's controls.
+The preference is saved immediately on this phone, independently of profile edits.
+
+Notifications show the bumper number, the local unit name/UIC, and PMCS status.
+The channel is silent, with no sound or vibration, and report details are private
+on the lock screen. Tapping a notification opens the host application. Reports
+received through peers and the remote store share durable report-ID deduplication,
+so receiving the same report again does not produce another alert. Existing local
+history, outgoing reports, read reports, maintainer review records, unrelated
+units, and withdrawn reports stay silent. A review received before its original
+PMCS can alert once for the restored original report.
+
+Notifications are off until explicitly enabled. Reports observed while disabled
+or denied are remembered without alerts; enabling notifications does not replay
+that backlog. Notification preferences and receipt IDs are excluded from Android
+backup. Failures to post an alert do not interrupt report storage or relay.
+
+This requires rebuilding the **native Lattice Edge APK** with the updated
+`circle_x_android` package and Circle X source. Its manifest contributes
+`POST_NOTIFICATIONS`; the host must register the package's Flutter plugin.
+Uploading the web extension with `deploy-extension.sh` alone does not add phone
+notifications. Web builds, other platforms, and older native hosts show the
+setting as unavailable.
+
+Reception and alerts can continue with the panel closed or the app backgrounded
+while the host's extension runtime remains active. This feature does not start
+an Android foreground service or wake a stopped host; reception resumes when the
+host initializes again. Before field use, verify permission grant/denial, silent
+delivery for default and followed units through both transports, duplicate
+suppression after restart, and notification taps on the rebuilt host APK.
+
 ## Dashboard mileage
 
 At the end of any PMCS checklist, the summary offers **Scan mileage** before

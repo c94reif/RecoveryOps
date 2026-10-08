@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:circle_x/core/di/service_locator.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
 import 'package:circle_x/domain/entities/uic.dart';
+import 'package:circle_x/domain/services/pmcs_notification_port.dart';
+import 'package:circle_x/presentation/profile/pmcs_notification_settings_card.dart';
 import 'package:circle_x/presentation/common/widgets/custom_button.dart';
 import 'package:circle_x/presentation/common/widgets/custom_text_field.dart';
 import 'package:circle_x/presentation/common/widgets/uic_text_field.dart';
@@ -19,6 +21,7 @@ class ProfilePage extends StatefulWidget {
 
 class ProfilePageState extends State<ProfilePage> {
   late final ProfileViewModel viewModel;
+  late final PmcsNotificationPort notifications;
   final uicController = TextEditingController();
   final unitNameController = TextEditingController();
   bool maintainerMode = false;
@@ -27,6 +30,9 @@ class ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     viewModel = getIt<ProfileViewModel>();
+    notifications = getIt.isRegistered<PmcsNotificationPort>()
+        ? getIt<PmcsNotificationPort>()
+        : const SilentPmcsNotificationPort();
 
     uicController.addListener(onFieldChanged);
     unitNameController.addListener(onFieldChanged);
@@ -199,6 +205,8 @@ class ProfilePageState extends State<ProfilePage> {
                     ),
                     const SizedBox(height: 16),
                     FollowedUnitsCard(viewModel: viewModel),
+                    const SizedBox(height: 16),
+                    PmcsNotificationSettingsCard(notifications: notifications),
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 24),
                       child: Row(
