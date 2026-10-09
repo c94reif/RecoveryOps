@@ -157,6 +157,21 @@ void main() {
     expect(bumper(tester), 'A-11');
   });
 
+  testWidgets('combined OCR markings use the same normalization as typing',
+      (tester) async {
+    scanner.lines = ['HHC', '112'];
+    await pump(tester);
+    await open(tester);
+    await tap(tester, 'READ MARKINGS');
+    await tap(tester, 'HHC');
+    await tap(tester, '112');
+    await tap(tester, 'USE BUMPER NUMBER');
+
+    expect(bumper(tester), 'HHC112');
+    await tap(tester, 'BEGIN PMCS');
+    expect(harness.viewModel.session!.bumperNumber, 'HHC112');
+  });
+
   testWidgets('deselecting everything or clearing the draft disables use',
       (tester) async {
     await pump(tester);

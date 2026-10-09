@@ -44,6 +44,38 @@ void main() {
     expect(history([old], before: old.timestamp).reports, isEmpty);
   });
 
+  test('formatted bumper and UIC variants share history without merging units',
+      () {
+    final previous = buildReport(
+      entityId: 'spaced',
+      bumperNumber: ' hhc 112 ',
+      uic: ' wj8 taa ',
+      faults: [buildFault()],
+    );
+    final source = [
+      previous,
+      buildReport(
+          entityId: 'other-unit', bumperNumber: 'HHC112', uic: 'WJ8TAB'),
+      buildReport(entityId: 'other-bumper', bumperNumber: 'HHC113'),
+      buildReport(entityId: 'leading-zero', bumperNumber: 'HHC0112'),
+      buildReport(entityId: 'lookalike', bumperNumber: 'HHCI12'),
+      buildReport(
+          entityId: 'other-platform',
+          bumperNumber: 'HHC112',
+          vehicleType: VehicleType.jltv),
+    ];
+    for (final bumper in ['HHC112', 'hhc-112', 'HHC \u2011 112']) {
+      final matching = PmcsHistory.forVehicle(source,
+          bumperNumber: bumper,
+          uic: 'WJ8TAA',
+          vehicleType: VehicleType.stryker);
+      expect(matching.reports, [previous]);
+      expect(matching.suggestedUnresolved.single.report, same(previous));
+    }
+    expect(previous.bumperNumber, ' hhc 112 ');
+    expect(previous.uic, ' wj8 taa ');
+  });
+
   test('unknown phase metadata cannot clear a prior fault or form a baseline',
       () {
     final legacy = buildReport(entityId: 'legacy', phases: []);

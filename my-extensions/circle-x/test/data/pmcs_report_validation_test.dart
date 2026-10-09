@@ -62,9 +62,27 @@ void main() {
     });
   }
 
-  for (final uic in ['', '   ', 'W12', 'W12ABCD', 'W12!BC']) {
+  for (final uic in ['', '   ', 'W12', 'W12ABCD', 'W12!BC', 'W12-BC']) {
     test('invalid UIC "$uic" is rejected at both receive boundaries', () {
       rejected(body()..['uic'] = uic);
+    });
+  }
+
+  for (final field in ['uic', 'unit']) {
+    test('$field spacing is normalized at both receive boundaries', () {
+      final report = body()
+        ..remove('uic')
+        ..[field] = ' wj\t8\u00a0t aa\n'
+        ..['bumperNumber'] = 'HHC 001';
+      final restored = codec.reportFromBody(report, fromCallsign: 'store')!;
+      final decoded =
+          codec.decodeReport(jsonEncode(report), fromCallsign: 'peer')!;
+
+      for (final received in [restored, decoded]) {
+        expect(received.uic, 'WJ8TAA');
+        expect(received.bumperNumber, 'HHC 001');
+        expect(codec.reportBody(received)['uic'], 'WJ8TAA');
+      }
     });
   }
 

@@ -14,9 +14,9 @@ class UnitReportsFake extends FakeReportsViewModel {
 
 void main() {
   late UnitReportsFake viewModel;
-  const alpha = (bumperNumber: 'A-11', uic: 'WJ8TAA');
-  const bravo = (bumperNumber: 'A-11', uic: 'WAB4C0');
-  const other = (bumperNumber: 'C-33', uic: 'WXYZ00');
+  const alpha = (bumperNumber: 'A11', uic: 'WJ8TAA');
+  const bravo = (bumperNumber: 'A11', uic: 'WAB4C0');
+  const other = (bumperNumber: 'C33', uic: 'WXYZ00');
 
   setUp(() async {
     await getIt.reset();
@@ -35,7 +35,7 @@ void main() {
       buildReport(
           entityId: 'bravo',
           bumperNumber: 'A-11',
-          uic: 'WAB4C0',
+          uic: ' wa b4\tc0 ',
           isOutgoing: false),
       buildReport(
           entityId: 'other',
@@ -124,7 +124,7 @@ void main() {
     expect(
         find.text('No vehicles match your search or filters.'), findsOneWidget);
     expect(find.byKey(const ValueKey(alpha)), findsNothing);
-    await tester.enterText(find.byType(TextField), 'wab4c0');
+    await tester.enterText(find.byType(TextField), 'wa b4 c0');
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey(bravo)), findsOneWidget);
   });

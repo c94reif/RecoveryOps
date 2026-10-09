@@ -4,6 +4,7 @@ import 'package:characters/characters.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:circle_x/domain/entities/attested_identity.dart';
+import 'package:circle_x/domain/entities/bumper_number.dart';
 import 'package:circle_x/domain/entities/mileage_reading.dart';
 import 'package:circle_x/domain/entities/cac_scan.dart';
 import 'package:circle_x/domain/entities/check_result.dart';

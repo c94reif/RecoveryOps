@@ -745,13 +745,14 @@ void main() {
       expect(viewModel.otherUnitReports.map((r) => r.entityId), ['attached']);
     });
 
-    test('a UIC typed in lower case still matches its own unit', () async {
+    test('a UIC typed with lowercase and whitespace still matches its unit',
+        () async {
       profileRepository.profile = const Profile(uic: 'WJ8TAA');
       repository.reports.add(buildReport(
         id: 1,
         entityId: 'peer',
         isOutgoing: false,
-        uic: 'wj8taa',
+        uic: ' wj8\tt aa ',
       ));
       await start();
 
@@ -776,6 +777,43 @@ void main() {
   });
 
   group('grouping by bumper number and UIC', () {
+    test('saved and received formatting variants share one unchanged history',
+        () async {
+      final old = buildReport(
+          entityId: 'spaced',
+          bumperNumber: ' hhc 112 ',
+          uic: ' wj 8taa ',
+          timestamp: DateTime.utc(2026, 3, 24, 6));
+      final compact = buildReport(
+          entityId: 'compact',
+          bumperNumber: 'HHC112',
+          uic: 'WJ8TAA',
+          isOutgoing: false,
+          timestamp: DateTime.utc(2026, 3, 24, 7));
+      final dashed = buildReport(
+          entityId: 'dashed',
+          bumperNumber: 'HHC–112',
+          uic: 'WJ8TAA',
+          timestamp: DateTime.utc(2026, 3, 24, 8));
+      repository.reports.addAll([
+        old,
+        compact,
+        dashed,
+        buildReport(
+            entityId: 'other-unit', bumperNumber: 'HHC112', uic: 'WBBBBB'),
+        buildReport(entityId: 'other-number', bumperNumber: 'HHC113'),
+      ]);
+      await start();
+
+      final groups = viewModel.groupByVehicle(viewModel.reports);
+      expect(groups, hasLength(3));
+      expect(groups[(bumperNumber: 'HHC112', uic: 'WJ8TAA')],
+          [dashed, compact, old]);
+      expect(old.bumperNumber, ' hhc 112 ');
+      expect(old.uic, ' wj 8taa ');
+      expect(dashed.bumperNumber, 'HHC–112');
+    });
+
     test(
         'matching normalized identities merge, but different UICs stay separate',
         () async {
@@ -797,10 +835,10 @@ void main() {
       final groups = viewModel.groupByVehicle(viewModel.yourReports);
       expect(groups, hasLength(2));
       expect(
-          groups[(bumperNumber: 'A-11', uic: 'WJ8TAA')]!.map((r) => r.entityId),
+          groups[(bumperNumber: 'A11', uic: 'WJ8TAA')]!.map((r) => r.entityId),
           ['alpha-new', 'alpha-old']);
       expect(
-          groups[(bumperNumber: 'A-11', uic: 'WBBBBB')]!.map((r) => r.entityId),
+          groups[(bumperNumber: 'A11', uic: 'WBBBBB')]!.map((r) => r.entityId),
           ['bravo']);
     });
 
@@ -826,9 +864,9 @@ void main() {
 
       final groups = viewModel.groupByVehicle(viewModel.yourReports);
 
-      expect(groups.keys, [(bumperNumber: 'A-11', uic: 'WJ8TAA')]);
+      expect(groups.keys, [(bumperNumber: 'A11', uic: 'WJ8TAA')]);
       expect(
-          groups[(bumperNumber: 'A-11', uic: 'WJ8TAA')]!.map((r) => r.entityId),
+          groups[(bumperNumber: 'A11', uic: 'WJ8TAA')]!.map((r) => r.entityId),
           ['newer', 'older']);
     });
 
@@ -852,8 +890,8 @@ void main() {
       final groups = viewModel.groupByVehicle(viewModel.yourReports);
 
       expect(groups.keys.toList(), [
-        (bumperNumber: 'A-11', uic: 'WJ8TAA'),
-        (bumperNumber: 'C-33', uic: 'WJ8TAA'),
+        (bumperNumber: 'A11', uic: 'WJ8TAA'),
+        (bumperNumber: 'C33', uic: 'WJ8TAA'),
       ]);
     });
   });
@@ -878,7 +916,7 @@ void main() {
 
       expect(viewModel.queued.map((q) => q.entityId), ['newest', 'older']);
       // The vehicle parked most recently leads, alphabetical order or not.
-      expect(viewModel.queuedByBumperNumber.keys.toList(), ['Z-99', 'A-11']);
+      expect(viewModel.queuedByBumperNumber.keys.toList(), ['Z99', 'A11']);
     });
 
     test('a vehicle parked twice keeps both under one entry, newest first',
@@ -887,7 +925,7 @@ void main() {
         buildQueuedSubmission(
           id: 1,
           entityId: 'first',
-          bumperNumber: 'A-11',
+          bumperNumber: ' a 11 ',
           createdAt: DateTime.utc(2026, 3, 24, 6),
         ),
         buildQueuedSubmission(
@@ -901,8 +939,8 @@ void main() {
 
       final groups = viewModel.queuedByBumperNumber;
 
-      expect(groups.keys.toList(), ['A-11']);
-      expect(groups['A-11']!.map((q) => q.entityId), ['second', 'first']);
+      expect(groups.keys.toList(), ['A11']);
+      expect(groups['A11']!.map((q) => q.entityId), ['second', 'first']);
     });
 
     test('a refresh picks up a submission parked since the tab was opened',

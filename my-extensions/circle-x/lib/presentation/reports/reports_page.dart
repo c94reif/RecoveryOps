@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
 import 'package:circle_x/domain/entities/fault_severity.dart';
+import 'package:circle_x/domain/entities/bumper_number.dart';
+import 'package:circle_x/domain/entities/uic.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
 import 'package:circle_x/presentation/maintainer/maintainer_review_summary.dart';
 import 'package:circle_x/core/di/service_locator.dart';
@@ -50,7 +52,7 @@ class ReportsPageState extends State<ReportsPage> {
     if (unit == ReportUnitSelector.other) return viewModel.otherUnitReports;
     if (unit == ReportUnitSelector.all) return viewModel.unitReports;
     return viewModel.unitReports
-        .where((report) => report.uic.trim().toUpperCase() == unit)
+        .where((report) => Uic.normalize(report.uic) == unit)
         .toList();
   }
 
@@ -94,8 +96,8 @@ class ReportsPageState extends State<ReportsPage> {
     setState(() {
       selectedTab = report.isOutgoing ? ReportsTab.yours : ReportsTab.unit;
       selectedVehicle = (
-        bumperNumber: report.bumperNumber.trim().toUpperCase(),
-        uic: report.uic.trim().toUpperCase(),
+        bumperNumber: BumperNumber.matchingKey(report.bumperNumber),
+        uic: Uic.normalize(report.uic),
       );
       expandedIds.add(report.entityId);
     });
@@ -254,7 +256,9 @@ class ReportsPageState extends State<ReportsPage> {
       }
       for (final entry in groups.entries) {
         rows.add(() => ReportBumperHeader(
-            bumperNumber: entry.key, count: entry.value.length));
+            bumperNumber:
+                BumperNumber.normalize(entry.value.first.bumperNumber),
+            count: entry.value.length));
         for (final submission in entry.value) {
           rows.add(() => QueuedReportCard(submission: submission));
         }
@@ -318,6 +322,9 @@ class ReportsPageState extends State<ReportsPage> {
             if (vehicle != null)
               ReportHistoryHeader(
                 vehicle: vehicle,
+                bumperNumber: history.isEmpty
+                    ? vehicle.bumperNumber
+                    : BumperNumber.normalize(history.first.bumperNumber),
                 count: history.length,
                 onBack: () => setState(() => selectedVehicle = null),
               ),

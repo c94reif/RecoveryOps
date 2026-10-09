@@ -110,6 +110,31 @@ void main() {
       ]);
     });
 
+    test('spacing aliases persist once while different UIC characters remain',
+        () async {
+      await repository.saveProfile(const Profile(
+        uic: ' wj 8\ttaa ',
+        followedUnits: [
+          FollowedUnit(uic: 'W J8TAA', name: 'Default duplicate'),
+          FollowedUnit(uic: ' wa\u00a0b4 c0 ', name: 'Attached'),
+          FollowedUnit(uic: 'WAB4C0', name: 'Spacing duplicate'),
+          FollowedUnit(uic: 'wab4co', name: 'Different letters'),
+          FollowedUnit(uic: '00 ab12', name: 'Leading zeros'),
+        ],
+      ));
+
+      final stored = (await dao.getProfile())!;
+      expect(stored.uic, 'WJ8TAA');
+      expect(jsonDecode(stored.followedUnitsJson), [
+        {'uic': 'WAB4C0', 'name': 'Attached'},
+        {'uic': 'WAB4CO', 'name': 'Different letters'},
+        {'uic': '00AB12', 'name': 'Leading zeros'},
+      ]);
+      final restored = (await repository.getProfile())!;
+      expect(restored.reportUnits.map((unit) => unit.uic),
+          ['WJ8TAA', 'WAB4C0', 'WAB4CO', '00AB12']);
+    });
+
     test('malformed stored lists never erase the existing default UIC',
         () async {
       for (final encoded in ['not JSON', '{}', 'null', '42']) {
@@ -134,8 +159,8 @@ void main() {
             {'name': 'No UIC'},
             {'uic': 123456},
             {'uic': 'ABC!12'},
-            {'uic': 'wj8taa', 'name': 'Default duplicate'},
-            {'uic': ' wab4c0 ', 'name': ' Attached '},
+            {'uic': 'wj8 taa', 'name': 'Default duplicate'},
+            {'uic': ' wa\tb4c0 ', 'name': ' Attached '},
             {'uic': 'WAB4C0', 'name': 'Duplicate'},
             {'uic': 'wcccc1', 'name': 7},
           ]));

@@ -74,12 +74,14 @@ class ReportTabs extends StatelessWidget {
 
 class ReportHistoryHeader extends StatelessWidget {
   final ReportVehicleKey vehicle;
+  final String bumperNumber;
   final int count;
   final VoidCallback onBack;
 
   const ReportHistoryHeader({
     super.key,
     required this.vehicle,
+    required this.bumperNumber,
     required this.count,
     required this.onBack,
   });
@@ -104,7 +106,7 @@ class ReportHistoryHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(vehicle.bumperNumber,
+                Text(bumperNumber,
                     style: const TextStyle(
                         color: textPrimary,
                         fontSize: 16,

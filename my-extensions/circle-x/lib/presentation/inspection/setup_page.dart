@@ -49,7 +49,7 @@ class SetupPageState extends State<SetupPage> {
   void prefillUic() {
     final uic = viewModel.profile?.uic ?? '';
     if (uic.isEmpty || uicController.text.isNotEmpty) return;
-    uicController.text = uic;
+    uicController.text = Uic.normalize(uic);
   }
 
   void onFieldChanged() => setState(() {});

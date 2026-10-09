@@ -1,6 +1,7 @@
 import 'package:circle_x/domain/entities/pmcs_history.dart';
 import 'package:circle_x/domain/entities/fault_severity.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
+import 'package:circle_x/presentation/reports/controllers/report_search.dart';
 
 /// Queries the current reports and suggestion preferences without owning them.
 class ReportBrowser {
@@ -15,13 +16,12 @@ class ReportBrowser {
     required bool unreadOnly,
     FaultSeverity? severity,
   }) {
-    final query = search.trim().toUpperCase();
+    final query = ReportSearch(search);
     return Map.fromEntries(
         viewModel.groupByVehicle(reports).entries.where((entry) {
-      final vehicle = entry.key;
-      return (query.isEmpty ||
-              vehicle.bumperNumber.contains(query) ||
-              vehicle.uic.contains(query)) &&
+      final latest = entry.value.first;
+      return query.matches(
+              bumperNumber: latest.bumperNumber, uic: latest.uic) &&
           (!(faultsOnly || severity != null) ||
               _matchesFaults(entry.value.first, severity)) &&
           (!unreadOnly ||

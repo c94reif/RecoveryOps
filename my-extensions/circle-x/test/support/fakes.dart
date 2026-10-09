@@ -1,4 +1,6 @@
 import 'package:circle_x/domain/entities/mileage_reading.dart';
+import 'package:circle_x/domain/entities/bumper_number.dart';
+import 'package:circle_x/domain/entities/uic.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -695,9 +697,9 @@ class FakeReportsViewModel extends ChangeNotifier implements ReportsViewModel {
 
   @override
   bool isSameUnit(PmcsReport report) => reportUnits.isEmpty
-      ? myUic.isEmpty || report.uic.trim().toUpperCase() == myUic
+      ? myUic.isEmpty || Uic.normalize(report.uic) == myUic
       : reportUnits
-          .any((unit) => unit.normalizedUic == report.uic.trim().toUpperCase());
+          .any((unit) => unit.normalizedUic == Uic.normalize(report.uic));
 
   @override
   List<PmcsReport> get unitReports =>
@@ -714,8 +716,8 @@ class FakeReportsViewModel extends ChangeNotifier implements ReportsViewModel {
     for (final report in source) {
       if (report.isMaintainerReview) continue;
       groups.putIfAbsent((
-        bumperNumber: report.bumperNumber.trim().toUpperCase(),
-        uic: report.uic.trim().toUpperCase(),
+        bumperNumber: BumperNumber.matchingKey(report.bumperNumber),
+        uic: Uic.normalize(report.uic),
       ), () => []).add(report);
     }
     for (final list in groups.values) {
@@ -734,7 +736,8 @@ class FakeReportsViewModel extends ChangeNotifier implements ReportsViewModel {
     final groups = <String, List<QueuedSubmission>>{};
     for (final submission in queued) {
       groups
-          .putIfAbsent(submission.bumperNumber.trim().toUpperCase(), () => [])
+          .putIfAbsent(
+              BumperNumber.matchingKey(submission.bumperNumber), () => [])
           .add(submission);
     }
     for (final list in groups.values) {

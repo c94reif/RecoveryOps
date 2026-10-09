@@ -119,6 +119,30 @@ void main() {
     expect(repository.profile!.followedUnits.single.name, 'Alpha');
   });
 
+  test('UIC whitespace aliases work for saving, duplicate checks and edits',
+      () async {
+    expect(await viewModel.save(' wj 8\ttaa '), isTrue);
+    expect(viewModel.savedUic, 'WJ8TAA');
+    viewModel.checkDirty('w j8taa');
+    expect(viewModel.isDirty, isFalse);
+
+    expect(await viewModel.addFollowedUnit(' wa\u00a0b4 c0 ', name: 'Alpha'),
+        isTrue);
+    expect(viewModel.followedUnits.single.uic, 'WAB4C0');
+    expect(
+        viewModel.followedUnitError('wa b4c0'), 'You already follow this UIC.');
+    expect(await viewModel.addFollowedUnit('wa b4c0'), isFalse);
+    expect(await viewModel.addFollowedUnit('w j8taa'), isFalse);
+    expect(
+        viewModel.followedUnitError('wa b4c0', editingUic: 'wab4 c0'), isNull);
+    expect(
+        await viewModel.updateFollowedUnit('wab4 c0', 'wa b4c0', name: 'Bravo'),
+        isTrue);
+    expect(viewModel.followedUnits.single.name, 'Bravo');
+    expect(await viewModel.removeFollowedUnit('wab4 c0'), isTrue);
+    expect(repository.profile!.followedUnits, isEmpty);
+  });
+
   test('invalid UICs and removal of the primary never change the profile',
       () async {
     for (final uic in ['', 'W123', 'W123456', 'W12!45']) {

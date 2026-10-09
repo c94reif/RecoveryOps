@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
+import 'package:circle_x/domain/entities/bumper_number.dart';
 import 'package:circle_x/domain/services/bumper_scanner_strategy.dart';
 import 'package:circle_x/domain/usecases/vehicle/find_bumper_markings.dart';
 import 'package:circle_x/presentation/common/widgets/custom_button.dart';
@@ -152,7 +153,7 @@ class _BumperScanDialogState extends State<BumperScanDialog>
                   text: 'USE BUMPER NUMBER',
                   onPressed: _canUse
                       ? () => Navigator.of(context)
-                          .pop(_draft.text.trim().toUpperCase())
+                          .pop(BumperNumber.normalize(_draft.text))
                       : null,
                 )),
               ]),

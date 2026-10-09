@@ -14,6 +14,13 @@ void main() {
         ['A', '11', 'B 22', '42', 'HQ']);
   });
 
+  test('spacing and hyphens do not repeat the same bumper suggestion', () {
+    expect(
+      findBumperMarkings(['HHC 112', 'hhc112', 'HHC-112', 'HHC–112', 'HHC113']),
+      ['HHC 112', 'HHC113'],
+    );
+  });
+
   test('does not guess at commonly confused characters or invent a format', () {
     expect(findBumperMarkings(['B-O1', 'B-01', 'I-11', '1-11', 'HQ/6', 'A.12']),
         ['B-O1', 'B-01', 'I-11', '1-11', 'HQ/6', 'A.12']);

@@ -48,6 +48,22 @@ void main() {
   }
 
   group('starting a PMCS', () {
+    testWidgets('manual entry saves spaced identifiers consistently',
+        (tester) async {
+      await harness.load();
+      await tester.pumpWidget(createWidgetUnderTest());
+      await tester.enterText(field('Bumper Number'), 'hhc 112');
+      await tester.enterText(field('UIC'), 'wj 8t aa');
+      await tester.pump();
+
+      expect(isBeginEnabled(tester), isTrue);
+      await tester.tap(beginButton);
+      await tester.pumpAndSettle();
+
+      expect(harness.viewModel.session?.bumperNumber, 'HHC112');
+      expect(harness.viewModel.session?.uic, 'WJ8TAA');
+    });
+
     testWidgets('short, long and invalid prefilled UICs block starting',
         (tester) async {
       await tester.pumpWidget(createWidgetUnderTest());
@@ -128,8 +144,8 @@ void main() {
       await tester.pumpAndSettle();
 
       harness.viewModel.prefillVehicle(
-        bumperNumber: 'B-22',
-        uic: 'WAB4C0',
+        bumperNumber: ' b - 22 ',
+        uic: ' wa b4 c0 ',
         vehicleType: VehicleType.jltv,
       );
       await tester.pumpAndSettle();

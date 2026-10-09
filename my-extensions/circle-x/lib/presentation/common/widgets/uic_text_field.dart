@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:circle_x/domain/entities/uic.dart';
 import 'package:circle_x/presentation/common/widgets/custom_text_field.dart';
 
@@ -41,7 +42,7 @@ class _UicTextFieldState extends State<UicTextField> {
                 ? Uic.validate(value.text)
                 : null,
             textCapitalization: TextCapitalization.characters,
-            uppercase: true,
+            inputFormatters: [_UicTextFormatter()],
             autocorrect: false,
             textInputAction: TextInputAction.done,
             onChanged: (_) => setState(() => edited = true),
@@ -50,4 +51,25 @@ class _UicTextFieldState extends State<UicTextField> {
           );
         },
       );
+}
+
+class _UicTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    if (!newValue.composing.isCollapsed) return newValue;
+    int offset(int value) => value < 0
+        ? value
+        : Uic.normalize(newValue.text.substring(0, value)).length;
+    return newValue.copyWith(
+      text: Uic.normalize(newValue.text),
+      selection: TextSelection(
+        baseOffset: offset(newValue.selection.baseOffset),
+        extentOffset: offset(newValue.selection.extentOffset),
+        affinity: newValue.selection.affinity,
+        isDirectional: newValue.selection.isDirectional,
+      ),
+      composing: TextRange.empty,
+    );
+  }
 }

@@ -336,6 +336,26 @@ void main() {
   });
 
   group('resume', () {
+    test('resumed legacy identifiers are normalized on the next draft save',
+        () async {
+      final draft = await sessions.insert(buildSession(
+        bumperNumber: ' hhc 112 ',
+        uic: ' wj 8t aa ',
+      ));
+      await viewModel.resumeSession(draft);
+      await viewModel.openPhase(PmcsPhase.before);
+      await viewModel.answer(brakeFluid, 0);
+      await viewModel.answer(parkingBrake, 0);
+      await viewModel.completeActivePhase();
+
+      expect(viewModel.session!.bumperNumber, 'HHC112');
+      expect(viewModel.session!.uic, 'WJ8TAA');
+      final saved = await sessions.getBySessionId(draft.sessionId);
+      expect(saved!.bumperNumber, 'HHC112');
+      expect(saved.uic, 'WJ8TAA');
+      expect(draft.bumperNumber, ' hhc 112 ');
+    });
+
     test('a draft without saved checks still needs a PMCS type', () async {
       final draft = await sessions.insert(buildSession());
       await viewModel.resumeSession(draft);

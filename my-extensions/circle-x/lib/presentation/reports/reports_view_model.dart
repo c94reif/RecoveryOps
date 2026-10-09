@@ -5,6 +5,7 @@ import 'package:circle_x/domain/entities/incoming_report_message.dart';
 import 'package:circle_x/domain/services/report_message_source.dart';
 
 import 'package:circle_x/core/constants/app_constants.dart';
+import 'package:circle_x/domain/entities/bumper_number.dart';
 import 'package:circle_x/domain/entities/pmcs_report.dart';
 import 'package:circle_x/domain/entities/followed_unit.dart';
 import 'package:circle_x/domain/entities/uic.dart';

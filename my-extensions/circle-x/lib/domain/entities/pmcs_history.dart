@@ -1,8 +1,10 @@
 import 'dart:convert';
 
+import 'package:circle_x/domain/entities/bumper_number.dart';
 import 'package:circle_x/domain/entities/pmcs_fault.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
 import 'package:circle_x/domain/entities/pmcs_report.dart';
+import 'package:circle_x/domain/entities/uic.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
 
 class HistoricalFault {
@@ -38,30 +40,35 @@ class PhaseComparison {
 class PmcsHistory {
   final List<PmcsReport> reports;
 
-  PmcsHistory.forVehicle(
+  PmcsHistory._(this.reports);
+
+  factory PmcsHistory.forVehicle(
     Iterable<PmcsReport> source, {
     required String bumperNumber,
     required String uic,
     required VehicleType vehicleType,
     DateTime? before,
     String? excluding,
-  }) : reports = source
-            .where((report) =>
-                !report.isMaintainerReview &&
-                report.entityId != excluding &&
-                report.vehicleType == vehicleType &&
-                _normalize(report.bumperNumber) == _normalize(bumperNumber) &&
-                _normalize(report.uic) == _normalize(uic) &&
-                (before == null || report.timestamp.isBefore(before)))
-            .toList()
-          ..sort((first, second) {
-            final timestampOrder = second.timestamp.compareTo(first.timestamp);
-            return timestampOrder != 0
-                ? timestampOrder
-                : second.entityId.compareTo(first.entityId);
-          });
-
-  static String _normalize(String value) => value.trim().toUpperCase();
+  }) {
+    final bumperKey = BumperNumber.matchingKey(bumperNumber);
+    final unitKey = Uic.normalize(uic);
+    final reports = source
+        .where((report) =>
+            !report.isMaintainerReview &&
+            report.entityId != excluding &&
+            report.vehicleType == vehicleType &&
+            BumperNumber.matchingKey(report.bumperNumber) == bumperKey &&
+            Uic.normalize(report.uic) == unitKey &&
+            (before == null || report.timestamp.isBefore(before)))
+        .toList()
+      ..sort((first, second) {
+        final timestampOrder = second.timestamp.compareTo(first.timestamp);
+        return timestampOrder != 0
+            ? timestampOrder
+            : second.entityId.compareTo(first.entityId);
+      });
+    return PmcsHistory._(reports);
+  }
 
   PmcsReport? previousFor(PmcsPhase phase) {
     for (final report in reports) {

@@ -160,7 +160,7 @@ void main() {
     await open(tester);
     await selectSeverity(tester, 'CIRCLE_X');
     final vehicle =
-        find.byKey(const ValueKey((bumperNumber: 'B-22', uic: 'WAB4C0')));
+        find.byKey(const ValueKey((bumperNumber: 'B22', uic: 'WAB4C0')));
     await tester.ensureVisible(vehicle);
     await tester.tap(vehicle);
     await tester.pumpAndSettle();

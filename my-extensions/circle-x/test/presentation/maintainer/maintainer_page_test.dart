@@ -145,6 +145,32 @@ void main() {
     expect(find.byType(PmcsReportCard), findsNWidgets(2));
   });
 
+  testWidgets('triage and search reconcile spaced, compact and dashed bumpers',
+      (tester) async {
+    viewModel.reports.addAll([
+      buildReport(
+          entityId: 'earlier',
+          bumperNumber: 'HHC 112',
+          uic: 'wj 8taa',
+          timestamp: DateTime.utc(2026, 1, 1),
+          faults: [buildFault()]),
+      buildReport(
+          entityId: 'current',
+          bumperNumber: 'HHC-112',
+          timestamp: DateTime.utc(2026, 1, 2),
+          faults: [buildFault()]),
+    ]);
+    await tester.pumpWidget(subject());
+    await tester.pumpAndSettle();
+    expect(find.text('1 vehicle awaiting review'), findsOneWidget);
+    expect(find.byKey(const ValueKey('earlier')), findsNothing);
+    for (final query in ['HHC112', 'hhc 112', ' wj 8 taa ']) {
+      await tester.enterText(find.byType(TextField), query);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('current')), findsOneWidget);
+    }
+  });
+
   testWidgets('incoming reports, fault notes and refresh use the shared data',
       (tester) async {
     await tester.pumpWidget(subject());

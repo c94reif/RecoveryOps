@@ -4,6 +4,45 @@ import 'package:circle_x/core/theme/app_theme.dart';
 import 'package:circle_x/presentation/common/widgets/uic_text_field.dart';
 
 void main() {
+  testWidgets('pasting a spaced UIC keeps all six characters', (tester) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(MaterialApp(
+        theme: appTheme,
+        home: Scaffold(body: UicTextField(controller: controller))));
+
+    await tester.enterText(find.byType(TextField), ' w ab 4 c0 ');
+    await tester.pumpAndSettle();
+
+    expect(controller.text, 'WAB4C0');
+    expect(controller.selection.baseOffset, 6);
+    expect(find.text('6/6'), findsOneWidget);
+    expect(find.text('UIC must be exactly 6 characters'), findsNothing);
+
+    await tester.enterText(find.byType(TextField), ' w ab 4 c00 ');
+    await tester.pumpAndSettle();
+    expect(controller.text, 'WAB4C00');
+    expect(find.text('UIC must be exactly 6 characters'), findsOneWidget);
+  });
+
+  testWidgets('normalizing a UIC keeps the cursor at the edited character',
+      (tester) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(MaterialApp(
+        theme: appTheme,
+        home: Scaffold(body: UicTextField(controller: controller))));
+    await tester.showKeyboard(find.byType(TextField));
+    tester.testTextInput.updateEditingValue(const TextEditingValue(
+      text: 'w ab4c0',
+      selection: TextSelection.collapsed(offset: 3),
+    ));
+    await tester.pump();
+
+    expect(controller.text, 'WAB4C0');
+    expect(controller.selection.baseOffset, 2);
+  });
+
   testWidgets('counts characters and shows short, long and invalid UIC errors',
       (tester) async {
     final controller = TextEditingController();

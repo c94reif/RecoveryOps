@@ -54,6 +54,19 @@ void main() {
     expect(session.bumperNumber, 'A-11');
   });
 
+  test('saves spaced bumper numbers and UICs without whitespace', () async {
+    final session = await start(
+      bumperNumber: '  hhc \t112 ',
+      uic: ' wj 8t aa ',
+    );
+
+    expect(session.bumperNumber, 'HHC112');
+    expect(session.uic, 'WJ8TAA');
+    final saved = await sessions.getBySessionId(session.sessionId);
+    expect(saved!.bumperNumber, 'HHC112');
+    expect(saved.uic, 'WJ8TAA');
+  });
+
   test('trims and upper-cases the UIC', () async {
     final session = await start(uic: '  wj8taa  ');
 

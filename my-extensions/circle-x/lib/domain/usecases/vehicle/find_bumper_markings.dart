@@ -1,7 +1,9 @@
+import 'package:circle_x/domain/entities/bumper_number.dart';
+
 /// Keeps the OCR's letters and digits intact, including O/0 and I/1. These are
 /// choices to review, not validated vehicle identifiers or an automatic match.
 List<String> findBumperMarkings(Iterable<String> lines) {
-  final markings = <String>{};
+  final markings = <String, String>{};
   for (final raw in lines) {
     final line = raw
         .toUpperCase()
@@ -14,7 +16,7 @@ List<String> findBumperMarkings(Iterable<String> lines) {
         !RegExp(r'^[A-Z0-9][A-Z0-9 ./-]*$').hasMatch(line)) {
       continue;
     }
-    markings.add(line);
+    markings.putIfAbsent(BumperNumber.matchingKey(line), () => line);
   }
-  return markings.toList(growable: false);
+  return markings.values.toList(growable: false);
 }

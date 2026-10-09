@@ -54,7 +54,10 @@ mixin _InspectionSession on _InspectionState {
       return false;
     }
     selectedVehicle = vehicleType;
-    pendingPrefill = (bumperNumber: bumperNumber, uic: uic);
+    pendingPrefill = (
+      bumperNumber: BumperNumber.normalize(bumperNumber),
+      uic: Uic.normalize(uic),
+    );
     notifyListeners();
     return true;
   }
@@ -135,7 +138,12 @@ mixin _InspectionSession on _InspectionState {
     }
 
     try {
-      session = open;
+      session = open.status == SessionStatus.inProgress
+          ? open.copyWith(
+              bumperNumber: BumperNumber.normalize(open.bumperNumber),
+              uic: Uic.normalize(open.uic),
+            )
+          : open;
       await loadHistory();
       selectedVehicle = open.vehicleType;
       sessionFaults = await faultsRepository.getForSession(open.sessionId);

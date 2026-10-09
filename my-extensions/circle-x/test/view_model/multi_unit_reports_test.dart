@@ -260,14 +260,14 @@ void main() {
     final groups = reports.groupByVehicle(reports.unitReports);
 
     expect(groups.keys.toSet(), {
-      (bumperNumber: 'A-11', uic: primary),
-      (bumperNumber: 'A-11', uic: followed),
+      (bumperNumber: 'A11', uic: primary),
+      (bumperNumber: 'A11', uic: followed),
     });
     expect(
-        groups[(bumperNumber: 'A-11', uic: primary)]!
+        groups[(bumperNumber: 'A11', uic: primary)]!
             .map((report) => report.entityId),
         ['home-new', 'home-old']);
-    expect(ids(groups[(bumperNumber: 'A-11', uic: followed)]!), {'attached'});
+    expect(ids(groups[(bumperNumber: 'A11', uic: followed)]!), {'attached'});
     expect(reports.otherUnitReports, isEmpty);
   });
 }

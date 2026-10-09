@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/core/di/injection.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
 import 'package:circle_x/domain/entities/fault_severity.dart';
+import 'package:circle_x/domain/entities/bumper_number.dart';
+import 'package:circle_x/domain/entities/uic.dart';
 import 'package:circle_x/domain/entities/maintainer_review.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
 import 'package:circle_x/domain/entities/attested_identity.dart';
@@ -44,7 +46,10 @@ void main() {
     String bumperNumber = 'A-11',
     String uic = 'WJ8TAA',
   }) async {
-    final card = find.byKey(ValueKey((bumperNumber: bumperNumber, uic: uic)));
+    final card = find.byKey(ValueKey((
+      bumperNumber: BumperNumber.matchingKey(bumperNumber),
+      uic: Uic.normalize(uic),
+    )));
     await tester.ensureVisible(card);
     await tester.pumpAndSettle();
     await tester.tap(card);
@@ -73,6 +78,35 @@ void main() {
   });
 
   group('vehicle search and filters', () {
+    testWidgets('formatting variants open one vehicle history from a request',
+        (tester) async {
+      final older = buildReport(
+          entityId: 'old-format',
+          bumperNumber: ' hhc 112 ',
+          uic: ' wj 8taa ',
+          timestamp: DateTime.utc(2026, 3, 24, 6));
+      viewModel.reports.addAll([
+        older,
+        buildReport(
+            entityId: 'new-format',
+            bumperNumber: 'HHC-112',
+            timestamp: DateTime.utc(2026, 3, 24, 9)),
+      ]);
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'hhc 112');
+      await tester.pumpAndSettle();
+      expect(find.text('HHC-112 - Stryker'), findsOneWidget);
+      expect(find.text('2 PMCS'), findsOneWidget);
+
+      viewModel.reportToOpen.value = older;
+      await tester.pumpAndSettle();
+      expect(find.text('UIC WJ8TAA · 2 PMCS'), findsOneWidget);
+      expect(find.text('HHC-112'), findsOneWidget);
+      expect(older.bumperNumber, ' hhc 112 ');
+      expect(older.uic, ' wj 8taa ');
+    });
+
     testWidgets(
         'search matches bumper numbers and UICs without case sensitivity',
         (tester) async {
@@ -437,6 +471,8 @@ void main() {
           timestamp: DateTime.utc(2026, 3, 24, 6));
       final newer = buildReport(
           entityId: 'new',
+          bumperNumber: ' a 11 ',
+          uic: ' wj8 taa ',
           operator: 'LATEST CREW',
           timestamp: DateTime.utc(2026, 3, 24, 9));
       viewModel.reports.add(older);

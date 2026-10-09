@@ -8,6 +8,7 @@ import 'package:circle_x/presentation/maintainer/maintainer_review_page.dart';
 import 'package:circle_x/presentation/maintainer/maintainer_review_prompt.dart';
 import 'package:circle_x/presentation/common/widgets/pmcs_report_card.dart';
 import 'package:circle_x/presentation/reports/controllers/report_browser.dart';
+import 'package:circle_x/presentation/reports/controllers/report_search.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
 import 'package:circle_x/presentation/reports/widgets/report_vehicle_filters.dart';
 
@@ -131,12 +132,11 @@ class MaintainerPageState extends State<MaintainerPage> {
             .values
             .map((history) => history.first)
             .toList();
-        final query = searchController.text.trim().toUpperCase();
+        final query = ReportSearch(searchController.text);
         final pending = pendingReports(latest);
         final filtered = pending
-            .where((report) => (query.isEmpty ||
-                report.bumperNumber.toUpperCase().contains(query) ||
-                report.uic.toUpperCase().contains(query)))
+            .where((report) => query.matches(
+                bumperNumber: report.bumperNumber, uic: report.uic))
             .toList()
           ..sort((first, second) {
             final severity = (second.worstSeverity?.rank ?? 0)
@@ -145,7 +145,7 @@ class MaintainerPageState extends State<MaintainerPage> {
                 ? severity
                 : second.timestamp.compareTo(first.timestamp);
           });
-        final hasFilters = query.isNotEmpty;
+        final hasFilters = !query.isEmpty;
         return SafeArea(
           child: Column(
             children: [

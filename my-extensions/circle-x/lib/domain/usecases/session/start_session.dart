@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:circle_x/domain/entities/bumper_number.dart';
 import 'package:circle_x/domain/services/diagnostic_logger.dart';
 import 'package:circle_x/domain/entities/pmcs_session.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
@@ -32,7 +33,7 @@ class StartSession {
     if (error != null) throw ArgumentError(error);
     final session = PmcsSession(
       sessionId: idGenerator.newId(),
-      bumperNumber: bumperNumber.trim().toUpperCase(),
+      bumperNumber: BumperNumber.normalize(bumperNumber),
       vehicleType: vehicleType,
       operator: '',
       uic: Uic.normalize(uic),

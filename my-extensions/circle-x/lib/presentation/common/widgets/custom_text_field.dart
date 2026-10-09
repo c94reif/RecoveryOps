@@ -20,6 +20,7 @@ class CustomTextField extends StatelessWidget {
   final String? helperText;
   final String? errorText;
   final String? counterText;
+  final List<TextInputFormatter>? inputFormatters;
 
   const CustomTextField({
     super.key,
@@ -40,6 +41,7 @@ class CustomTextField extends StatelessWidget {
     this.helperText,
     this.errorText,
     this.counterText,
+    this.inputFormatters,
   });
 
   @override
@@ -53,7 +55,10 @@ class CustomTextField extends StatelessWidget {
       focusNode: focusNode,
       textInputAction: textInputAction,
       onSubmitted: onSubmitted,
-      inputFormatters: uppercase ? [UppercaseTextFormatter()] : null,
+      inputFormatters: [
+        if (uppercase) UppercaseTextFormatter(),
+        ...?inputFormatters,
+      ],
       decoration: InputDecoration(
         labelText: label,
         floatingLabelBehavior: floatingLabelBehavior,

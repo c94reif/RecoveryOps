@@ -53,8 +53,8 @@ mixin _ReportsCollection on _ReportsState {
     for (final report in source) {
       if (report.isMaintainerReview) continue;
       final vehicle = (
-        bumperNumber: report.bumperNumber.trim().toUpperCase(),
-        uic: report.uic.trim().toUpperCase(),
+        bumperNumber: BumperNumber.matchingKey(report.bumperNumber),
+        uic: Uic.normalize(report.uic),
       );
       groups.putIfAbsent(vehicle, () => []).add(report);
     }
@@ -74,7 +74,7 @@ mixin _ReportsCollection on _ReportsState {
   Map<String, List<QueuedSubmission>> get queuedByBumperNumber {
     final groups = <String, List<QueuedSubmission>>{};
     for (final submission in queued) {
-      final bumper = submission.bumperNumber.trim().toUpperCase();
+      final bumper = BumperNumber.matchingKey(submission.bumperNumber);
       groups.putIfAbsent(bumper, () => []).add(submission);
     }
     for (final list in groups.values) {

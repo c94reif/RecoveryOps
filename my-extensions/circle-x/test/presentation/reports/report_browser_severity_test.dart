@@ -42,6 +42,37 @@ void main() {
           .map((history) => history.first.entityId)
           .toSet();
 
+  test('search ignores identifier case, whitespace and bumper dashes', () {
+    model.reports.addAll([
+      buildReport(
+          entityId: 'spaced', bumperNumber: ' hhc 112 ', uic: ' wj 8taa '),
+      buildReport(entityId: 'other', bumperNumber: 'HHC113', uic: 'WBBBBB'),
+    ]);
+
+    for (final query in [
+      'hhc112',
+      ' HHC 112 ',
+      'HHC-112',
+      'hhc–112',
+      'wj8 taa'
+    ]) {
+      expect(matches(search: query), {'spaced'}, reason: query);
+    }
+    expect(matches(search: '-'), isEmpty);
+    expect(matches(search: 'HHC113'), {'other'});
+  });
+
+  test('search resolves an older bumper spelling against the latest report',
+      () {
+    model.reports.addAll([
+      buildReport(entityId: 'old', bumperNumber: 'HHC 112', timestamp: old),
+      buildReport(entityId: 'new', bumperNumber: 'HHC-112', timestamp: latest),
+    ]);
+
+    expect(matches(search: 'HHC 112'), {'new'});
+    expect(matches(search: '-'), {'new'});
+  });
+
   test('each severity matches any latest fault, including mixed-severity PMCS',
       () {
     for (final severity in FaultSeverity.values) {

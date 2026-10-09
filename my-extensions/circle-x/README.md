@@ -267,6 +267,14 @@ unread PMCS for followed units (including the default); maintainer reviews stay
 attached to their source PMCS. Vehicle history remains grouped by bumper number
 and UIC, even when two units use the same bumper number.
 
+Bumper matching ignores capitalization, whitespace, and optional hyphens, so
+`HHC 112`, `HHC112`, and `HHC-112` share one vehicle history within the same UIC.
+These rules also apply to existing and received reports, report search, and
+historical fault suggestions. New entries remove whitespace and use uppercase;
+UICs still require six letters or digits. Leading zeros and distinct characters
+such as `O`/`0` and `I`/`1` remain significant. Existing report payloads are not
+rewritten to combine histories.
+
 The severity choices **All severities**, **RED X**, **X**, and **DASH** combine
 with unit selection, search, **With faults**, and **Unread**. A selected severity
 matches any fault in the vehicle's latest PMCS or an earlier unresolved fault
