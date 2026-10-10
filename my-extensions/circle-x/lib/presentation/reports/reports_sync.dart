@@ -1,6 +1,5 @@
 part of 'reports_view_model.dart';
 
-/// Database loading, incoming messages, withdrawals, and remote polling.
 mixin _ReportsSync on _ReportsState {
   Future<void> loadFromDb() async {
     final rows = await repository.getAllReports();
@@ -16,7 +15,6 @@ mixin _ReportsSync on _ReportsState {
         addedReports = true;
       }
     }
-    // An eager lifecycle wake may already have snapshotted the empty list.
     if (addedReports && syncInFlight != null) syncAgain = true;
     await loadMyUic();
     if (disposed) return;
@@ -67,8 +65,6 @@ mixin _ReportsSync on _ReportsState {
       updateUnread();
       notifyListeners();
       unawaited(reportNotifier.received(stored));
-      // Received records are durable before relay. Reconcile even when this
-      // screen is not mounted, without rebroadcasting the peer's report.
       syncAgain = true;
       unawaited(syncRemoteLatticeReports());
     } on ReportWithdrawn {

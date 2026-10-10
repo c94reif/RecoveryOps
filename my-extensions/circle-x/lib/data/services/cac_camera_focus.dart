@@ -15,8 +15,6 @@ Future<void> focusCacCamera(CameraController camera, Offset point) async {
       await operation();
     } on CameraException catch (error) {
       debugPrint('[CircleX] camera metering unavailable: ${error.code}');
-    } on MissingPluginException {
-      // Some host camera implementations do not expose metering controls.
-    }
+    } on MissingPluginException catch (_) {}
   }
 }

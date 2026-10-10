@@ -138,8 +138,6 @@ class ProfileViewModel extends ChangeNotifier {
     errorMessage = null;
     _notify();
     try {
-      // Read the latest settings so changing the default never overwrites a
-      // followed-unit edit saved by another view of the profile.
       final current = await repository.getProfile() ?? const Profile(uic: '');
       final next = change(current);
       await repository.saveProfile(next);

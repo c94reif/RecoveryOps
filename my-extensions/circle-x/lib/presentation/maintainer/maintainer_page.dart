@@ -73,8 +73,6 @@ class MaintainerPageState extends State<MaintainerPage> {
       if (report.faults.isEmpty) return false;
       final keys =
           report.faults.map((fault) => (fault.phase, fault.itemId)).toSet();
-      // A single signed batch must cover this exact PMCS. Delivery may still
-      // be queued, and a "not verified" decision is still a completed review.
       return !(submitted[report.entityId] ?? []).any((review) =>
           review.faults.length == keys.length &&
           review.faults.every((fault) => keys.contains(fault.key)));

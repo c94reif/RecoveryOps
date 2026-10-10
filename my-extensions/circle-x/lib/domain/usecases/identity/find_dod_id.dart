@@ -2,8 +2,6 @@ import 'package:circle_x/domain/entities/cac_identity.dart';
 
 String? findDodId(Iterable<String> lines) => inspectDodId(lines).dodId;
 
-/// Keeps the complete numeric field so a short read can guide another frame.
-/// An incomplete labelled ID must never fall back to a different card number.
 ({String? dodId, int? digitCount}) inspectDodId(Iterable<String> lines) {
   final labelled = <String>{};
   final unlabelled = <String>{};
@@ -19,14 +17,12 @@ String? findDodId(Iterable<String> lines) => inspectDodId(lines).dodId;
       if (label != null) {
         field = _benefitsLabel.hasMatch(label) ? _Field.benefits : _Field.id;
         sawIdLabel |= field == _Field.id;
-        // ML Kit sometimes puts a field's label on its own line.
         pendingField = field;
         continue;
       }
 
       pendingField = null;
       if (field == _Field.benefits) continue;
-      // Reject digits embedded in an OCR word instead of dropping the letter.
       if ((match.start > 0 && _letter.hasMatch(line[match.start - 1])) ||
           (match.end < line.length && _letter.hasMatch(line[match.end]))) {
         continue;
@@ -51,8 +47,6 @@ String? findDodId(Iterable<String> lines) => inspectDodId(lines).dodId;
 
 enum _Field { id, benefits }
 
-// Consume the whole number, including OCR spacing and dashes, before checking
-// its length. Matching just ten digits can accept a fragment of a longer field.
 final _tokens = RegExp(
   r'\b((?:DOD\s+)?(?:ID|BENEFITS)(?:\s+NUMBER)?|DBN)\b|'
   r'([0-9]+(?:[ \t\u00a0-]+[0-9]+)*)',

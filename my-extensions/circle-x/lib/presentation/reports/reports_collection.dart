@@ -1,6 +1,5 @@
 part of 'reports_view_model.dart';
 
-/// Cached report views, vehicle grouping, and unread counts.
 mixin _ReportsCollection on _ReportsState {
   @override
   void invalidateReportViews() {

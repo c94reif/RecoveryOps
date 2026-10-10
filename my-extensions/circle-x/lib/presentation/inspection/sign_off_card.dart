@@ -15,7 +15,6 @@ export 'package:circle_x/presentation/inspection/sign_off/scan_guidance.dart'
 export 'package:circle_x/presentation/inspection/sign_off/verified_sign_off.dart'
     show formatCardDate;
 
-/// Selects the sign-off state and connects its actions to the inspection.
 class SignOffCard extends StatelessWidget {
   final InspectionViewModel viewModel;
 

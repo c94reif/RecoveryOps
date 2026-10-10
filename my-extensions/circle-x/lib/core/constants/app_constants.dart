@@ -3,8 +3,6 @@ import 'package:circle_x/domain/entities/report_message_type.dart';
 class AppConstants {
   const AppConstants._();
 
-  // Keep registration and package IDs aligned for package assets, as in
-  // Recovery Ops. The operator-facing name remains hyphenated.
   static const String extensionId = 'circle_x';
   static const String extensionName = 'circle-x';
   static const String extensionDescription =

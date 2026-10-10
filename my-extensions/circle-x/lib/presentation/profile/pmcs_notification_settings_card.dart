@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
 import 'package:circle_x/domain/services/pmcs_notification_port.dart';
 
-/// Phone preferences are saved independently of the profile's editable fields.
 class PmcsNotificationSettingsCard extends StatefulWidget {
   final PmcsNotificationPort notifications;
 
@@ -66,7 +65,6 @@ class _PmcsNotificationSettingsCardState
   Future<void> _setEnabled(bool value) {
     if (_busy || _status?.supported != true) return Future.value();
     return _run(
-      // Only this explicit switch action can request phone permission.
       (notifications) => notifications.setEnabled(value),
       activity: 'Saving notification preference…',
       error: 'Could not update notification settings. Try again.',

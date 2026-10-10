@@ -1,7 +1,5 @@
 import 'package:circle_x/domain/entities/cac_name.dart';
 
-/// Reads the NAME field, or an unambiguous LAST, GIVEN line if its label was
-/// missed. Never guesses a name from arbitrary unlabelled words on the card.
 CacName? findCacName(Iterable<String> rawLines) {
   final lines =
       rawLines.map(_normalize).where((line) => line.isNotEmpty).toList();
@@ -15,8 +13,6 @@ CacName? findCacName(Iterable<String> rawLines) {
       final parts = <String>[];
       final inline = line.substring(label.end);
       if (inline.isNotEmpty) parts.add(inline);
-      // Names can wrap over multiple OCR lines. A field label, date, or card
-      // heading ends this field instead of becoming part of the person's name.
       for (var next = index + 1;
           next < lines.length && parts.length < 3;
           next++) {

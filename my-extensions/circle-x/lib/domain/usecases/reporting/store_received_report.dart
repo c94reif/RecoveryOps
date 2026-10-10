@@ -1,8 +1,6 @@
 import 'package:circle_x/domain/entities/pmcs_report.dart';
 import 'package:circle_x/domain/repositories/reports_repo.dart';
 
-/// A peer can receive the review before the operator's original transmission.
-/// Restore the included PMCS snapshot only when that original is absent.
 Future<List<PmcsReport>> storeReceivedReport(
   ReportsRepository repository,
   PmcsReport report,

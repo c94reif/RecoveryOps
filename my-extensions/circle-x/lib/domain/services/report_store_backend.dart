@@ -1,4 +1,3 @@
-/// Selects remote persistence only. Local storage and peer delivery are separate.
 enum ReportStoreBackend {
   meshItemStore,
   entities;

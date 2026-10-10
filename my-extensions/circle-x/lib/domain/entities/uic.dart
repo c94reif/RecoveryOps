@@ -2,7 +2,6 @@ abstract final class Uic {
   static const length = 6;
   static final _whitespace = RegExp(r'\s+');
 
-  /// Spaces from typing or pasting are formatting; all six letters/digits stay.
   static String normalize(String value) =>
       value.replaceAll(_whitespace, '').toUpperCase();
 

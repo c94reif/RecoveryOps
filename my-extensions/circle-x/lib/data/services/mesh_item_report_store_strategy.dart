@@ -61,8 +61,6 @@ class MeshItemReportStoreStrategy implements ReportStoreStrategy {
             entry.key,
       };
 
-  // Import and reconciliation must agree about which live records are usable.
-  // Withdrawals stay known even when no report body can be decoded.
   PmcsReport? _readReport(String reportId, sdk.MeshItem item) {
     if (item.data['withdrawn'] != false) return null;
     final body = MeshReportCollection.body(item);

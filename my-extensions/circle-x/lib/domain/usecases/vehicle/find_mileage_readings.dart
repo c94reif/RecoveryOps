@@ -1,7 +1,5 @@
 import 'package:circle_x/domain/entities/mileage_reading.dart';
 
-/// Keep plausible odometer lines, never combining numbers from separate gauges.
-/// Results are suggestions only: the operator must confirm the value and unit.
 List<MileageReading> findMileageReadings(List<String> lines) {
   final readings = <String, MileageReading>{};
   final label =
@@ -12,7 +10,6 @@ List<MileageReading> findMileageReadings(List<String> lines) {
   for (var i = 0; i < lines.length; i++) {
     var text = lines[i].trim().toUpperCase();
     if (unrelated.hasMatch(text)) continue;
-    // A label and its value can arrive as separate OCR lines.
     final previous = i == 0 ? '' : lines[i - 1].trim().toUpperCase();
     if (unrelated.hasMatch(previous) &&
         !RegExp(r'\d').hasMatch(previous) &&
@@ -35,14 +32,12 @@ List<MileageReading> findMileageReadings(List<String> lines) {
     final unit =
         unitText.startsWith('K') ? MileageUnit.kilometers : MileageUnit.miles;
     text = text.replaceFirst(units, '').trim();
-    // Permit thousands separated by spaces without joining arbitrary digits.
     if (RegExp(r'^\d{1,3}(?: \d{3}){1,2}(?:\.\d)?$').hasMatch(text)) {
       text = text.replaceAll(' ', ',');
     }
     final reading = MileageReading.parse(text, unit);
     if (reading == null) continue;
     final digits = text.split('.').first.replaceAll(',', '').length;
-    // Short unlabelled values are usually speedometer ticks or other gauges.
     if (!labeled && unitText.isEmpty && digits < 4) continue;
     readings[reading.display] = reading;
   }

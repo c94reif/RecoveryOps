@@ -1,8 +1,5 @@
 part of 'inspection_view_model.dart';
 
-/// State shared by the inspection workflows, with dependencies supplied by
-/// [InspectionViewModel]. Cross-workflow operations are declared here so each
-/// mixin depends on this contract rather than on another mixin's order.
 abstract class _InspectionState extends ChangeNotifier {
   PmcsCatalogSource get catalogSource;
   StartSession get startSession;

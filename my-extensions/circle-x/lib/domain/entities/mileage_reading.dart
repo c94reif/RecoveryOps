@@ -7,7 +7,6 @@ enum MileageUnit {
   const MileageUnit(this.symbol, this.label);
 }
 
-/// An operator-confirmed odometer value, in the units shown on the dashboard.
 class MileageReading {
   final double value;
   final MileageUnit unit;

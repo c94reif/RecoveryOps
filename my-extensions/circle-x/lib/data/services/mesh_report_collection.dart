@@ -3,8 +3,6 @@ import 'dart:async';
 import 'package:le_sdk/le_sdk.dart' as sdk;
 import 'package:circle_x/core/constants/app_constants.dart';
 
-/// Resolves stable report IDs to server-assigned item paths on every write.
-/// Kept inside each extension so its source package remains self-contained.
 class MeshReportCollection {
   final sdk.MeshItemService items;
   final sdk.MeshDataTypePath type;
@@ -18,16 +16,13 @@ class MeshReportCollection {
   });
 
   Future<List<sdk.MeshItem>> _list() async {
-    // Do not interpret an unavailable/unregistered collection as an empty one.
     if (await items.getDataType(type).timeout(requestTimeout) == null) {
       throw StateError('Register mesh item schema '
           '${type.namespace}/${type.domain}/${type.dataType}/${type.version}');
     }
-    // Read the typed collection, without relying on upstream filter dialects.
     return items.listItems(type).timeout(requestTimeout);
   }
 
-  /// Withdrawal records are immutable and dominate all live duplicates.
   Future<Map<String, sdk.MeshItem>> snapshot() async {
     final records = <String, sdk.MeshItem>{};
     for (final item in await _list()) {
@@ -53,8 +48,6 @@ class MeshReportCollection {
         final records = await snapshot();
         final existing = records[reportId];
         if (existing != null && withdrawn(existing)) return;
-        // A queued review can run before this device imports remote withdrawals.
-        // Check its source in this same snapshot before persisting the review.
         final source = records[sourceReportId];
         if (source != null && withdrawn(source)) return;
         final bodyToSave = <String, Object?>{
@@ -67,8 +60,6 @@ class MeshReportCollection {
             updatedAt is String &&
             DateTime.tryParse(updatedAt) != null &&
             _equal(body(existing), bodyToSave)) {
-          // Another relay may already have committed this immutable report.
-          // Verify it without rewriting updatedAt or producing replication churn.
           await _verify(existing, existing.data);
           return;
         }
@@ -89,8 +80,6 @@ class MeshReportCollection {
   Future<void> withdraw(String reportId) => _serial(reportId, () async {
         final existing = (await snapshot())[reportId];
         if (existing != null && withdrawn(existing)) return;
-        // Never replace the live item: an in-flight update on another device
-        // must not overwrite the withdrawal. No TTL on either record type.
         final data = <String, Object?>{
           'reportId': reportId,
           'withdrawn': true,
@@ -153,8 +142,6 @@ class MeshReportCollection {
     try {
       await operation();
     } finally {
-      // A timed-out bridge write may still commit. Release the local lock so a
-      // retry can resolve the stable report ID and verify the remote outcome.
       done.complete();
       if (identical(_pending[id], done.future)) _pending.remove(id);
     }

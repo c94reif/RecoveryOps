@@ -6,7 +6,6 @@ import 'package:circle_x/data/services/lattice_report_source.dart';
 import 'package:circle_x/domain/entities/pmcs_report.dart';
 import 'package:circle_x/domain/services/report_store_strategy.dart';
 
-/// Retains the original entity implementation as an explicitly selected strategy.
 class EntityReportStoreStrategy implements ReportStoreStrategy {
   final LatticePmcsAdapter writer;
   final LatticeReportSource reader;

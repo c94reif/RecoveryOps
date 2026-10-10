@@ -16,7 +16,6 @@ class Profile {
 
   bool get isComplete => Uic.isValid(uic);
 
-  /// The submission default comes first; followed units only affect local views.
   List<FollowedUnit> get reportUnits {
     final seen = <String>{};
     final units = <FollowedUnit>[];

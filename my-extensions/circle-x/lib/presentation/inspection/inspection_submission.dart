@@ -1,6 +1,5 @@
 part of 'inspection_view_model.dart';
 
-/// CAC sign-off, report submission, and delivery status.
 mixin _InspectionSubmission on _InspectionState {
   CacScan? get lastScan => identityScan.lastScan;
   set lastScan(CacScan? value) => identityScan.lastScan = value;

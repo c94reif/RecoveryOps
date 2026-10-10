@@ -289,7 +289,6 @@ class _MaintainerReviewPageState extends State<MaintainerReviewPage> {
           Expanded(child: LayoutBuilder(builder: (context, constraints) {
             final reviewing = model.saved == null && !model.signing;
             final bottomPadding = 12 + MediaQuery.viewInsetsOf(context).bottom;
-            // Keep the current offset valid even when the next fault is shorter.
             final minimumHeight = reviewing && reviewScroll.hasClients
                 ? (constraints.maxHeight +
                         reviewScroll.offset -

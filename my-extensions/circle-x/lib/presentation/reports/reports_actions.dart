@@ -1,6 +1,5 @@
 part of 'reports_view_model.dart';
 
-/// User actions on reports: reading, deleting, and map display.
 mixin _ReportsActions on _ReportsState {
   Future<void> addOutgoing(PmcsReport stored) async {
     reports.removeWhere(

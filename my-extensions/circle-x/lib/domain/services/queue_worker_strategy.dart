@@ -5,7 +5,6 @@ abstract class QueueWorkerStrategy {
   Future<void> start();
   Future<void> stop();
 
-  /// Attempt pending deliveries immediately after a lifecycle/connectivity wake.
   Future<void> retryNow() async {}
 
   Future<void> enqueue(QueuedSubmission submission);

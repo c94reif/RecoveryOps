@@ -66,9 +66,7 @@ class _SwipeFaultCardState extends State<SwipeFaultCard>
               duration: const Duration(milliseconds: 340),
               curve: Curves.easeOutBack)
           .orCancel;
-    } on TickerCanceled {
-      // A new drag, navigation, or dictation supersedes this animation.
-    }
+    } on TickerCanceled catch (_) {}
   }
 
   Future<void> commit(bool verified, double width) async {
@@ -90,9 +88,7 @@ class _SwipeFaultCardState extends State<SwipeFaultCard>
       setState(() => committing = false);
       widget.onAnimatingChanged?.call(false);
       widget.onDecision(verified);
-    } on TickerCanceled {
-      // Never apply an outgoing card's decision to a different fault.
-    }
+    } on TickerCanceled catch (_) {}
   }
 
   @override

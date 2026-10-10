@@ -1,4 +1,3 @@
-/// Notification preferences and Android permission state on this phone.
 class PmcsNotificationStatus {
   final bool supported;
   final bool enabled;
@@ -11,20 +10,15 @@ class PmcsNotificationStatus {
   });
 }
 
-/// Silent device notifications, independent of report transport and host toasts.
 abstract interface class PmcsNotificationPort {
   Future<PmcsNotificationStatus> getStatus();
 
-  /// Only an explicit user action may call this to request OS permission.
   Future<PmcsNotificationStatus> setEnabled(bool enabled);
 
   Future<void> openSettings();
 
-  /// Seed already observed report IDs without posting a notification.
   Future<void> rememberReports(Iterable<String> reportIds);
 
-  /// Observe [reportId] once, posting silently if enabled and permitted.
-  /// Observations persist even while notifications are disabled or denied.
   Future<void> showReport({
     required String reportId,
     required String title,

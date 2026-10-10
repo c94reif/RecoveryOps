@@ -233,7 +233,6 @@ class AndroidCacScanner implements CacScannerStrategy, CacCameraPreview {
       await _disposeCamera(failedCamera);
       if (_inFlight != completer) return;
       try {
-        // An unsupported preset must not end an otherwise usable scan.
         await _openCamera(camera.description, ResolutionPreset.high, completer);
       } catch (error) {
         debugPrint('[CircleX] camera recovery failed: $error');

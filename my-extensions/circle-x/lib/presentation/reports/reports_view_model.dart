@@ -51,7 +51,6 @@ enum ReportsTab {
   final String label;
 }
 
-/// Wires report workflows and owns their subscriptions and lifecycle.
 class ReportsViewModel extends _ReportsState
     with _ReportsSync, _ReportsQueue, _ReportsCollection, _ReportsActions {
   final ReportMessageSource messaging;

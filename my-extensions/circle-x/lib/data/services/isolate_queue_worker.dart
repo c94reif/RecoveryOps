@@ -40,7 +40,6 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
     required this.repository,
     required this.entityPort,
     required this.meshPort,
-    // Retained for source compatibility; retries never ask for UI approval.
     QueuePromptStrategy? promptStrategy,
     UserNotificationSink? snackBarService,
     Duration? probeInterval,

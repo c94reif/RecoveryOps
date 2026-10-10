@@ -5,8 +5,6 @@ import 'package:circle_x/domain/repositories/reports_repo.dart';
 import 'package:circle_x/domain/services/diagnostic_logger.dart';
 import 'package:circle_x/domain/services/pmcs_notification_port.dart';
 
-/// Serializes best-effort phone alerts independently of storage and transport.
-/// The native port provides durable deduplication across restarts and deletion.
 class PmcsReportNotifier {
   final ReportsRepository reportsRepository;
   final ProfileRepository profileRepository;
@@ -26,7 +24,6 @@ class PmcsReportNotifier {
     this.logger = const SilentDiagnosticLogger(),
     this.requestTimeout = const Duration(seconds: 10),
   }) {
-    // Issue the history read before the receiver subscribes to peer messages.
     _pending = _seed();
   }
 
@@ -45,8 +42,6 @@ class PmcsReportNotifier {
       _baselineLoaded = true;
       await _remember(ids);
     } catch (error) {
-      // Without a trustworthy history baseline, never announce old reports as
-      // new. Durable reception and relay continue independently.
       logger.log('[CircleX] Notification baseline unavailable: $error');
     }
   }
@@ -63,7 +58,6 @@ class PmcsReportNotifier {
     });
   }
 
-  /// Withdrawals also cancel an alert that is waiting behind another OS call.
   Future<void> remember(Iterable<String> reportIds) {
     final ids = reportIds.where((id) => id.isNotEmpty).toSet();
     _suppressed.addAll(ids);
@@ -102,8 +96,6 @@ class PmcsReportNotifier {
     } catch (error) {
       logger.log('[CircleX] PMCS notification failed: $error');
     }
-    // A later follow/enable/refetch must not turn an old ignored report into a
-    // new arrival. Failed alerts are also consumed rather than retried noisily.
     await _remember([report.entityId]);
   }
 

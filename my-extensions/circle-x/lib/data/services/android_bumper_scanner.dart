@@ -90,7 +90,6 @@ class AndroidBumperScanner implements BumperScannerStrategy, OcrCameraPreview {
     final request = _pending;
     final camera = _camera;
     final recognizer = _recognizer;
-    // No OCR work is performed until the operator taps Read markings.
     if (request == null ||
         camera == null ||
         recognizer == null ||

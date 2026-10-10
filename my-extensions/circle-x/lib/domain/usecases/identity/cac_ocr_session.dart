@@ -3,7 +3,6 @@ import 'package:circle_x/domain/entities/cac_scan.dart';
 import 'package:circle_x/domain/usecases/identity/find_cac_name.dart';
 import 'package:circle_x/domain/usecases/identity/find_dod_id.dart';
 
-/// One capture attempt. Partial names never survive cancellation or a retry.
 class CacOcrSession {
   static const framesToAgree = 2;
   CacScanSide _side = CacScanSide.front;
@@ -36,7 +35,6 @@ class CacOcrSession {
       return null;
     }
 
-    // A still-visible front must not supply an unrelated ten-digit number.
     if (findCacName(lines) != null) {
       unreadableFrames = 0;
       _agrees(null);
@@ -71,7 +69,6 @@ class CacOcrSession {
       'Name read: ${_name!.lastName}, ${_name!.firstName}. '
       'Flip to the BACK — hold the DoD ID number above the wide strip steady';
 
-  /// Focus, resolution or orientation changes start fresh frame agreement.
   void resetFrameAgreement() {
     _candidate = null;
     _agreed = 0;

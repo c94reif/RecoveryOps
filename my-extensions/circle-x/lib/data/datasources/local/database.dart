@@ -97,7 +97,6 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(pmcsSessions, pmcsSessions.mileageJson);
             await migrator.addColumn(pmcsReports, pmcsReports.mileageJson);
           }
-          // The v1 profile rebuild above already includes these default columns.
           if (fromVersion >= 2 && fromVersion < 8) {
             await migrator.addColumn(profiles, profiles.unitName);
             await migrator.addColumn(profiles, profiles.followedUnitsJson);

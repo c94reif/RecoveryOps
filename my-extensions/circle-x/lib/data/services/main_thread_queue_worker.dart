@@ -46,7 +46,6 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
     required this.repository,
     required this.entityPort,
     required this.meshPort,
-    // Retained for source compatibility; retries never ask for UI approval.
     QueuePromptStrategy? promptStrategy,
     UserNotificationSink? snackBarService,
     Duration? probeInterval,
@@ -85,7 +84,6 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
     debugPrint('[CircleX] QueueWorker: resumed ${resumed.length} pending');
 
     probeTimer = Timer.periodic(probeInterval, (_) => onProbeTick());
-    // Startup must not wait for an SDK request to finish.
     unawaited(onProbeTick());
   }
 
@@ -221,7 +219,6 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
     connected[key] = false;
     final failures = ((_failures[key] ?? 0) + 1).clamp(1, 5);
     _failures[key] = failures;
-    // Retry after 1, 2, 4, 8, then at most 16 probe intervals.
     _skipProbes[key] = (1 << (failures - 1)) - 1;
   }
 
@@ -274,8 +271,6 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
       delivery.queueChanged();
       return true;
     } catch (error) {
-      // Keep the row tracked until local settlement succeeds; the coordinator
-      // remembers delivery so retrying a failed delete does not resend it.
       debugPrint('[CircleX] QueueWorker: delete failed for $id: $error');
       return false;
     }

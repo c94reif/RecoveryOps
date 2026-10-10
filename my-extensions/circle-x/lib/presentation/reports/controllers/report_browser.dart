@@ -3,7 +3,6 @@ import 'package:circle_x/domain/entities/fault_severity.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
 import 'package:circle_x/presentation/reports/controllers/report_search.dart';
 
-/// Queries the current reports and suggestion preferences without owning them.
 class ReportBrowser {
   final ReportsViewModel viewModel;
 

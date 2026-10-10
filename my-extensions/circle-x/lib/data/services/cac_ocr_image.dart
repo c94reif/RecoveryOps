@@ -4,8 +4,6 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:circle_x/core/platform/cac_camera_geometry.dart';
 import 'package:circle_x/domain/entities/cac_scan.dart';
 
-/// Crops the actual NV21 pixels to the same card guide shown in the preview.
-/// The complete card preserves labels and the front-side name guard.
 InputImage? cacOcrImage(CameraImage frame, CameraDescription camera,
     DeviceOrientation orientation, CacScanSide side) {
   if (frame.planes.length != 1 ||
@@ -30,13 +28,11 @@ InputImage? cacOcrImage(CameraImage frame, CameraDescription camera,
       ? Size(frame.height.toDouble(), frame.width.toDouble())
       : Size(frame.width.toDouble(), frame.height.toDouble());
   final card = CacCameraGeometry.cardInImage(upright, side);
-  // The guide is centered, so undoing rotation only swaps its dimensions.
   final rawCrop = Rect.fromCenter(
     center: Offset(frame.width / 2, frame.height / 2),
     width: sideways ? card.height : card.width,
     height: sideways ? card.width : card.height,
   );
-  // NV21 shares each VU pair across a 2x2 pixel block.
   final left = (rawCrop.left / 2).floor() * 2;
   final top = (rawCrop.top / 2).floor() * 2;
   final right = (rawCrop.right / 2).ceil() * 2;

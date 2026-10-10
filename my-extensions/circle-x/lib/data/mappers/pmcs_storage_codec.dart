@@ -53,7 +53,6 @@ abstract final class PmcsStorageCodec {
               PmcsFault.fromMap(entityId, fault as Map<String, Object?>))
           .toList();
     } catch (_) {
-      // A corrupt fault list must never turn a stored report into FMC.
       throw const FormatException('Stored report contains invalid faults');
     }
   }

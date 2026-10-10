@@ -26,7 +26,6 @@ class _MileageCardState extends State<MileageCard> {
       _editing = true;
       _error = null;
     });
-    // Each dialog owns a fresh instance of the existing raw-text OCR camera.
     final scanner = scan && getIt.isRegistered<BumperScannerStrategy>()
         ? getIt<BumperScannerStrategy>()
         : null;
@@ -39,7 +38,6 @@ class _MileageCardState extends State<MileageCard> {
           startWithCamera: scan,
         ),
       );
-      // Release the camera before CAC sign-off can start another capture.
       await scanner?.dispose();
       if (!mounted || reading == null) return;
       final saved = await widget.viewModel.saveMileage(reading);

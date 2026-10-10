@@ -2,7 +2,6 @@ import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 import 'package:circle_x/domain/entities/cac_scan.dart';
 
-/// Shared by the visible guide, OCR crop and camera metering points.
 abstract final class CacCameraGeometry {
   static const previewAspect = 4 / 3;
   static const cardAspect = 85.6 / 53.98;
@@ -18,7 +17,6 @@ abstract final class CacCameraGeometry {
     );
   }
 
-  /// The portion of the full upright image visible through BoxFit.cover.
   static Rect visibleImage(Size image) {
     final width = image.aspectRatio > previewAspect
         ? image.height * previewAspect
@@ -48,7 +46,6 @@ abstract final class CacCameraGeometry {
   static Offset textTarget(CacScanSide side) {
     const viewport = Size(4, 3);
     final card = guide(viewport, side);
-    // Name below the front photo; printed ID above the back barcode strip.
     final y = side == CacScanSide.front ? 0.65 : 0.35;
     return Offset(0.5, (card.top + card.height * y) / viewport.height);
   }

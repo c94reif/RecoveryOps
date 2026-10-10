@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
 
-/// A platform choice with the vehicle identity ahead of its manual metadata.
 class VehiclePlatformCard extends StatelessWidget {
   final VehicleType vehicle;
   final bool selected;
@@ -163,7 +162,6 @@ class _PlatformGraphic extends StatelessWidget {
   }
 }
 
-/// Decorative silhouettes; proportions do not encode vehicle specifications.
 class _VehicleSilhouette extends CustomPainter {
   final bool stryker;
   final Color color;

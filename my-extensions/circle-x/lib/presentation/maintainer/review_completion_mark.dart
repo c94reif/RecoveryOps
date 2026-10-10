@@ -29,7 +29,6 @@ class _CompletionPainter extends CustomPainter {
         .transform(const Interval(0, .65).transform(progress));
     final paint = Paint()..isAntiAlias = true;
 
-    // A single outward pulse settles into a persistent completion badge.
     paint
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2

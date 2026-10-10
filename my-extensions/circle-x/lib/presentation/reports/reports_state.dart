@@ -1,6 +1,5 @@
 part of 'reports_view_model.dart';
 
-/// Shared state and dependencies for report workflows on a single notifier.
 abstract class _ReportsState extends ChangeNotifier {
   ReportsRepository get repository;
   ParseIncomingReport get parseIncomingReport;

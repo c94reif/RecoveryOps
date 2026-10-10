@@ -88,7 +88,6 @@ class ReportsRepoImpl implements ReportsRepository {
     try {
       faults = PmcsStorageCodec.decodeFaults(row.entityId, row.faultsJson);
     } on FormatException {
-      // Keep the row on disk, but do not present corrupt faults as a clean PMCS.
       return null;
     }
 
@@ -99,7 +98,6 @@ class ReportsRepoImpl implements ReportsRepository {
             (jsonDecode(row.maintainerReviewJson!) as Map)
                 .cast<String, Object?>());
       } catch (_) {
-        // A malformed review must not masquerade as a new operator PMCS.
         return null;
       }
     }

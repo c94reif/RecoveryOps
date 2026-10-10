@@ -99,7 +99,6 @@ class MaintainerReviewViewModel extends ChangeNotifier
         final draft = [descriptions[target].trim(), text.trim()]
             .where((part) => part.isNotEmpty)
             .join(' ');
-        // Match the submission limit without splitting Unicode characters.
         final limited = StringBuffer();
         for (final character in draft.characters) {
           if (limited.length + character.length > maxDescriptionLength) break;
@@ -190,7 +189,6 @@ class MaintainerReviewViewModel extends ChangeNotifier
     }
     final record = saved;
     if (record != null) {
-      // The durable outbox already exists, even if the user closes this screen.
       unawaited(send(record));
       try {
         await onSaved(record);

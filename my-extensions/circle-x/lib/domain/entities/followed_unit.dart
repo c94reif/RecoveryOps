@@ -1,6 +1,5 @@
 import 'package:circle_x/domain/entities/uic.dart';
 
-/// A local label and UIC used to choose which unit reports to display.
 class FollowedUnit {
   final String uic;
   final String name;

@@ -1,7 +1,6 @@
 import 'package:circle_x/domain/entities/bumper_number.dart';
 import 'package:circle_x/domain/entities/uic.dart';
 
-/// Applies the same identifier formatting rules in reports and review queues.
 class ReportSearch {
   final String _query;
   final String _bumperQuery;

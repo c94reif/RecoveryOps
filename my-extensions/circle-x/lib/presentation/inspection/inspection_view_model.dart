@@ -61,10 +61,6 @@ enum InspectionStage {
   submitted,
 }
 
-/// Owns dependencies and lifecycle for the inspection flow.
-///
-/// Private mixins group session, checklist, history, and submission operations
-/// around one shared state and ChangeNotifier, preserving the public API.
 class InspectionViewModel extends _InspectionState
     with
         _InspectionSession,

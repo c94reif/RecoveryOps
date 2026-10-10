@@ -11,8 +11,6 @@ import 'package:circle_x/domain/services/queue_worker_strategy.dart';
 import 'package:circle_x/domain/services/report_codec.dart';
 import 'package:circle_x/domain/services/transaction_runner.dart';
 
-/// Saves a signed batch and both delivery attempts in one local transaction.
-/// Each batch has its own ID; the operator's report remains immutable.
 class SubmitMaintainerReview {
   final ReportsRepository reports;
   final QueuedSubmissionsRepository queue;

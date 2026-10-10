@@ -1,6 +1,5 @@
 part of 'inspection_view_model.dart';
 
-/// Checklist answers, fault notes, phase navigation, and summary review.
 mixin _InspectionChecklist on _InspectionState {
   bool get isListening => dictation.isListening;
   String? get listeningItemId => dictation.listeningItemId;

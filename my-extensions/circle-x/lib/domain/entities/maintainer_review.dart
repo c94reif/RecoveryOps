@@ -32,8 +32,6 @@ class FaultReview {
       );
 }
 
-/// An immutable review batch, carried by its own report record so concurrent
-/// reviews never replace the original PMCS or another maintainer's signature.
 class MaintainerReview {
   final String sourceReportId;
   final List<FaultReview> faults;

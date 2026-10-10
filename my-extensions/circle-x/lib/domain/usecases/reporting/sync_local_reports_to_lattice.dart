@@ -12,8 +12,6 @@ import 'package:circle_x/domain/services/queue_worker_strategy.dart';
 import 'package:circle_x/domain/services/remote_report_source.dart';
 import 'package:circle_x/domain/services/report_codec.dart';
 
-/// Any device holding a report can carry it to the shared store. Reconciliation
-/// never broadcasts back to peers, and retained local rows survive offline runs.
 class SyncLocalReportsToLattice {
   final DiagnosticLogger logger;
   final RemoteReportSource source;
@@ -68,8 +66,6 @@ class SyncLocalReportsToLattice {
           .map((submission) => submission.entityId)
           .toSet();
       var republished = 0;
-      // Withdrawals travel upstream too, even if this device never saw the
-      // original report. Publish them before considering any stale snapshots.
       for (final entityId in withdrawn.difference(remoteWithdrawn)) {
         delivery.suppressReport(entityId);
         if (queuedWithdrawals.contains(entityId) ||
@@ -151,8 +147,6 @@ class SyncLocalReportsToLattice {
       delivery.update(entityId, TransportKind.lattice, DeliveryStatus.queued,
           withdrawal: withdrawal);
     } catch (error) {
-      // The report/withdrawal itself is already durable. A later reconciliation
-      // can recover if persisting the separate retry row temporarily fails.
       logger.log('[CircleX] Could not queue relay $entityId: $error');
     }
     return false;

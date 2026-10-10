@@ -1,6 +1,5 @@
 part of 'reports_view_model.dart';
 
-/// Coalesced queue refreshes and pending submission counts.
 mixin _ReportsQueue on _ReportsState {
   @override
   Future<void> refreshQueued() {

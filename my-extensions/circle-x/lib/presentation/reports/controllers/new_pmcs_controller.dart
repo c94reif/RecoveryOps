@@ -3,7 +3,6 @@ import 'package:circle_x/domain/entities/pmcs_report.dart';
 import 'package:circle_x/domain/entities/pmcs_session.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
 
-/// Starts a vehicle inspection or offers to continue the existing session.
 class NewPmcsController extends ChangeNotifier {
   final InspectionViewModel? Function() resolveInspection;
   final VoidCallback openInspection;

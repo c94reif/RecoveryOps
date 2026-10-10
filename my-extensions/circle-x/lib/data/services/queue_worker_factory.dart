@@ -13,7 +13,6 @@ QueueWorkerStrategy createQueueWorker({
   required QueuedSubmissionsRepository repository,
   required PmcsEntityPort entityPort,
   required MeshBroadcasterPort meshPort,
-  // Legacy callers may still supply this; delivery is always automatic.
   QueuePromptStrategy? promptStrategy,
   DeliveryCoordinator? delivery,
   UserNotificationSink notifications = const SilentNotificationSink(),

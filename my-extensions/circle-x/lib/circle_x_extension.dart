@@ -46,7 +46,6 @@ class CircleXExtension extends LatticeEdgeExtension
     configureDependencies(context);
     initialized = true;
     _queue = getIt<QueueWorkerStrategy>();
-    // This singleton owns peer reception and reconciliation independently of UI.
     _reports = getIt<ReportsViewModel>();
     WidgetsBinding.instance.addObserver(this);
     _peerSubscription = context.messaging.onPeersChanged.listen((peers) {
@@ -83,8 +82,6 @@ class CircleXExtension extends LatticeEdgeExtension
     if (state == AppLifecycleState.resumed) _wakeDelivery();
   }
 
-  // Closing the panel or backgrounding the app leaves timers/listeners active.
-  // A stopped host restores persisted reports and queues on its next startup.
   @override
   void dispose() {
     if (_disposed) return;
@@ -98,7 +95,6 @@ class CircleXExtension extends LatticeEdgeExtension
 
   @override
   Widget build(ExtensionContext extensionContext) {
-    // Standalone/web hosts may only invoke build, without the native init hook.
     _initialize(extensionContext);
     return Theme(
       data: appTheme,
