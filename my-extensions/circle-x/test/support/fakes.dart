@@ -438,7 +438,16 @@ class FakeQueueWorker implements QueueWorkerStrategy {
   void trackPersisted(QueuedSubmission submission) => enqueued.add(submission);
 
   final List<QueuedSubmission> enqueued = [];
+  final List<QueuedSubmission> sentNow = [];
+  bool sendNowSucceeds = true;
   final List<(TransportKind, bool)> outcomes = [];
+
+  @override
+  Future<bool> sendNow(QueuedSubmission submission) async {
+    sentNow.add(submission);
+    return sendNowSucceeds;
+  }
+
   bool started = false;
   bool stopped = false;
 
@@ -694,6 +703,18 @@ class FakeReportsViewModel extends ChangeNotifier implements ReportsViewModel {
 
   @override
   final List<QueuedSubmission> queued = [];
+
+  @override
+  final Set<int> sendingNow = {};
+
+  final List<QueuedSubmission> sentNow = [];
+
+  @override
+  Future<void> sendQueuedNow(QueuedSubmission submission) async {
+    sentNow.add(submission);
+    sendingNow.add(submission.id!);
+    notifyListeners();
+  }
 
   @override
   bool isSameUnit(PmcsReport report) => reportUnits.isEmpty

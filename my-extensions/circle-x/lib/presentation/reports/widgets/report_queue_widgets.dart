@@ -44,10 +44,14 @@ class ReportQueueBanner extends StatelessWidget {
 
 class QueuedReportCard extends StatelessWidget {
   final QueuedSubmission submission;
+  final bool isSending;
+  final VoidCallback onSendNow;
 
   const QueuedReportCard({
     super.key,
     required this.submission,
+    required this.isSending,
+    required this.onSendNow,
   });
 
   @override
@@ -90,8 +94,40 @@ class QueuedReportCard extends StatelessWidget {
               '${submission.transport.name}',
               style: const TextStyle(color: textSecondary, fontSize: 11),
             ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: buildSendNowButton(),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget buildSendNowButton() {
+    return Tooltip(
+      message: 'Try ${submission.transport.displayName} now',
+      child: OutlinedButton.icon(
+        onPressed: isSending ? null : onSendNow,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: textPrimary,
+          disabledForegroundColor: textSecondary,
+          backgroundColor: circleXGlow,
+          side: const BorderSide(color: circleXAmber),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          minimumSize: const Size(0, minTouchTarget),
+        ),
+        icon: isSending
+            ? const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: textSecondary,
+                ),
+              )
+            : const Icon(Icons.send, size: 18),
+        label: Text(isSending ? 'Sending…' : 'Send now'),
       ),
     );
   }

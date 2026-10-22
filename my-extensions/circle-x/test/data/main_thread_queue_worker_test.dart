@@ -167,6 +167,39 @@ void main() {
     expect(repository.submissions, isEmpty);
   });
 
+  test('send now delivers a mesh row while lattice is blocked', () async {
+    final gated = GatedEntityPort();
+    entity = gated;
+    worker = buildWorker();
+    mesh.broadcastSucceeds = false;
+    await enqueueBoth();
+    await worker.start();
+    await pumpQueue();
+    expect(mesh.broadcastPayloads, hasLength(1));
+
+    mesh.broadcastSucceeds = true;
+    final meshRow = repository.submissions
+        .singleWhere((row) => row.transport == TransportKind.mesh);
+    expect(await worker.sendNow(meshRow), isTrue);
+
+    expect(mesh.broadcastPayloads, hasLength(2));
+    expect(repository.submissions.single.transport, TransportKind.lattice);
+    gated.gate.complete(true);
+  });
+
+  test('send now reports a failed attempt and keeps the row', () async {
+    mesh.broadcastSucceeds = false;
+    await worker.enqueue(buildQueuedSubmission(transport: TransportKind.mesh));
+    expect(await worker.sendNow(repository.submissions.single), isFalse);
+    await worker.start();
+    await pumpQueue();
+
+    expect(await worker.sendNow(repository.submissions.single), isFalse);
+
+    expect(mesh.broadcastPayloads, hasLength(2));
+    expect(repository.submissions, hasLength(1));
+  });
+
   test('concurrent probes join one send and duplicate tracking is harmless',
       () async {
     final gated = GatedEntityPort();

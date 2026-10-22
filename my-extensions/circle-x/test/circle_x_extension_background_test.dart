@@ -52,6 +52,17 @@ class BackgroundContext extends sdk.StubExtensionContext {
   BackgroundContext(this.messaging);
 }
 
+class StallingMeshItems extends FakeMeshItems {
+  Completer<void>? stall;
+
+  @override
+  Future<List<sdk.MeshItem>> listItems(sdk.MeshDataTypePath type,
+      {Map<String, Object?>? filter}) async {
+    await stall?.future;
+    return super.listItems(type, filter: filter);
+  }
+}
+
 class CountingBackgroundWorker extends FakeQueueWorker {
   int starts = 0;
   int stops = 0;
@@ -79,7 +90,7 @@ void main() {
   late BackgroundMessaging messaging;
   late BackgroundContext context;
   late CountingBackgroundWorker worker;
-  late FakeMeshItems items;
+  late StallingMeshItems items;
   late CircleXExtension extension;
   bool disposed = false;
 
@@ -129,7 +140,7 @@ void main() {
     messaging = BackgroundMessaging();
     context = BackgroundContext(messaging);
     worker = CountingBackgroundWorker();
-    items = FakeMeshItems();
+    items = StallingMeshItems();
     extension = CircleXExtension();
     disposed = false;
     getIt.registerSingleton<AppDatabase>(database);
@@ -231,6 +242,31 @@ void main() {
 
     expect(worker.retries, greaterThan(retries));
     expect(worker.stops, 0);
+  });
+
+  test('a peer coming online retries the queue while a report sync is stalled',
+      () async {
+    await initialize();
+    final stall = items.stall = Completer<void>();
+    addTearDown(() {
+      if (!stall.isCompleted) stall.complete();
+    });
+    extension.onActivate();
+    await Future<void>.delayed(Duration.zero);
+    final retries = worker.retries;
+
+    messaging.peers.add([
+      sdk.Peer(
+        deviceId: 'peer-bravo',
+        callsign: 'BRAVO',
+        ip: '192.0.2.10',
+        isOnline: true,
+        lastSeen: DateTime.utc(2026, 10, 6),
+      ),
+    ]);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(worker.retries, greaterThan(retries));
   });
 
   test('teardown stops delivery and removes message and lifecycle listeners',

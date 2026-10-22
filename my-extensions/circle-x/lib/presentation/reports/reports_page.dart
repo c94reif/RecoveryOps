@@ -260,7 +260,11 @@ class ReportsPageState extends State<ReportsPage> {
                 BumperNumber.normalize(entry.value.first.bumperNumber),
             count: entry.value.length));
         for (final submission in entry.value) {
-          rows.add(() => QueuedReportCard(submission: submission));
+          rows.add(() => QueuedReportCard(
+                submission: submission,
+                isSending: viewModel.sendingNow.contains(submission.id),
+                onSendNow: () => viewModel.sendQueuedNow(submission),
+              ));
         }
       }
       return rows;

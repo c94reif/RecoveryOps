@@ -7,6 +7,8 @@ abstract class QueueWorkerStrategy {
 
   Future<void> retryNow() async {}
 
+  Future<bool> sendNow(QueuedSubmission submission);
+
   Future<void> enqueue(QueuedSubmission submission);
 
   void trackPersisted(QueuedSubmission submission);

@@ -157,6 +157,40 @@ class MainThreadQueueWorker implements QueueWorkerStrategy {
     await onProbeTick();
   }
 
+  @override
+  Future<bool> sendNow(QueuedSubmission submission) async {
+    if (probeTimer == null) return false;
+    final key = submission.transport.wireName;
+    final row = pending[key]!
+        .where((pendingSubmission) => pendingSubmission.id == submission.id)
+        .firstOrNull;
+    if (row == null) return true;
+    final generation = _generation;
+    try {
+      final success = await attemptSend(row);
+      if (generation != _generation) return false;
+      if (!success) {
+        _backOff(key);
+        return false;
+      }
+      if (!await settle(row, generation: generation)) {
+        if (generation == _generation) _backOff(key);
+        return true;
+      }
+      connected[key] = true;
+      _failures.remove(key);
+      _skipProbes.remove(key);
+      unawaited(drainNext(submission.transport).catchError((Object error) {
+        debugPrint('[CircleX] Queue drain failed: $error');
+      }));
+      return true;
+    } catch (error) {
+      if (generation == _generation) _backOff(key);
+      debugPrint('[CircleX] Queued send failed: $error');
+      return false;
+    }
+  }
+
   Future<void> onProbeTick() async {
     await Future.wait(TransportKind.values.map((transport) async {
       final key = transport.wireName;

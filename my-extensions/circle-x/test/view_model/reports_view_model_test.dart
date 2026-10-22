@@ -10,6 +10,7 @@ import 'package:circle_x/domain/entities/fault_severity.dart';
 import 'package:circle_x/domain/entities/maintainer_review.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
 import 'package:circle_x/domain/entities/profile.dart';
+import 'package:circle_x/domain/entities/transport_kind.dart';
 import 'package:circle_x/domain/usecases/map/show_report_on_map.dart';
 import 'package:circle_x/domain/usecases/publishing/publish_pmcs_deletion.dart';
 import 'package:circle_x/domain/usecases/reporting/parse_incoming_deletion.dart';
@@ -952,6 +953,54 @@ void main() {
       await viewModel.refreshQueued();
 
       expect(viewModel.queued, hasLength(1));
+    });
+  });
+
+  group('sending a queued submission now', () {
+    test('marks the row busy until the worker answers, then confirms',
+        () async {
+      final row = buildQueuedSubmission(id: 7, transport: TransportKind.mesh);
+      queuedRepository.submissions.add(row);
+      await start();
+      SnackBarService.instance.queue.clear();
+
+      final sending = viewModel.sendQueuedNow(row);
+      expect(viewModel.sendingNow, {7});
+      queuedRepository.submissions.clear();
+      await sending;
+
+      expect(queueWorker.sentNow.single.id, 7);
+      expect(viewModel.sendingNow, isEmpty);
+      expect(viewModel.queued, isEmpty);
+      final notice = SnackBarService.instance.queue.single;
+      expect(notice.message, 'Sent over Mesh — A-11 - Stryker');
+      expect(notice.isError, isFalse);
+    });
+
+    test('a failed attempt says the transport is still unreachable', () async {
+      final row = buildQueuedSubmission(id: 7, transport: TransportKind.mesh);
+      queuedRepository.submissions.add(row);
+      queueWorker.sendNowSucceeds = false;
+      await start();
+      SnackBarService.instance.queue.clear();
+
+      await viewModel.sendQueuedNow(row);
+
+      expect(viewModel.sendingNow, isEmpty);
+      expect(viewModel.queued, hasLength(1));
+      final notice = SnackBarService.instance.queue.single;
+      expect(notice.message, 'Mesh still unreachable — will keep retrying');
+      expect(notice.isError, isTrue);
+    });
+
+    test('a second tap while the first is running sends once', () async {
+      final row = buildQueuedSubmission(id: 7);
+      await start();
+
+      await Future.wait(
+          [viewModel.sendQueuedNow(row), viewModel.sendQueuedNow(row)]);
+
+      expect(queueWorker.sentNow, hasLength(1));
     });
   });
 

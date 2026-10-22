@@ -33,6 +33,7 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
   ReceivePort? _handshakePort;
   Completer<void>? readyCompleter;
   final waitingForStart = <int, QueuedSubmission>{};
+  final sendNowWaiters = <int, Completer<bool>>{};
   Future<void>? starting;
   int _generation = 0;
 
@@ -135,6 +136,10 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
       readyCompleter!.complete();
     }
     waitingForStart.clear();
+    for (final waiter in sendNowWaiters.values) {
+      waiter.complete(false);
+    }
+    sendNowWaiters.clear();
     _handshakePort?.close();
     _handshakePort = null;
     probeTimer?.cancel();
@@ -185,6 +190,17 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
   Future<void> retryNow() async => toWorker?.send(mainRetryNow());
 
   @override
+  Future<bool> sendNow(QueuedSubmission submission) {
+    final id = submission.id;
+    if (id == null || probeTimer == null) return Future.value(false);
+    final waiting = sendNowWaiters[id];
+    if (waiting != null) return waiting.future;
+    final waiter = sendNowWaiters[id] = Completer<bool>();
+    toWorker!.send(mainSendNow(id));
+    return waiter.future;
+  }
+
+  @override
   Future<int> pendingCount() => repository.count();
 
   void handleWorkerMessage(dynamic message) {
@@ -213,6 +229,11 @@ class IsolateQueueWorker implements QueueWorkerStrategy {
         break;
       case QueueWireType.workerDelete:
         unawaited(handleDelete(map['submissionId'] as int));
+        break;
+      case QueueWireType.workerSendNowResult:
+        sendNowWaiters
+            .remove(map['submissionId'] as int)
+            ?.complete(map['delivered'] as bool);
         break;
       case QueueWireType.workerLog:
         debugPrint('[CircleX] QueueWorker: ${map['message']}');

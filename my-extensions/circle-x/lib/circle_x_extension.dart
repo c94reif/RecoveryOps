@@ -19,7 +19,6 @@ class CircleXExtension extends LatticeEdgeExtension
   QueueWorkerStrategy? _queue;
   ReportsViewModel? _reports;
   StreamSubscription<List<Peer>>? _peerSubscription;
-  Future<void>? _wakeInFlight;
 
   @override
   String get id => AppConstants.extensionId;
@@ -57,8 +56,8 @@ class CircleXExtension extends LatticeEdgeExtension
   }
 
   void _wakeDelivery() {
-    if (!initialized || _disposed || _wakeInFlight != null) return;
-    _wakeInFlight = () async {
+    if (!initialized || _disposed) return;
+    unawaited(() async {
       try {
         await _queue!.start();
         if (_disposed) return;
@@ -68,10 +67,8 @@ class CircleXExtension extends LatticeEdgeExtension
         ]);
       } catch (error) {
         debugPrint('[CircleX] background delivery wake failed: $error');
-      } finally {
-        _wakeInFlight = null;
       }
-    }();
+    }());
   }
 
   @override

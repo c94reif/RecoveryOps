@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
 import 'package:circle_x/data/dao/queue/queued_submissions_dao.dart';
 import 'package:circle_x/data/dao/reports/pmcs_reports_dao.dart';
@@ -49,6 +50,20 @@ class BlockedPrompt extends FakeQueuePromptStrategy {
   Future<bool> ask(QueuedSubmission submission) {
     if (submission.transport == TransportKind.lattice) return answer.future;
     return super.ask(submission);
+  }
+}
+
+class StuckFirstEntityPort extends FakePmcsEntityPort {
+  final stuck = Completer<bool>();
+  @override
+  Future<bool> publishEncodedReport(
+      {required String entityId,
+      required String payload,
+      required LatLng position}) {
+    publishedPayloads.add(payload);
+    return publishedPayloads.length == 1
+        ? stuck.future
+        : Future.value(publishSucceeds);
   }
 }
 
@@ -412,6 +427,78 @@ void main() {
       expect(native.probeTimer, isNull);
       expect(native.fromWorker, isNull);
     }
+  });
+
+  test('native send now pushes mesh while a lattice send hangs', () async {
+    final pending = FakeQueuedSubmissionsRepository();
+    final entity = StuckFirstEntityPort();
+    final mesh = FakeMeshBroadcaster()..broadcastSucceeds = false;
+    final native = IsolateQueueWorker(
+        repository: pending,
+        entityPort: entity,
+        meshPort: mesh,
+        probeInterval: const Duration(hours: 1));
+    addTearDown(native.stop);
+    await native.enqueue(
+        buildQueuedSubmission(entityId: 'report-1', payload: 'signed:1'));
+    await native.enqueue(buildQueuedSubmission(
+        entityId: 'report-2',
+        payload: 'signed:2',
+        transport: TransportKind.mesh));
+    await native.start();
+    await until(() => mesh.broadcastPayloads.isNotEmpty);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
+    mesh.broadcastSucceeds = true;
+    expect(await native.sendNow(pending.submissions.last), isTrue);
+
+    expect(pending.submissions.map((row) => row.entityId), ['report-1']);
+    expect(mesh.broadcastPayloads, ['signed:2', 'signed:2']);
+    expect(entity.publishedPayloads, ['signed:1']);
+  });
+
+  test('native send now overtakes a hung row on the same transport', () async {
+    final pending = FakeQueuedSubmissionsRepository();
+    final entity = StuckFirstEntityPort();
+    final native = IsolateQueueWorker(
+        repository: pending,
+        entityPort: entity,
+        meshPort: FakeMeshBroadcaster(),
+        probeInterval: const Duration(hours: 1));
+    addTearDown(native.stop);
+    for (final id in [1, 4]) {
+      await native.enqueue(
+          buildQueuedSubmission(entityId: 'report-$id', payload: 'signed:$id'));
+    }
+    await native.start();
+    await until(() => entity.publishedPayloads.isNotEmpty);
+
+    expect(await native.sendNow(pending.submissions.last), isTrue);
+
+    expect(pending.submissions.map((row) => row.entityId), ['report-1']);
+    expect(entity.publishedPayloads, ['signed:1', 'signed:4']);
+  });
+
+  test('native send now reports failure while the transport is still down',
+      () async {
+    final pending = FakeQueuedSubmissionsRepository();
+    final mesh = FakeMeshBroadcaster()..broadcastSucceeds = false;
+    final native = IsolateQueueWorker(
+        repository: pending,
+        entityPort: FakePmcsEntityPort(),
+        meshPort: mesh,
+        probeInterval: const Duration(hours: 1));
+    addTearDown(native.stop);
+    await native.enqueue(buildQueuedSubmission(transport: TransportKind.mesh));
+    expect(await native.sendNow(pending.submissions.single), isFalse);
+    await native.start();
+    await until(() => mesh.broadcastPayloads.isNotEmpty);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
+    expect(await native.sendNow(pending.submissions.single), isFalse);
+
+    expect(pending.submissions, hasLength(1));
+    expect(mesh.broadcastPayloads, hasLength(2));
   });
 
   test(

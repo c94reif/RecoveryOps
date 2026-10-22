@@ -20,18 +20,40 @@ void queueWorkerMain(QueueWorkerSetup setup) {
   final failures = <String, int>{};
   final skipProbes = <String, int>{};
   final delivered = <int>{};
+  final sendNowRequested = <int>{};
+
+  void dispatch(String transport, Map<String, Object?> row) {
+    final id = row['id'] as int;
+    inFlight[id] = InFlight(transport: transport)
+      ..awaitingDelete = delivered.contains(id);
+    setup.toMain.send(delivered.contains(id)
+        ? workerDelete(id)
+        : workerExecute(submissionId: id, submission: row));
+  }
 
   void requestNext(String transport) {
     if (inFlight.values.any((entry) => entry.transport == transport)) return;
     final transportQueue = pending[transport]!;
     if (transportQueue.isEmpty) return;
-    final next = transportQueue.first;
-    final id = next['id'] as int;
-    inFlight[id] = InFlight(transport: transport)
-      ..awaitingDelete = delivered.contains(id);
-    setup.toMain.send(delivered.contains(id)
-        ? workerDelete(id)
-        : workerExecute(submissionId: id, submission: next));
+    dispatch(transport, transportQueue.first);
+  }
+
+  void answerSendNow(int id, {required bool delivered}) {
+    if (!sendNowRequested.remove(id)) return;
+    setup.toMain
+        .send(workerSendNowResult(submissionId: id, delivered: delivered));
+  }
+
+  void onSendNow(int id) {
+    for (final entry in pending.entries) {
+      for (final row in entry.value) {
+        if (row['id'] != id) continue;
+        sendNowRequested.add(id);
+        if (!inFlight.containsKey(id)) dispatch(entry.key, row);
+        return;
+      }
+    }
+    setup.toMain.send(workerSendNowResult(submissionId: id, delivered: true));
   }
 
   void enqueueLocal(Map<String, Object?> submission) {
@@ -68,6 +90,7 @@ void queueWorkerMain(QueueWorkerSetup setup) {
     } else {
       inFlight.remove(id);
       backOff(entry.transport);
+      answerSendNow(id, delivered: false);
     }
   }
 
@@ -75,6 +98,7 @@ void queueWorkerMain(QueueWorkerSetup setup) {
     final entry = inFlight[id];
     if (entry == null || !entry.awaitingDelete) return;
     inFlight.remove(id);
+    answerSendNow(id, delivered: true);
     if (!success) {
       backOff(entry.transport);
       return;
@@ -124,6 +148,9 @@ void queueWorkerMain(QueueWorkerSetup setup) {
         failures.clear();
         skipProbes.clear();
         onProbe();
+        break;
+      case QueueWireType.mainSendNow:
+        onSendNow(map['submissionId'] as int);
         break;
       case QueueWireType.mainProbe:
         onProbe();

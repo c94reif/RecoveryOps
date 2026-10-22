@@ -37,6 +37,7 @@ abstract class _ReportsState extends ChangeNotifier {
   List<FollowedUnit> reportUnits = const [];
 
   final List<QueuedSubmission> queued = [];
+  final Set<int> sendingNow = {};
 
   void invalidateReportViews();
   void updateUnread();

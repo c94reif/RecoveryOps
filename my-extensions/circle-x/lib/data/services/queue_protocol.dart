@@ -6,11 +6,13 @@ class QueueWireType {
   static const String mainExecuteResult = 'main.executeResult';
   static const String mainProbe = 'main.probe';
   static const String mainRetryNow = 'main.retryNow';
+  static const String mainSendNow = 'main.sendNow';
   static const String mainShutdown = 'main.shutdown';
 
   static const String workerReady = 'worker.ready';
   static const String workerExecute = 'worker.execute';
   static const String workerDelete = 'worker.delete';
+  static const String workerSendNowResult = 'worker.sendNowResult';
   static const String workerLog = 'worker.log';
 }
 
@@ -56,6 +58,11 @@ Map<String, Object?> mainExecuteResult({
 
 Map<String, Object?> mainRetryNow() => {'type': QueueWireType.mainRetryNow};
 
+Map<String, Object?> mainSendNow(int submissionId) => {
+      'type': QueueWireType.mainSendNow,
+      'submissionId': submissionId,
+    };
+
 Map<String, Object?> mainProbe() => {'type': QueueWireType.mainProbe};
 
 Map<String, Object?> mainShutdown() => {'type': QueueWireType.mainShutdown};
@@ -75,6 +82,16 @@ Map<String, Object?> workerExecute({
 Map<String, Object?> workerDelete(int submissionId) => {
       'type': QueueWireType.workerDelete,
       'submissionId': submissionId,
+    };
+
+Map<String, Object?> workerSendNowResult({
+  required int submissionId,
+  required bool delivered,
+}) =>
+    {
+      'type': QueueWireType.workerSendNowResult,
+      'submissionId': submissionId,
+      'delivered': delivered,
     };
 
 Map<String, Object?> workerLog(String message) => {

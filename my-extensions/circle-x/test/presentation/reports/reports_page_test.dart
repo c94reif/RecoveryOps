@@ -10,6 +10,7 @@ import 'package:circle_x/domain/entities/pmcs_phase.dart';
 import 'package:circle_x/domain/entities/attested_identity.dart';
 import 'package:circle_x/domain/entities/cac_scan.dart';
 import 'package:circle_x/domain/entities/pmcs_signature.dart';
+import 'package:circle_x/domain/entities/transport_kind.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
 import 'package:circle_x/presentation/common/widgets/fault_tally_bar.dart';
 import 'package:circle_x/presentation/common/widgets/severity_badge.dart';
@@ -806,6 +807,29 @@ void main() {
       // Last in, first out — Z-99 parked later, so it leads despite sorting
       // after A-11 alphabetically.
       expect(headers, ['Z-99', 'A-11']);
+    });
+
+    testWidgets('send now asks for that row and shows it sending',
+        (tester) async {
+      viewModel.queued.add(buildQueuedSubmission(
+        id: 1,
+        bumperNumber: 'A-11',
+        transport: TransportKind.mesh,
+      ));
+
+      await tester.pumpWidget(subject());
+      await tester.pumpAndSettle();
+      await openTab(tester, ReportsTab.queued);
+
+      await tester.tap(find.text('Send now'));
+      await tester.pump();
+
+      expect(viewModel.sentNow.single.id, 1);
+      expect(find.text('Sending…'), findsOneWidget);
+      final button = tester.widget<ButtonStyleButton>(find.ancestor(
+          of: find.text('Sending…'),
+          matching: find.byWidgetPredicate((w) => w is OutlinedButton)));
+      expect(button.onPressed, isNull);
     });
 
     testWidgets('one vehicle parked twice keeps both under its header',

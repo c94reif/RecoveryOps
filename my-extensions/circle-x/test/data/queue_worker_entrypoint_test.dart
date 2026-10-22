@@ -193,6 +193,65 @@ void main() {
     expect(executed(), [1]);
   });
 
+  List<Map<String, Object?>> sendNowResults() =>
+      ofType(QueueWireType.workerSendNowResult);
+
+  test('send now runs a row stuck behind an in-flight head of its transport',
+      () async {
+    toWorker.send(mainHello([submission(1), submission(4)]));
+    await pump();
+    expect(executed(), [1]);
+    toWorker.send(mainSendNow(4));
+    await pump();
+    expect(executed(), [1, 4]);
+    expect(sendNowResults(), isEmpty);
+    await finish(4);
+    expect(sendNowResults().single, containsPair('delivered', true));
+    expect(sendNowResults().single['submissionId'], 4);
+    expect(executed(), [1, 4]);
+  });
+
+  test('send now ignores backoff and reports a failed attempt', () async {
+    toWorker.send(mainHello([submission(2, TransportKind.mesh)]));
+    await pump();
+    toWorker.send(mainExecuteResult(submissionId: 2, success: false));
+    toWorker.send(mainProbe());
+    await pump();
+    toWorker.send(mainExecuteResult(submissionId: 2, success: false));
+    toWorker.send(mainProbe());
+    await pump();
+    expect(executed(), [2, 2]);
+    toWorker.send(mainSendNow(2));
+    await pump();
+    expect(executed(), [2, 2, 2]);
+    toWorker.send(mainExecuteResult(submissionId: 2, success: false));
+    await pump();
+    expect(sendNowResults().single, containsPair('delivered', false));
+    expect(deleted(), isEmpty);
+  });
+
+  test('send now on a row already in flight waits for that attempt', () async {
+    toWorker.send(mainHello([submission(1)]));
+    await pump();
+    toWorker.send(mainSendNow(1));
+    await pump();
+    expect(executed(), [1]);
+    await finish(1);
+    expect(sendNowResults().single, containsPair('delivered', true));
+    expect(executed(), [1]);
+  });
+
+  test('send now on a row that already left the queue reports it delivered',
+      () async {
+    toWorker.send(mainHello([submission(1)]));
+    await pump();
+    await finish(1);
+    toWorker.send(mainSendNow(1));
+    await pump();
+    expect(sendNowResults().single, containsPair('delivered', true));
+    expect(executed(), [1]);
+  });
+
   test('a failed transport leaves the other transport free to drain', () async {
     toWorker
         .send(mainHello([submission(1), submission(2, TransportKind.mesh)]));
