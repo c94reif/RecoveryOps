@@ -1,8 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cac_ocr/src/domain/reading/find_dod_id.dart';
 
-/// Recorded shapes of what ML Kit hands back off the back of a CAC — one
-/// string per recognised line, labels and values often on the same line.
 void main() {
   group('the number on the back of the card', () {
     test('is picked out of the full set of printed numbers', () {
@@ -18,7 +16,6 @@ void main() {
     });
 
     test('is never the eleven-digit benefits number, even alone', () {
-      // Its first nine digits are the same Soldier; its length is not.
       expect(findDodId(['DoD Benefits Number 10879874981']), isNull);
     });
 
@@ -33,7 +30,6 @@ void main() {
     test(
         'is not assembled across a letter — the benefits number stays '
         'separate', () {
-      // "1087987498" followed on the same line by a label and more digits.
       expect(findDodId(['ID 1087987498 DBN 10879874981']), '1087987498');
     });
 

@@ -28,7 +28,6 @@ void main() {
   }
 
   group('a digit ML Kit doubts', () {
-    // The fifth digit of the DoD ID.
     final shakyDigit = {
       back.single: {18}
     };

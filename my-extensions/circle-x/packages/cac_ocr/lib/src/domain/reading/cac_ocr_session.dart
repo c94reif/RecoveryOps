@@ -156,7 +156,6 @@ class CacOcrSession {
     return (
       name: name,
       rank: findCacRank(lines) ?? '',
-      // An expiry no card issued on that date could carry is a misread.
       expiresOn: expiresOn != null &&
               issuedOn != null &&
               !CacCardDates.plausible(issuedOn, expiresOn)

@@ -28,9 +28,6 @@ void main() {
   });
 
   test('the camera failing is reported as the camera failing', () async {
-    // The operator needs to know whether to shoot the card again or stop
-    // trying, so the capture reason survives rather than collapsing into a
-    // generic failure.
     scanner.willFail(CacRejection.noCamera);
 
     final scan = await verify();
@@ -52,8 +49,6 @@ void main() {
   });
 
   test('a readable barcode is judged by the parser, not the scanner', () async {
-    // The Code 39 off the back of a CAC: the parser, not the scanner, turns
-    // it into a Soldier by DoD ID.
     scanner.willReadBarcode('1TPBOMMS10DINPAEDL');
 
     final scan = await verify();
@@ -63,8 +58,6 @@ void main() {
 
   test('a DoD ID the scanner read itself is judged by the number parser',
       () async {
-    // What the Android scanner hands over: the printed number, OCR'd off the
-    // back, with no barcode record to decode.
     scanner.willReadFields('1087987498');
 
     final scan = await verify();

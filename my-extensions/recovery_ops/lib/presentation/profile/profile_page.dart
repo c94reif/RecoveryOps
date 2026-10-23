@@ -85,8 +85,6 @@ class ProfilePageState extends State<ProfilePage> {
                       label: 'Name',
                       icon: Icons.person_outline,
                     ),
-                    // TODO: Don't forget to eventually go back and refactor
-                    // all the other code that deals with call sign in VM's
                     const SizedBox(height: 16),
                     CustomTextField(
                       controller: unitController,

@@ -84,8 +84,6 @@ import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
 import 'package:circle_x/presentation/profile/profile_view_model.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
 
-/*I know this has become god class, but haven't gotten aroudn to refactoring it yet. All
-* dependency injection occurs here. */
 void configureDependencies(
   sdk.ExtensionContext extensionContext, {
   ReportStoreBackend? reportStoreBackend,

@@ -1,7 +1,5 @@
 import 'package:cac_ocr/src/domain/cac_identity.dart';
 
-/// A Soldier as the parser would hand one back, for tests that need an
-/// identity without going through a barcode.
 CacIdentity buildIdentity({
   String dodId = '1087987498',
   String firstName = 'JOHN',

@@ -4,11 +4,6 @@ import 'package:cac_ocr/src/domain/cac_identity.dart';
 import '../support/identities.dart';
 
 void main() {
-  /// A card that runs out [days] after it was scanned.
-  ///
-  /// Both ends come off the same instant on purpose: `verifiedAt` is already
-  /// the scan moment off the injected clock, so the arithmetic under test
-  /// takes no clock of its own and stays deterministic.
   CacIdentity cardExpiringIn(int days, {int scannedAtHour = 7}) {
     final scannedAt = DateTime.utc(2026, 3, 24, scannedAtHour);
     return buildIdentity(
@@ -17,8 +12,6 @@ void main() {
     );
   }
 
-  /// A card whose barcode carried no expiry field at all. Reachable from
-  /// `CacIdentity.fromMap` on a report written by an older build.
   final noExpiry = CacIdentity(
     dodId: '1087987498',
     firstName: 'JOHN',
@@ -41,10 +34,6 @@ void main() {
     });
 
     test('a late-evening scan does not read a day short', () {
-      // Both ends are cut back to UTC calendar days because a card expires on
-      // a day, not at an instant. Without that, a card scanned at 23:00 the
-      // day before its expiry counts 0 days instead of 1 and the copy says
-      // "expires today" to a Soldier whose card is good tomorrow.
       expect(cardExpiringIn(1, scannedAtHour: 23).daysUntilCardExpiry, 1);
       expect(cardExpiringIn(30, scannedAtHour: 23).daysUntilCardExpiry, 30);
     });
@@ -63,9 +52,6 @@ void main() {
     });
 
     test('the warning window is inclusive at its edge', () {
-      // Thirty days is the window a Soldier can act inside — an ID card
-      // appointment is rarely same-week. A card exactly on the boundary is
-      // inside it, not one day too late.
       expect(CacIdentity.expiryWarningDays, 30);
       expect(cardExpiringIn(30).isCardExpiringSoon, isTrue);
     });
@@ -77,9 +63,6 @@ void main() {
     });
 
     test('a card already dead still warns', () {
-      // The scan gate refuses an expired card outright, so this only reaches
-      // here through an identity restored from an older report — and the
-      // maintainer reading that signature block still wants to be told.
       expect(cardExpiringIn(-3).isCardExpiringSoon, isTrue);
     });
 
@@ -146,8 +129,6 @@ void main() {
     });
 
     test('a code this build does not know shows the code, not a guess', () {
-      // The 2012 barcode spec predates the Space Force; an unknown letter is
-      // still worth putting in front of a maintainer.
       expect(buildIdentity(branchCode: 'S').branch, 'S');
     });
   });

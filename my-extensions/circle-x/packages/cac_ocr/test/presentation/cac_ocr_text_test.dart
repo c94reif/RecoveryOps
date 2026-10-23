@@ -35,7 +35,6 @@ class _LiveScanner implements CacScannerStrategy, CacCameraPreview {
   Future<void> focusAt(Offset point) async {}
 }
 
-/// Every field set to a marker, so a word that did not come from here shows.
 final marked = CacOcrText(
   promptBothSides: 'T.promptBothSides',
   promptBackOnly: 'T.promptBackOnly',
@@ -82,7 +81,6 @@ final marked = CacOcrText(
   typedSubmitButton: 'T.typedSubmitButton',
 );
 
-/// The lines a sign-off can show with every optional one left out.
 const quiet = CacOcrText(
   promptBothSides: null,
   promptBackOnly: null,
@@ -109,7 +107,6 @@ const quiet = CacOcrText(
 void main() {
   final shown = <String>{};
 
-  /// Every string on screen, gathered across the states a test walks through.
   void collect(WidgetTester tester) {
     for (final text in tester.widgetList<Text>(find.byType(Text))) {
       shown.add(text.data ?? text.textSpan!.toPlainText());

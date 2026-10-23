@@ -60,15 +60,12 @@ class CacCameraHarness {
   var failInitialize = false;
   var minExposureOffset = -2.0;
 
-  /// Characters ML Kit doubts, by their place in the line.
   var doubted = <String, Set<int>>{};
   Completer<void>? pendingInitialize;
   Completer<Map<String, Object>>? pendingOcr;
 
-  /// Unique across tests: the camera plugin's listeners outlive a harness.
   static int _cameraId = 0;
 
-  /// Like a phone, one camera at a time: another is refused until it closes.
   final _openCameras = <int>{};
 
   void install() {
@@ -213,7 +210,6 @@ class CacCameraHarness {
     }
   }
 
-  /// Sends one camera frame; [luma] fills its brightness plane.
   Future<void> frame(List<String> text, {Uint8List? luma}) async {
     lines = text;
     final bytes = Uint8List(640 * 480 * 3 ~/ 2);
@@ -242,7 +238,6 @@ class CacCameraHarness {
     }
   }
 
-  /// Reads the front through to the flip.
   Future<void> readFront([List<String> lines = cardFront]) async {
     await frames(lines, CacOcrSession.framesToAgree);
     expect(scanner.side.value, CacScanSide.back);
@@ -252,20 +247,17 @@ class CacCameraHarness {
       .where((call) => call.method == 'vision#startTextRecognizer')
       .length;
 
-  /// A 640x480 brightness plane of 4-pixel squares in two shades.
   static Uint8List checkerboard({int light = 200}) => Uint8List.fromList([
         for (var y = 0; y < 480; y++)
           for (var x = 0; x < 640; x++) (x ~/ 4 + y ~/ 4).isEven ? light : 0,
       ]);
 
-  /// Moves the app through Flutter's lifecycle as Android would.
   Future<void> lifecycle(AppLifecycleState state) async {
     await messenger.handlePlatformMessage(SystemChannels.lifecycle.name,
         SystemChannels.lifecycle.codec.encodeMessage(state.toString()), null);
     await flush();
   }
 
-  /// The modes the scanner set through [method], in order.
   List<Object?> modes(String method) => [
         for (final call in cameraCalls)
           if (call.method == method) (call.arguments as Map)['mode'],

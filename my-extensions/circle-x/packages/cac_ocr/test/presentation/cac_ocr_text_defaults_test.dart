@@ -4,7 +4,6 @@ import 'package:cac_ocr/src/presentation/cac_ocr_text.dart';
 
 import '../support/identities.dart';
 
-/// The package's own wording, where it carries a rule of its own.
 void main() {
   String? retryHint(int attempts, {bool bothSides = false}) =>
       const CacOcrText().retryHint!(attempts, bothSides);
@@ -15,18 +14,11 @@ void main() {
     });
 
     test('nothing on the first miss', () {
-      // The rejection carries its own instruction — wipe the card, move
-      // closer, turn it over. Stacking a second piece of advice on top of it
-      // while the Soldier is still lining the card up is how someone in the
-      // rain stops reading the panel at all.
       expect(retryHint(1), isNull);
     });
 
     test('the second miss offers the rotation, which is the non-obvious one',
         () {
-      // The PDF417's bars run the long way up a portrait card, so a card held
-      // upright puts a tall thin symbol in a wide frame and most of the sensor
-      // is spent on card stock and sky.
       final hint = retryHint(2);
 
       expect(hint, isNotNull);
@@ -45,17 +37,12 @@ void main() {
     });
 
     test('the advice stops escalating rather than running out', () {
-      // A Soldier on their ninth attempt still gets the best thing there is to
-      // say, not null and not something new invented to fill the space.
       expect(retryHint(4), retryHint(3));
       expect(retryHint(9), retryHint(3));
       expect(retryHint(99), retryHint(3));
     });
 
     test('a negative count cannot crash the refused card', () {
-      // Not reachable through the view model, which only ever increments —
-      // but this is a pure function on a plain int and the refused card has no
-      // business being the place that finds out.
       expect(retryHint(-1), isNull);
     });
 
@@ -64,7 +51,6 @@ void main() {
         'there', () {
       for (final hint in [retryHint(2)!, retryHint(3)!]) {
         expect(hint, endsWith('.'));
-        // Nothing that needs equipment they do not have in their hands.
         expect(hint.toLowerCase(), isNot(contains('lighting')));
         expect(hint.toLowerCase(), isNot(contains('scanner')));
       }
@@ -89,7 +75,6 @@ void main() {
     });
 
     test('a past date says so rather than counting backwards', () {
-      // 'in -3 days' is the off-by-one lie this case exists to refuse.
       expect(
           warningFor(-3), 'This CAC expired 21 MAR 2026. Draw a current card.');
     });

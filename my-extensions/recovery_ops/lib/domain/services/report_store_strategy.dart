@@ -9,6 +9,5 @@ abstract class NavigatorStateStore {
   Future<bool> stopNavigator(String entityId);
 }
 
-/// Existing entityId fields remain stable report IDs for the database/outbox.
 abstract class ReportStoreStrategy
     implements RecoveryEntityPort, RemoteReportSource, ReportWithdrawalSource {}

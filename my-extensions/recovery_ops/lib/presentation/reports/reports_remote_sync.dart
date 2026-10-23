@@ -1,6 +1,5 @@
 part of 'reports_view_model.dart';
 
-/// Reconciles remote records and permanent withdrawals with local report state.
 mixin _RemoteReportSync on ChangeNotifier {
   ReportsRepository get repository;
   SyncRemoteReports get syncRemoteReports;

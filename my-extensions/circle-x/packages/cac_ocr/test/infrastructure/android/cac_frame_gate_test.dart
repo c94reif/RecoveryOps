@@ -10,7 +10,6 @@ void main() {
   test('a frame well under the recent sharpest is blurred', () {
     final frames = gate();
     expect(frames.judge((sharpness: 100, glare: 0)), isNull);
-    // The sharpest fades to 90 first, so the bar is 54.
     expect(frames.judge((sharpness: 50, glare: 0)), CacFrameSkip.blur);
     expect(frames.judge((sharpness: 60, glare: 0)), isNull);
   });

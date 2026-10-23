@@ -4,16 +4,11 @@ import 'package:cac_ocr/src/domain/cac_scan.dart';
 import 'package:cac_ocr/src/domain/parse_cac_barcode.dart';
 import 'package:cac_ocr/src/domain/parse_dod_id.dart';
 
-/// Scans a card and says who it belongs to: the use case behind every
-/// sign-off. A barcode is decoded here; fields the scanner read itself are
-/// checked the same way, so every scanner's capture meets the same rules.
 class VerifyOperatorIdentity {
   final CacScannerStrategy scanner;
   final ParseCacBarcode parseBarcode;
   final ParseDodId parseDodId;
 
-  /// Accepts a card past its printed expiry date instead of refusing it. The
-  /// identity still carries the date, so the verified card can say so.
   final bool allowExpired;
 
   VerifyOperatorIdentity({

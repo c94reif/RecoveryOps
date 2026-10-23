@@ -8,11 +8,6 @@ import '../support/identities.dart';
 
 void main() {
   group('the operator copy', () {
-    // The file's own stated policy, asserted rather than trusted: a Soldier in
-    // gloves in the rain needs to know what to do next, and a message that
-    // only diagnoses leaves them holding a walked PMCS and no next move. The
-    // `expired` message was a bare 'That CAC is expired.' and is the reason
-    // this group exists.
     for (final rejection in CacRejection.values) {
       test('${rejection.name} is a whole sentence, not a fragment', () {
         final message = rejection.message;
@@ -24,9 +19,6 @@ void main() {
     }
 
     test('every rejection the operator can act on names an action', () {
-      // `cancelled` is the one exception and stays one: the operator caused it
-      // themselves and is already looking at SCAN AGAIN and SUBMIT UNVERIFIED,
-      // so a sentence telling them to do what they can see would be noise.
       const verbs = [
         'fill',
         'wipe',
@@ -68,8 +60,6 @@ void main() {
     });
 
     test('says nothing about a submission flow the app may not have', () {
-      // Whether an unverified submission exists is the app's call, so the
-      // offer belongs in its CacOcrText rather than in the card's copy.
       for (final rejection in CacRejection.values) {
         expect(rejection.message.toLowerCase(), isNot(contains('unverified')));
         expect(rejection.message, isNot(contains('PMCS')));
@@ -78,10 +68,6 @@ void main() {
   });
 
   group('isWorthRetrying', () {
-    // Drives which control the refused card leads with, so a wrong answer here
-    // either walks the operator round a loop that cannot end or hides the
-    // retry from someone whose next photograph would have worked. Every enum
-    // value is pinned, not a sample.
     const retryable = {
       CacRejection.nameNotFound,
       CacRejection.noCodeFound,
@@ -99,8 +85,6 @@ void main() {
     };
 
     test('the two sets between them cover every rejection', () {
-      // A value added to the enum and to neither set fails here rather than
-      // quietly inheriting whichever answer happens to be first.
       expect({...retryable, ...settled}, CacRejection.values.toSet());
       expect(retryable.intersection(settled), isEmpty);
     });

@@ -27,7 +27,6 @@ class Pdf417Read {
   }) : text = null;
 }
 
-/// Finds and decodes a CAC's barcodes in a photo's pixels, in pure Dart.
 class Pdf417ImageDecoder {
   const Pdf417ImageDecoder();
 

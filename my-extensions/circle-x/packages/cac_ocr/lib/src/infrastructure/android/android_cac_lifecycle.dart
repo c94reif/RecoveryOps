@@ -12,8 +12,6 @@ mixin _CacLifecycle on _CacScannerState, WidgetsBindingObserver {
     final completer = _inFlight;
     if (completer == null) return;
     switch (state) {
-      // Inactive alone is a permission prompt or the notification shade,
-      // with the scan still on screen.
       case AppLifecycleState.hidden || AppLifecycleState.paused:
         _pause();
       case AppLifecycleState.resumed:
@@ -44,19 +42,16 @@ mixin _CacLifecycle on _CacScannerState, WidgetsBindingObserver {
     }();
   }
 
-  /// The side's time limit starts over on return.
   Future<void> _resume(Completer<CacCapture> completer) async {
     if (!_paused) return;
     _paused = false;
     final revision = ++_lifecycleRevision;
-    // Whatever was opening or closing the camera settles first.
     await _pausing;
     await _startup;
     await _reopening;
     bool current() => _inFlight == completer && revision == _lifecycleRevision;
     final session = _session;
     if (!current() || session == null) return;
-    // The reopened camera's focus starts the votes over.
     if (_controller == null) {
       final description = _description;
       final reopening = description == null

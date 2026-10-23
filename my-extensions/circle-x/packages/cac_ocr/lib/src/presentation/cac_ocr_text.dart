@@ -48,7 +48,6 @@ class CacOcrText {
   final String? unverifiedNotice;
   final String? galleryAdvisory;
 
-  // The typed fallback.
   final String? typedHeading;
   final String? typedNotice;
   final String lastNameLabel;

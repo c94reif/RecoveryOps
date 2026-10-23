@@ -35,7 +35,6 @@ void main() {
     });
 
     test('refuses ten digits DEERS has never issued', () {
-      // A misread digit, not a Soldier who does not exist.
       expect(parse('0000000001').rejection, CacRejection.notACac);
       expect(parse('0999999999').rejection, CacRejection.notACac);
     });

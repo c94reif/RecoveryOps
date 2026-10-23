@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cac_ocr/src/presentation/cac_ocr_theme.dart';
 
-/// The colour family a [CacPanel] takes from [CacOcrTheme].
 enum CacTone { neutral, success, warning, danger }
 
 class CacPanel extends StatelessWidget {

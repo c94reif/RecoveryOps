@@ -33,7 +33,6 @@ void main() {
   });
 
   test('gives up where the issue date could be mistaken for it', () {
-    // Read as a column, the line under the labels is the issue date.
     expect(findCacExpiry(['Issued Expires', '2026 SEP 30', '2029 SEP 30']),
         isNull);
     expect(findCacExpiry(['Expires', '2026 SEP 30 2029 SEP 30']), isNull);

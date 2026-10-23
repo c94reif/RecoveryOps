@@ -70,7 +70,7 @@ void main() {
     await readFront();
     await harness.frame(back);
     await harness.rotate('landscapeLeft');
-    await harness.frame(back); // Refocus after rotating, before using frames.
+    await harness.frame(back);
     await frames(back, agree - 1);
     expect(completed, isFalse);
     final input = harness.ocrCalls.last.arguments['imageData'] as Map;
@@ -93,7 +93,6 @@ void main() {
         .lastWhere((call) => call.method == 'setFocusPoint')
         .arguments as Map;
     expect(point['x'], 0.25);
-    // The portrait preview is cropped vertically to fit the 4:3 viewfinder.
     expect(point['y'], closeTo(0.359375, 0.00001));
     harness.pendingOcr!.complete(CacCameraHarness.recognized(back));
     await harness.flush();
@@ -118,7 +117,6 @@ void main() {
         if (rejectPreset) AndroidCacScanner.startResolution,
       ]);
       expect(harness.scanner.side.value, CacScanSide.back);
-      // This attempt must not reopen the camera on every failed frame.
       await frames(short, tuning.unreadableFramesBeforeUpgrade);
       expect(harness.resolutions.length, rejectPreset ? 3 : 2);
       await frames(back, agree);
@@ -372,7 +370,6 @@ void main() {
 
     test('some glare is read through, with the tip shown', () async {
       final luma = checkerboard();
-      // 40 of the front crop's 180 rows: enough to coach, not to skip.
       luma.fillRange(640 * 220, 640 * 260, 255);
       harness.scanner.capture();
       await harness.flush();

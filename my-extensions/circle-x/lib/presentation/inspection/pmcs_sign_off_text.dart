@@ -1,7 +1,5 @@
 import 'package:cac_ocr/cac_ocr.dart';
 
-/// The PMCS reading of the CAC sign-off: a walked PMCS goes to the maintainer,
-/// and a card that cannot be read still leaves an unverified way to send it.
 const pmcsSignOffText = CacOcrText(
   promptBothSides: 'A PMCS is signed by the Soldier who walked it. Scan the '
       'front of your CAC for your name, then flip it when asked to read the '

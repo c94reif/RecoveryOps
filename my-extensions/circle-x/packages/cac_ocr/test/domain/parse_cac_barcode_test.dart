@@ -5,7 +5,6 @@ import 'package:cac_ocr/src/domain/parse_cac_barcode.dart';
 import 'package:cac_ocr/testing.dart';
 
 void main() {
-  // Before the fixture card's 2028 expiry, so a default fixture is current.
   final scannedAt = DateTime.utc(2026, 3, 24, 9);
   final parse = ParseCacBarcode(() => scannedAt);
 
@@ -27,37 +26,26 @@ void main() {
     });
 
     test('decodes the DoD ID number out of its base-32 packing', () {
-      // DMDC's own published sample: '10DINPA' decodes to 1087987498.
       final identity = parse(cacBarcode()).identity!;
 
       expect(identity.dodId, '1087987498');
     });
 
     test('matches a second DMDC published sample', () {
-      // '1L6MPQI' is published as 1785423698. Two independent samples pin the
-      // base-32 arithmetic to ground truth rather than to this app's own
-      // reading of the spec.
       final identity = parse(cacBarcode(dodId: '1L6MPQI')).identity!;
 
       expect(identity.dodId, '1785423698');
     });
 
     test('decodes the date of birth field on the published sample date', () {
-      // 'ATJ1' is published as 1980-02-18. The parser drops the value, but
-      // the date arithmetic it shares with the expiry field is pinned here by
-      // proving a card whose expiry carries the same packing reads back.
       final identity = parse(cacBarcode(expires: 'ATJ1')).identity;
 
-      // 1980 is long past, so this card is refused — which is itself the
-      // proof the day count decoded to 1980 and not to some far future.
       expect(identity, isNull);
       expect(
           parse(cacBarcode(expires: 'ATJ1')).rejection, CacRejection.expired);
     });
 
     test('keeps a short DoD ID number ten characters wide', () {
-      // Zero-padded because that is how DEERS and the 5988-E print it; a
-      // stripped leading zero is a different Soldier's number.
       final identity = parse(cacBarcode(dodId: '0TPLIG0')).identity!;
 
       expect(identity.dodId, '1000000000');
@@ -103,12 +91,6 @@ void main() {
     });
 
     test('reads a Soldier who has no middle name', () {
-      // The middle initial is the LAST field of a version-`N` record, and on a
-      // Soldier with no middle name the card carries it as a space. Trimming
-      // the record shortens that 89 to an 88, which matches neither layout, so
-      // every such Soldier was refused as `notACac` — told to re-aim at a card
-      // they were already holding correctly, and left able to close the PMCS
-      // out only as unverified.
       final scan = parse(cacBarcode(middleInitial: ''));
 
       expect(scan.isVerified, isTrue,
@@ -119,8 +101,6 @@ void main() {
     });
 
     test('reads a version-1 card whose card instance is blank', () {
-      // Same mechanism one field over: the card instance is the last character
-      // of the 88-character legacy layout.
       final scan = parse(cacBarcode(version: '1', cardInstance: ''));
 
       expect(scan.isVerified, isTrue);
@@ -128,9 +108,6 @@ void main() {
     });
 
     test('padding around a blank-initial record does not eat the field', () {
-      // Leading whitespace is unambiguous — field 0 is the version character
-      // and is never a space — so it goes before the length is judged, and the
-      // blank middle initial survives.
       final scan = parse('  \r\n${cacBarcode(middleInitial: '')}');
 
       expect(scan.isVerified, isTrue);
@@ -147,9 +124,6 @@ void main() {
   group('what is refused', () {
     test('a card issued before December 2012, because that field is an SSN',
         () {
-      // Pre-2012 the Person Designator Identifier was literally the
-      // cardholder's SSN. The app will not hold one even for the moment it
-      // takes to ignore it.
       final scan = parse(cacBarcode(securityId: 'ABCDEF'));
 
       expect(scan.isVerified, isFalse);
@@ -158,7 +132,6 @@ void main() {
     });
 
     test('the lowest post-2012 security id is still accepted', () {
-      // 999,000,000 is the boundary, not a rejection.
       final scan = parse(cacBarcode(securityId: 'TP7RAO'));
 
       expect(scan.rejection, isNot(CacRejection.legacySsnCard));
@@ -175,12 +148,6 @@ void main() {
     });
 
     test('a card expiring today is still good, all day', () {
-      // A CAC is valid THROUGH its printed date, and the field decodes to
-      // midnight at the START of that day — so comparing against it directly
-      // deadlines the card at 00:00:01 and, because `expired` is not worth
-      // retrying, steers that Soldier to an unverified submission with a
-      // perfectly good card in their hand. Midnight alone passes even with
-      // that bug; the times of day are the checks that mean something.
       for (final at in [
         DateTime.utc(2028, 6, 30),
         DateTime.utc(2028, 6, 30, 7),
@@ -198,15 +165,8 @@ void main() {
     });
 
     test('the Code 39 strip off the back of the card, named as such', () {
-      // 18 characters, no name, no rank — the wrong barcode, and slicing it
-      // as if it were the front one would invent a Soldier. Recognised
-      // specifically so the operator is told to turn the card over rather
-      // than to go and find a different card.
       final scan = parse('1TPBOMMS10DINPAEDL');
 
-      // The back is now the side asked for, and its strip carries the DoD ID
-      // — so this is a signature by number, the same identity an OCR read of
-      // the printed number produces, with no name to put beside it.
       expect(scan.isVerified, isTrue);
       expect(scan.identity!.dodId, '1087987498');
       expect(scan.identity!.lastName, isEmpty);
@@ -214,10 +174,6 @@ void main() {
     });
 
     test('the same strip with the sentinels a reader tacks on', () {
-      // Code 39 readers commonly hand back the start/stop characters. They
-      // must be stripped before the length is judged, or a real back-of-card
-      // read falls through to the vaguer notACac and the operator is sent
-      // looking for a different card.
       final scan = parse('*1TPBOMMS10DINPAEDL*');
 
       expect(scan.isVerified, isTrue);
@@ -225,11 +181,6 @@ void main() {
     });
 
     group('an 18-character barcode that is not a CAC Code 39', () {
-      // A motor pool is full of 18-character barcodes — tool crib tags, part
-      // labels, container placards. Matching one on length alone would tell a
-      // Soldier to turn over a card they are already holding the right way
-      // round, which is worse than the vaguer answer. Every field is checked,
-      // so each of these fails on a different one.
       void refusedAsNotACac(String description, String barcode) {
         test(description, () {
           expect(barcode.length, 18,
@@ -245,8 +196,6 @@ void main() {
       refusedAsNotACac('a run of letters', 'ABCDEFGHIJKLMNOPQR');
       refusedAsNotACac(
           'a URL that happens to be 18 wide', 'https://example.co');
-      // Shape-perfect apart from one field each, which is the case that would
-      // survive a looser check.
       refusedAsNotACac(
           'a DoD ID number below the range DEERS issues', '1TPBOMMS0000001EDL');
       refusedAsNotACac('a digit where the branch code must be a letter',
@@ -283,8 +232,6 @@ void main() {
     });
 
     test('a base-32 field carrying a character outside the alphabet', () {
-      // 'Z' is not in 0-9A-V. Coercing it would silently shift the decoded
-      // number and put another Soldier's DoD ID on the 5988-E.
       final scan = parse(cacBarcode(dodId: '10DINPZ'));
 
       expect(scan.isVerified, isFalse);
@@ -301,9 +248,6 @@ void main() {
 
   group('what is deliberately not kept', () {
     test('the date of birth never reaches the identity', () {
-      // DoD guidance treats a DoD ID number paired with a date of birth as a
-      // reportable combination, and a date of birth says nothing about who
-      // signed for a vehicle.
       final identity = parse(cacBarcode()).identity!;
 
       expect(identity.toMap().keys, isNot(contains('dateOfBirth')));

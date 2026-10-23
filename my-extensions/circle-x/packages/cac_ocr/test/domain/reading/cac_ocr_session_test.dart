@@ -18,7 +18,6 @@ void main() {
     value: '1TPBOMMS10DINPBEDL',
   );
 
-  /// Feeds [lines] one frame short of agreement; nothing may come back.
   void nearly(CacOcrSession session, List<String> lines,
       {List<CacBarcode> barcodes = const []}) {
     for (var frame = 1; frame < agree; frame++) {
@@ -27,7 +26,6 @@ void main() {
     }
   }
 
-  /// Feeds [lines] for a full agreement and returns what it settles on.
   CacCapture? settle(CacOcrSession session, List<String> lines,
       {List<CacBarcode> barcodes = const []}) {
     nearly(session, lines, barcodes: barcodes);

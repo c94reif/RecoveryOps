@@ -150,8 +150,6 @@ class CacOcrRefused extends StatelessWidget {
         ),
       );
 
-  /// Says plainly that the card ran out, whose it is and when, so it does not
-  /// read like one more misread worth another try.
   Widget buildExpiredBanner(CacOcrTheme theme) {
     final card = expiredCard;
     final holder = card == null ? null : text.expiredHolder?.call(card);

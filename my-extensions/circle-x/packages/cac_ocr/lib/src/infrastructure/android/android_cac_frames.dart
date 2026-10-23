@@ -60,7 +60,6 @@ mixin _CacFrames on _CacScannerState {
           await (recognizer.processImage(input), _readBarcodes(input)).wait;
       final readTime = _elapsed.elapsed - started;
       if (_inFlight != completer) return;
-      // A frame from before the app left is from a camera that has closed.
       if (lifecycleRevision != _lifecycleRevision) return;
       if (focusRevision != _focusRevision) return;
       if (orientation != camera.value.deviceOrientation) {

@@ -18,7 +18,6 @@ CameraImage frame({
   int format = 17,
   Uint8List? bytes,
 }) {
-  // Construct the same channel shape used by the platform's camera frames.
   // ignore: deprecated_member_use
   return CameraImage.fromPlatformData({
     'width': width,
@@ -55,7 +54,6 @@ void main() {
     final original = Uint8List.fromList(bytes);
     final input = cacOcrImage(frame(bytes: bytes), rear,
         DeviceOrientation.landscapeLeft, CacScanSide.back)!;
-    // 86% of the visible 160px width, expanded to even NV21 coordinates.
     expect(input.metadata!.size, const Size(140, 88));
     expect(input.metadata!.bytesPerRow, 140);
     expect(input.metadata!.rotation.rawValue, 0);

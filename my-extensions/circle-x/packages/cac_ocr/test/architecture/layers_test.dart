@@ -19,8 +19,6 @@ List<File> _dartFiles(String path) => FileSystemEntity.isFileSync(path)
         .where((file) => file.path.endsWith('.dart'))
         .toList();
 
-/// Every directive under [paths] that reaches outside portable Dart and the
-/// [allowed] package paths.
 List<String> reachesOutside(List<String> paths, List<String> allowed) => [
       for (final path in paths)
         for (final file in _dartFiles(path))
@@ -30,7 +28,6 @@ List<String> reachesOutside(List<String> paths, List<String> allowed) => [
               '${file.path}: ${match.group(1)}',
     ];
 
-/// Every directive under [paths] into one of the [forbidden] package paths.
 List<String> reachesInto(List<String> paths, List<String> forbidden) => [
       for (final path in paths)
         for (final file in _dartFiles(path))
@@ -40,8 +37,6 @@ List<String> reachesInto(List<String> paths, List<String> forbidden) => [
     ];
 
 void main() {
-  // An app's domain layer imports cac_core.dart, so one Flutter import here
-  // would drag the framework into every layer that trusts it not to.
   test('the domain needs nothing but Dart and itself', () {
     expect(reachesOutside(['lib/src/domain'], ['${_src}domain/']), isEmpty);
   });
@@ -59,8 +54,6 @@ void main() {
         isEmpty);
   });
 
-  // ML Kit imports dart:io, so a widget that named a platform scanner would
-  // break the web build; widgets see scanners only through their contracts.
   test('the UI knows no platform scanner', () {
     expect(
       reachesInto([

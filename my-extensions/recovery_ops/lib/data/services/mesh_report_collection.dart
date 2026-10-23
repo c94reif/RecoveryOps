@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:le_sdk/le_sdk.dart' as sdk;
 
-/// Resolves stable report IDs to server-assigned item paths on every write.
-/// Kept inside each extension so its source package remains self-contained.
 class MeshReportCollection {
   final sdk.MeshItemService items;
   final sdk.MeshDataTypePath type;
@@ -12,16 +10,13 @@ class MeshReportCollection {
   MeshReportCollection({required this.items, required this.type});
 
   Future<List<sdk.MeshItem>> _list() async {
-    // Do not interpret an unavailable/unregistered collection as an empty one.
     if (await items.getDataType(type) == null) {
       throw StateError('Register mesh item schema '
           '${type.namespace}/${type.domain}/${type.dataType}/${type.version}');
     }
-    // Read the typed collection, without relying on upstream filter dialects.
     return items.listItems(type);
   }
 
-  /// Withdrawal records are immutable and dominate all live duplicates.
   Future<Map<String, sdk.MeshItem>> snapshot() async {
     final records = <String, sdk.MeshItem>{};
     for (final item in await _list()) {
@@ -64,8 +59,6 @@ class MeshReportCollection {
   Future<void> withdraw(String reportId) => _serial(reportId, () async {
         final existing = (await snapshot())[reportId];
         if (existing != null && withdrawn(existing)) return;
-        // Never replace the live item: an in-flight update on another device
-        // must not overwrite the withdrawal. No TTL on either record type.
         final data = <String, Object?>{
           'reportId': reportId,
           'withdrawn': true,
@@ -75,7 +68,6 @@ class MeshReportCollection {
         await _verify(saved, data);
       });
 
-  /// Update navigation only when a complete report already exists.
   Future<void> patch(String reportId, Map<String, Object?> changes) =>
       _serial(reportId, () async {
         final existing = (await snapshot())[reportId];
