@@ -8,8 +8,7 @@ import 'package:circle_x/data/mappers/pmcs_entity_mapper.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
 import 'package:circle_x/domain/entities/fault_severity.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/domain/entities/attested_identity.dart';
-import 'package:circle_x/domain/entities/cac_scan.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/domain/entities/pmcs_signature.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
 
@@ -120,7 +119,7 @@ void main() {
           blockedBy: CacRejection.codeUnreadable,
           signedAt: DateTime.utc(2026, 3, 24, 9),
           attestedBy: const AttestedIdentity(
-            edipi: '1087987498',
+            dodId: '1087987498',
             firstName: 'JOHN',
             lastName: 'SMITH',
           ),
@@ -347,7 +346,7 @@ void main() {
       final parsed = mapper.parseRemoteEntity(mapper.buildEntity(report))!;
 
       expect(parsed.isSignatureVerified, isTrue);
-      expect(parsed.signature!.identity!.edipi, '1087987498');
+      expect(parsed.signature!.identity!.dodId, '1087987498');
     });
 
     test('an unverified report stays unverified on the COP', () {

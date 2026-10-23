@@ -1,30 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/presentation/common/widgets/confirm_dialog.dart';
 import 'package:circle_x/presentation/common/widgets/section_label.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
-import 'package:circle_x/presentation/inspection/sign_off/refused_sign_off.dart';
-import 'package:circle_x/presentation/inspection/sign_off/scan_guidance.dart';
-import 'package:circle_x/presentation/inspection/sign_off/scan_progress.dart';
-import 'package:circle_x/presentation/inspection/sign_off/scan_prompt.dart';
-import 'package:circle_x/presentation/inspection/sign_off/verified_sign_off.dart';
-import 'package:circle_x/presentation/inspection/typed_identity_form.dart';
-import 'package:circle_x/presentation/inspection/viewfinder/cac_viewfinder.dart';
-
-export 'package:circle_x/presentation/inspection/sign_off/scan_guidance.dart'
-    show AimGuideLine;
-export 'package:circle_x/presentation/inspection/sign_off/verified_sign_off.dart'
-    show formatCardDate;
+import 'package:circle_x/presentation/inspection/pmcs_sign_off_text.dart';
 
 class SignOffCard extends StatelessWidget {
   final InspectionViewModel viewModel;
 
   const SignOffCard({super.key, required this.viewModel});
 
-  static const int maxLeadingRetries = RefusedSignOff.maxLeadingRetries;
+  static const int maxLeadingRetries = CacOcr.defaultMaxLeadingRetries;
   static const double cardWidth = CacAimGuide.cardWidth;
   static const double cardHeight = CacAimGuide.cardHeight;
-
-  bool get scansBothSides => scansBothCacSides(viewModel.cacScanner);
 
   @override
   Widget build(BuildContext context) {
@@ -33,37 +21,15 @@ class SignOffCard extends StatelessWidget {
       children: [
         const SectionLabel(text: 'SIGN OFF'),
         const SizedBox(height: 8),
-        if (viewModel.isScanning)
-          SignOffScanning(
-            scanner: viewModel.cacScanner,
-            isBusy: viewModel.isBusy,
-            onCancel: viewModel.cancelScan,
-          )
-        else if (viewModel.isSignedOff)
-          VerifiedSignOff(
-            identity: viewModel.lastScan!.identity!,
-            scansBothSides: scansBothSides,
-            isBusy: viewModel.isBusy,
-            onSubmit: viewModel.submit,
-            onRescan: viewModel.scanCac,
-          )
-        else if (viewModel.canSubmitUnverified)
-          RefusedSignOff(
-            rejection: viewModel.lastScan!.rejection!,
-            scanAttempts: viewModel.scanAttempts,
-            scansBothSides: scansBothSides,
-            isBusy: viewModel.isBusy,
-            onScan: viewModel.scanCac,
-            onSubmitUnverified: () => confirmUnverified(context),
-            typedIdentityForm: TypedIdentityForm(viewModel: viewModel),
-          )
-        else
-          SignOffPrompt(
-            scansBothSides: scansBothSides,
-            scannerAvailable: viewModel.cacScannerAvailable,
-            isBusy: viewModel.isBusy,
-            onScan: viewModel.scanCac,
-          ),
+        CacOcr(
+          controller: viewModel.identityScan,
+          scannerAvailable: viewModel.cacScannerAvailable,
+          isBusy: viewModel.isBusy,
+          text: pmcsSignOffText,
+          onSubmit: viewModel.submit,
+          onSubmitUnverified: () => confirmUnverified(context),
+          onSubmitTyped: viewModel.submitAttested,
+        ),
       ],
     );
   }

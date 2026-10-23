@@ -7,7 +7,7 @@ import 'package:circle_x/domain/entities/pmcs_session.dart';
 import 'package:circle_x/presentation/inspection/inspection_flow_page.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
 
-import '../../support/cac_fixtures.dart';
+import 'package:cac_ocr/testing.dart';
 import '../../support/inspection_harness.dart';
 
 void main() {
@@ -91,7 +91,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(harness.viewModel.stage, InspectionStage.summary);
 
-        harness.cacScanner.willRead(cacBarcode());
+        harness.cacScanner.willReadBarcode(cacBarcode());
         await tap(tester, 'SCAN CAC');
         await tap(tester, 'SUBMIT PMCS');
 

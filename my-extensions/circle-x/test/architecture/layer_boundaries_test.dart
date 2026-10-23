@@ -17,6 +17,7 @@ void main() {
     final forbidden = dependencies('lib/domain').where((dependency) {
       final (_, uri) = dependency;
       return !uri.startsWith('package:circle_x/domain/') &&
+          uri != 'package:cac_ocr/cac_core.dart' &&
           !uri.startsWith('package:characters/') &&
           !uri.startsWith('package:latlong2/') &&
           !{'dart:async', 'dart:convert', 'dart:math', 'dart:collection'}

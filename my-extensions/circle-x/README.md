@@ -7,6 +7,11 @@ Lattice Edge. Companion application for **Convoy Ops** / **Recovery Ops**.
 The display name and source folder are `circle-x`. The host registration ID is
 `circle_x`, matching the Dart package, just as Recovery Ops uses `recovery_ops`
 for both. The Android helper package is `circle_x_android`.
+CAC scanning (the card model, the Android OCR and web barcode scanners, and the
+sign-off UI) is the reusable [`cac_ocr`](packages/cac_ocr/README.md)
+package; circle-x supplies its PMCS wording and colours. Build with
+`--dart-define=CAC_DIAGNOSTICS=true` to show the scanner's per-frame log under
+the sign-off, for tuning on a phone.
 The plugin logo is declared as `assets/logo.png` in the Flutter assets, using
 the same registration pattern as Recovery Ops without an `iconAsset` override.
 In a native host build the bundled logo is `packages/circle_x/assets/logo.png`.

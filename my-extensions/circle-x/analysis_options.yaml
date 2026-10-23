@@ -10,6 +10,7 @@
 analyzer:
   exclude:
     - build/**
+    - packages/**
     - android/**
     - web/**
     - ios/**

@@ -2,17 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/core/di/injection.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/cac_scan.dart';
+import 'package:cac_ocr/cac_ocr.dart';
+import 'package:cac_ocr/testing.dart';
 import 'package:circle_x/domain/entities/fault_severity.dart';
 import 'package:circle_x/domain/entities/pmcs_fault.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/presentation/common/widgets/custom_button.dart';
 import 'package:circle_x/presentation/common/widgets/fault_tally_bar.dart';
 import 'package:circle_x/presentation/common/widgets/severity_badge.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
 import 'package:circle_x/presentation/inspection/summary_page.dart';
 
-import '../../support/cac_fixtures.dart';
 import '../../support/fakes.dart';
 import '../../support/inspection_harness.dart';
 
@@ -84,11 +83,10 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  final submitButton = find.widgetWithText(CustomButton, 'SUBMIT PMCS');
-  final scanButton = find.widgetWithText(CustomButton, 'SCAN CAC');
-  final scanAgainButton = find.widgetWithText(CustomButton, 'SCAN AGAIN');
-  final unverifiedButton =
-      find.widgetWithText(CustomButton, 'SUBMIT UNVERIFIED');
+  final submitButton = find.widgetWithText(CacButton, 'SUBMIT PMCS');
+  final scanButton = find.widgetWithText(CacButton, 'SCAN CAC');
+  final scanAgainButton = find.widgetWithText(CacButton, 'SCAN AGAIN');
+  final unverifiedButton = find.widgetWithText(CacButton, 'SUBMIT UNVERIFIED');
 
   testWidgets(
       'review shows completed inspections and preserves access to older saved checks',
@@ -304,7 +302,7 @@ void main() {
   /// Scans a readable CAC through the sign-off card, which is the only way
   /// SUBMIT PMCS ever appears.
   Future<void> signOff(WidgetTester tester) async {
-    harness.cacScanner.willRead(cacBarcode());
+    harness.cacScanner.willReadBarcode(cacBarcode());
     await tester.tap(scanButton);
     await tester.pumpAndSettle();
   }
@@ -332,7 +330,7 @@ void main() {
       expect(find.textContaining('DoD ID 1087987498'), findsOneWidget);
       expect(find.textContaining('US Army'), findsOneWidget);
       expect(submitButton, findsOneWidget);
-      expect(tester.widget<CustomButton>(submitButton).onPressed, isNotNull);
+      expect(tester.widget<CacButton>(submitButton).onPressed, isNotNull);
     });
 
     testWidgets('a refused scan says why and offers the override',
@@ -362,7 +360,7 @@ void main() {
       await walkPmcs(faults: [deadlining]);
       await pumpPage(tester);
 
-      harness.cacScanner.willRead('not a cac at all');
+      harness.cacScanner.willReadFields('not a cac at all');
       await tester.tap(scanButton);
       await tester.pumpAndSettle();
 
@@ -429,7 +427,7 @@ void main() {
       await signOff(tester);
 
       expect(submitButton, findsOneWidget);
-      expect(tester.widget<CustomButton>(submitButton).onPressed, isNotNull);
+      expect(tester.widget<CacButton>(submitButton).onPressed, isNotNull);
     });
 
     testWidgets('submitting stores the report and clears the walk-around',

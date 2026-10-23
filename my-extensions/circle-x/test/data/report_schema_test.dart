@@ -1,8 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
 import 'package:circle_x/data/services/mesh_item_report_store_strategy.dart';
-import 'package:circle_x/domain/entities/attested_identity.dart';
-import 'package:circle_x/domain/entities/cac_scan.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/domain/entities/fault_severity.dart';
 import 'package:circle_x/domain/entities/maintainer_review.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
@@ -81,7 +80,7 @@ void main() {
         blockedBy: CacRejection.noCamera,
         signedAt: DateTime.utc(2026),
         attestedBy: const AttestedIdentity(
-            edipi: '1087987498', firstName: 'JOHN', lastName: 'SMITH'),
+            dodId: '1087987498', firstName: 'JOHN', lastName: 'SMITH'),
       ),
       buildSignature(
           identity: buildIdentity(firstName: '', lastName: '', rank: '')),
@@ -154,7 +153,7 @@ void main() {
         (location == 'operator' ? body(data) : review(data))['signature']
             as Map;
 
-    for (final edipi in [
+    for (final dodId in [
       '',
       '123',
       'abcdefghij',
@@ -163,9 +162,9 @@ void main() {
       '1087987498\n',
       1087987498
     ]) {
-      test('schema rejects $location identity number $edipi', () {
+      test('schema rejects $location identity number $dodId', () {
         final data = record();
-        (signature(data)['identity'] as Map)['edipi'] = edipi;
+        (signature(data)['identity'] as Map)['edipi'] = dodId;
         expectInvalid(data);
       });
     }

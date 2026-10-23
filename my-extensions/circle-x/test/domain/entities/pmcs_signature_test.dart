@@ -1,7 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:circle_x/domain/entities/cac_identity.dart';
-import 'package:circle_x/domain/entities/cac_scan.dart';
-import 'package:circle_x/domain/entities/attested_identity.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/domain/entities/pmcs_signature.dart';
 
 import '../../support/fakes.dart';
@@ -37,27 +35,9 @@ void main() {
     });
   });
 
-  group('service and category labels', () {
-    test('name the service a maintainer would recognise', () {
-      expect(buildIdentity(branchCode: 'M').branch, 'US Marine Corps');
-      expect(buildIdentity(branchCode: 'N').branch, 'US Navy');
-    });
-
-    test('a contractor reads differently from a Soldier', () {
-      expect(buildIdentity(categoryCode: 'E').category, 'DoD Contractor');
-      expect(buildIdentity(categoryCode: 'N').category, 'National Guard');
-    });
-
-    test('a code this build does not know shows the code, not a guess', () {
-      // The 2012 barcode spec predates the Space Force; an unknown letter is
-      // still worth putting in front of a maintainer.
-      expect(buildIdentity(branchCode: 'S').branch, 'S');
-    });
-  });
-
   group('the typed fallback', () {
     const typed = AttestedIdentity(
-      edipi: '1087987498',
+      dodId: '1087987498',
       firstName: 'JOHN',
       lastName: 'SMITH',
     );
@@ -95,7 +75,7 @@ void main() {
       expect(back, isNotNull);
       expect(back!.isVerified, isFalse);
       expect(back.attestedBy?.displayName, 'SMITH, JOHN');
-      expect(back.attestedBy?.edipi, '1087987498');
+      expect(back.attestedBy?.dodId, '1087987498');
       expect(back.blockedBy, CacRejection.codeUnreadable);
     });
 
@@ -108,36 +88,6 @@ void main() {
       expect(back.attestedBy, isNull);
       expect(back.displayName, 'UNVERIFIED');
     });
-
-    test('what the operator typed is normalised the way the card prints it',
-        () {
-      final parsed = AttestedIdentity.parse(
-        lastName: '  smith ',
-        firstName: 'john',
-        edipi: '1087 987 498',
-      );
-
-      expect(parsed.error, isNull);
-      expect(parsed.identity!.lastName, 'SMITH');
-      expect(parsed.identity!.firstName, 'JOHN');
-      expect(parsed.identity!.edipi, '1087987498');
-    });
-
-    test('refuses the entries that cannot be a Soldier', () {
-      String? errorFor(
-              {String last = 'SMITH',
-              String first = 'JOHN',
-              String id = '1087987498'}) =>
-          AttestedIdentity.parse(lastName: last, firstName: first, edipi: id)
-              .error;
-
-      expect(errorFor(last: ' '), 'Last name is required');
-      expect(errorFor(first: ''), 'First name is required');
-      expect(
-          errorFor(id: '12345'), 'DoD ID is the 10-digit number on the card');
-      expect(errorFor(id: '0000000001'), 'That is not a DoD ID number');
-      expect(errorFor(), isNull);
-    });
   });
 
   group('storage and the wire', () {
@@ -145,7 +95,7 @@ void main() {
       final restored = PmcsSignature.fromMap(buildSignature().toMap())!;
 
       expect(restored.isVerified, isTrue);
-      expect(restored.identity!.edipi, '1087987498');
+      expect(restored.identity!.dodId, '1087987498');
       expect(restored.identity!.displayName, 'SGT SMITH, JOHN A');
       expect(restored.signedAt, DateTime.utc(2026, 3, 24, 9));
     });
@@ -193,16 +143,6 @@ void main() {
 
     test('a verified signature carries no date of birth onto the wire', () {
       expect(buildSignature().toMap().toString(), isNot(contains('1980')));
-    });
-
-    test('CacIdentity tolerates fields a newer build added', () {
-      final restored = CacIdentity.fromMap({
-        ...buildIdentity().toMap(),
-        'somethingNew': 'ignored',
-      });
-
-      expect(restored, isNotNull);
-      expect(restored!.edipi, '1087987498');
     });
   });
 }

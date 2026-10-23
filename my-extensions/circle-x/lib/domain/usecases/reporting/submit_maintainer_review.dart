@@ -1,4 +1,4 @@
-import 'package:circle_x/domain/entities/cac_identity.dart';
+import 'package:cac_ocr/cac_core.dart';
 import 'package:circle_x/domain/entities/maintainer_review.dart';
 import 'package:circle_x/domain/entities/pmcs_report.dart';
 import 'package:circle_x/domain/entities/pmcs_signature.dart';
@@ -36,7 +36,7 @@ class SubmitMaintainerReview {
   }) async {
     if (reviewId.isEmpty ||
         reviewId == sourceReportId ||
-        !CacIdentity.isValidEdipi(identity.edipi) ||
+        !DodId.isValid(identity.dodId) ||
         (identity.daysUntilCardExpiry ?? 0) < 0) {
       throw ArgumentError('A valid CAC scan is required');
     }

@@ -1,12 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:circle_x/domain/entities/cac_scan.dart';
+import 'package:cac_ocr/cac_ocr.dart';
+import 'package:cac_ocr/testing.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
 
-import '../support/cac_fixtures.dart';
-import '../support/fakes.dart';
 import '../support/inspection_harness.dart';
 
 /// The scan-abandonment paths, which only exist because of a latch that shipped
@@ -88,7 +87,7 @@ void main() {
       await startScanning();
       viewModel.cancelScan();
 
-      scanner.pending.complete(CacCapture.read(cacBarcode()));
+      scanner.pending.complete(CacCapture.barcode(cacBarcode()));
       await Future<void>.delayed(Duration.zero);
       await Future<void>.delayed(Duration.zero);
 
@@ -164,7 +163,7 @@ void main() {
       await viewModel.scanCac();
       await viewModel.scanCac();
 
-      harness.cacScanner.willRead(cacBarcode());
+      harness.cacScanner.willReadBarcode(cacBarcode());
       await viewModel.scanCac();
 
       expect(viewModel.scanAttempts, 0);
@@ -216,13 +215,13 @@ void main() {
     });
 
     test('a cancel rolls back only its own attempt', () async {
-      final scanner = HangingCacScanner();
+      final scanner = _MissThenHang();
       final own = InspectionHarness(scanner: scanner).viewModel;
       await own.load();
 
       // A genuine miss first — the decoder judged a frame and it did not read.
-      own.lastScan = const CacScan.rejected(CacRejection.noCodeFound);
-      own.scanAttempts = 1;
+      await own.scanCac();
+      expect(own.scanAttempts, 1);
 
       unawaited(own.scanCac());
       await Future<void>.delayed(Duration.zero);
@@ -315,7 +314,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       own.backToPhases();
-      scanner.pending.complete(CacCapture.read(cacBarcode()));
+      scanner.pending.complete(CacCapture.barcode(cacBarcode()));
       await Future<void>.delayed(Duration.zero);
       await Future<void>.delayed(Duration.zero);
 
@@ -330,4 +329,22 @@ void main() {
 class ThrowingCancelScanner extends HangingCacScanner {
   @override
   Future<void> cancel() async => throw StateError('camera bridge is gone');
+}
+
+/// Misses once, as a card the decoder judged and could not read, then hangs
+/// like a camera still open.
+class _MissThenHang implements CacScannerStrategy {
+  final _open = Completer<CacCapture>();
+  var _calls = 0;
+
+  @override
+  Future<bool> isAvailable() async => true;
+
+  @override
+  Future<CacCapture> capture() async => _calls++ == 0
+      ? const CacCapture.failed(CacRejection.noCodeFound)
+      : _open.future;
+
+  @override
+  Future<void> cancel() async {}
 }

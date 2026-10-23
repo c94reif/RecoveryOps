@@ -3,7 +3,7 @@ import 'package:circle_x/domain/entities/fault_severity.dart';
 import 'package:circle_x/domain/entities/pmcs_history.dart';
 import 'package:circle_x/domain/entities/pmcs_phase.dart';
 import 'package:circle_x/presentation/common/services/fault_suggestion_controller.dart';
-import '../support/cac_fixtures.dart';
+import 'package:cac_ocr/testing.dart';
 import '../support/fakes.dart';
 import '../support/inspection_harness.dart';
 
@@ -59,7 +59,7 @@ void main() {
     expect(model.summarySuggestions, isEmpty);
     expect(model.comparisons.single.changes.single.kind,
         FaultChangeKind.noLongerReported);
-    harness.cacScanner.willRead(cacBarcode());
+    harness.cacScanner.willReadBarcode(cacBarcode());
     await model.scanCac();
     await model.submit();
     final report = harness.reports.reports.last;
@@ -73,7 +73,7 @@ void main() {
     expect(model.summarySuggestions, hasLength(1));
     expect(model.sessionTally.isEmpty, isTrue);
     expect(model.comparisons.single.previous, isNull);
-    harness.cacScanner.willRead(cacBarcode());
+    harness.cacScanner.willReadBarcode(cacBarcode());
     await model.scanCac();
     await model.submit();
     expect(harness.reports.reports.last.faults, isEmpty);

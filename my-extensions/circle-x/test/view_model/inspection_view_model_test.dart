@@ -8,13 +8,12 @@ import 'package:circle_x/domain/entities/pmcs_phase.dart';
 import 'package:circle_x/domain/entities/pmcs_session.dart';
 import 'package:circle_x/domain/entities/profile.dart';
 import 'package:circle_x/domain/repositories/location_repo.dart';
-import 'package:circle_x/domain/entities/cac_scan.dart';
+import 'package:cac_ocr/cac_ocr.dart';
+import 'package:cac_ocr/testing.dart';
 import 'package:circle_x/domain/entities/vehicle_type.dart';
 import 'package:circle_x/domain/services/clock.dart';
 import 'package:circle_x/domain/services/pmcs_catalog_source.dart';
 import 'package:circle_x/domain/services/speech_recognition_strategy.dart';
-import 'package:circle_x/domain/usecases/identity/parse_cac_barcode.dart';
-import 'package:circle_x/domain/usecases/identity/verify_operator_identity.dart';
 import 'package:circle_x/domain/usecases/publishing/publish_pmcs_report.dart';
 import 'package:circle_x/domain/usecases/reporting/build_session_report.dart';
 import 'package:circle_x/domain/usecases/reporting/submit_session.dart';
@@ -27,7 +26,6 @@ import 'package:circle_x/presentation/common/widgets/custom_snack_bar.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../support/cac_fixtures.dart';
 import '../support/fakes.dart';
 
 /// Fails every call, to prove a thrown repository never latches the UI.
@@ -216,7 +214,7 @@ void main() {
       speechStrategy: speech,
       verifyOperatorIdentity: VerifyOperatorIdentity(
         scanner: cacScanner,
-        parseBarcode: ParseCacBarcode(clock),
+        parseBarcode: ParseCacBarcode(clock.nowUtc),
       ),
       cacScanner: cacScanner,
       profileRepository: profileRepo,
@@ -753,7 +751,7 @@ void main() {
     /// state an ordinary submit is reachable from.
     Future<void> completeAndSign() async {
       await completeEverything();
-      cacScanner.willRead(cacBarcode());
+      cacScanner.willReadBarcode(cacBarcode());
       await viewModel.scanCac();
     }
 
@@ -830,7 +828,7 @@ void main() {
 
       final report = reportsRepo.reports.single;
       expect(report.isSignatureVerified, isTrue);
-      expect(report.signature!.identity!.edipi, '1087987498');
+      expect(report.signature!.identity!.dodId, '1087987498');
       expect(report.operator, 'SGT SMITH, JOHN A');
       // Each closed phase updates the session too, so the signed one is last.
       expect(sessions.updated.last.signature!.isVerified, isTrue);
@@ -884,7 +882,7 @@ void main() {
       await viewModel.submitAttested(
         lastName: 'smith',
         firstName: 'john',
-        edipi: '1087 987 498',
+        dodId: '1087 987 498',
       );
 
       final report = reportsRepo.reports.single;
@@ -906,7 +904,7 @@ void main() {
       await viewModel.submitAttested(
         lastName: 'SMITH',
         firstName: 'JOHN',
-        edipi: '12345',
+        dodId: '12345',
       );
 
       expect(reportsRepo.reports, isEmpty);
@@ -920,7 +918,7 @@ void main() {
       await viewModel.submitAttested(
         lastName: 'SMITH',
         firstName: 'JOHN',
-        edipi: '1087987498',
+        dodId: '1087987498',
       );
 
       expect(reportsRepo.reports, isEmpty);
@@ -928,7 +926,7 @@ void main() {
 
     test('an expired CAC is refused rather than accepted', () async {
       await completeEverything();
-      cacScanner.willRead(cacBarcode(expires: 'BBQH'));
+      cacScanner.willReadBarcode(cacBarcode(expires: 'BBQH'));
 
       await viewModel.scanCac();
 
@@ -954,7 +952,7 @@ void main() {
       await viewModel.scanCac();
       expect(viewModel.isSignedOff, isFalse);
 
-      cacScanner.willRead(cacBarcode());
+      cacScanner.willReadBarcode(cacBarcode());
       await viewModel.scanCac();
 
       expect(viewModel.isSignedOff, isTrue);
@@ -1046,7 +1044,7 @@ void main() {
         speechStrategy: speech,
         verifyOperatorIdentity: VerifyOperatorIdentity(
           scanner: cacScanner,
-          parseBarcode: ParseCacBarcode(clock),
+          parseBarcode: ParseCacBarcode(clock.nowUtc),
         ),
         cacScanner: cacScanner,
         profileRepository: profileRepo,

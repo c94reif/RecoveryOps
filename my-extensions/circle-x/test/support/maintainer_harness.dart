@@ -1,10 +1,8 @@
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
 import 'package:circle_x/domain/entities/pmcs_report.dart';
-import 'package:circle_x/domain/services/cac_scanner_strategy.dart';
+import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/domain/services/clock.dart';
 import 'package:circle_x/domain/services/speech_recognition_strategy.dart';
-import 'package:circle_x/domain/usecases/identity/parse_cac_barcode.dart';
-import 'package:circle_x/domain/usecases/identity/verify_operator_identity.dart';
 import 'package:circle_x/domain/usecases/publishing/publish_pmcs_report.dart';
 import 'package:circle_x/domain/usecases/reporting/submit_maintainer_review.dart';
 import 'package:circle_x/presentation/maintainer/maintainer_review_view_model.dart';
@@ -44,12 +42,12 @@ class MaintainerHarness {
         queueWorker: worker,
         codec: const PmcsReportCodec(),
         clock: clock);
-    scanner.willRead('1087987498');
+    scanner.willReadFields('1087987498');
   }
 
   VerifyOperatorIdentity verify(CacScannerStrategy scanner) =>
       VerifyOperatorIdentity(
-          scanner: scanner, parseBarcode: ParseCacBarcode(clock));
+          scanner: scanner, parseBarcode: ParseCacBarcode(clock.nowUtc));
 
   MaintainerReviewViewModel model(
           {CacScannerStrategy? withScanner,
