@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/maintainer_review.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/reporting/entities/maintainer_review.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
 import 'package:circle_x/presentation/maintainer/maintainer_review_summary.dart';
 
 import '../../support/fakes.dart';

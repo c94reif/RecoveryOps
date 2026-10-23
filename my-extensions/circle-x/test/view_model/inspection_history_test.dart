@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
-import 'package:circle_x/domain/entities/pmcs_history.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
+import 'package:circle_x/domain/reporting/entities/pmcs_history.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
 import 'package:circle_x/presentation/common/services/fault_suggestion_controller.dart';
 import 'package:cac_ocr/testing.dart';
 import '../support/fakes.dart';

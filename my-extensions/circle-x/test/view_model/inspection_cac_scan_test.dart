@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cac_ocr/cac_ocr.dart';
 import 'package:cac_ocr/testing.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
 
 import '../support/inspection_harness.dart';

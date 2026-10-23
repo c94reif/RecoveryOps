@@ -6,11 +6,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/core/di/service_locator.dart';
 import 'package:circle_x/core/platform/ocr_camera_preview.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/services/bumper_scanner_strategy.dart';
+import 'package:circle_x/domain/vehicle/services/bumper_scanner_strategy.dart';
 import 'package:circle_x/presentation/common/widgets/custom_button.dart';
 import 'package:circle_x/presentation/common/widgets/custom_text_field.dart';
-import 'package:circle_x/presentation/inspection/bumper_scan_dialog.dart';
-import 'package:circle_x/presentation/inspection/setup_page.dart';
+import 'package:circle_x/presentation/inspection/setup/bumper_scan_dialog.dart';
+import 'package:circle_x/presentation/inspection/setup/setup_page.dart';
 
 import '../../support/inspection_harness.dart';
 

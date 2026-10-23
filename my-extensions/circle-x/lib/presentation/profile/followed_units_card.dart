@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/profile.dart';
+import 'package:circle_x/domain/profile/entities/profile.dart';
 import 'package:circle_x/presentation/common/widgets/custom_text_field.dart';
 import 'package:circle_x/presentation/common/widgets/uic_text_field.dart';
 import 'package:circle_x/presentation/profile/profile_view_model.dart';

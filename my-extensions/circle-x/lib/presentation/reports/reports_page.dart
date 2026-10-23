@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
-import 'package:circle_x/domain/entities/bumper_number.dart';
-import 'package:circle_x/domain/entities/uic.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
+import 'package:circle_x/domain/vehicle/entities/bumper_number.dart';
+import 'package:circle_x/domain/profile/entities/uic.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
 import 'package:circle_x/presentation/maintainer/maintainer_review_summary.dart';
 import 'package:circle_x/core/di/service_locator.dart';

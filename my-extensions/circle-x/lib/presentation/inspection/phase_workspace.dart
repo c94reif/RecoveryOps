@@ -1,9 +1,9 @@
-import 'package:circle_x/domain/entities/check_result.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
-import 'package:circle_x/domain/entities/pmcs_category.dart';
-import 'package:circle_x/domain/entities/pmcs_check_item.dart';
-import 'package:circle_x/domain/entities/pmcs_fault.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/inspection/entities/check_result.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_category.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_check_item.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_fault.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
 
 class PhaseWorkspace {
   final PmcsPhase phase;

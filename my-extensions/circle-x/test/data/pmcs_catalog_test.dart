@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/data/catalog/jltv_pmcs_catalog.g.dart';
 import 'package:circle_x/data/catalog/stryker_pmcs_catalog.g.dart';
-import 'package:circle_x/data/services/static_pmcs_catalog_source.dart';
-import 'package:circle_x/domain/entities/pmcs_catalog.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/domain/entities/vehicle_type.dart';
+import 'package:circle_x/data/services/catalog/static_pmcs_catalog_source.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_catalog.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/catalog/entities/vehicle_type.dart';
 
 void main() {
   group('catalog integrity', () {

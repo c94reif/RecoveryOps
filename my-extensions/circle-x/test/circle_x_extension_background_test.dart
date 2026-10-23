@@ -9,10 +9,10 @@ import 'package:circle_x/core/config/report_store_config.dart';
 import 'package:circle_x/core/di/injection.dart';
 import 'package:circle_x/data/datasources/local/database.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
-import 'package:circle_x/data/services/mesh_item_report_store_strategy.dart';
-import 'package:circle_x/domain/repositories/reports_repo.dart';
-import 'package:circle_x/domain/services/queue_worker_strategy.dart';
-import 'package:circle_x/domain/services/report_store_strategy.dart';
+import 'package:circle_x/data/services/delivery/mesh_item_report_store_strategy.dart';
+import 'package:circle_x/domain/reporting/repositories/reports_repo.dart';
+import 'package:circle_x/domain/delivery/services/queue_worker_strategy.dart';
+import 'package:circle_x/domain/delivery/services/report_store_strategy.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
 
 import 'support/fake_mesh_items.dart';

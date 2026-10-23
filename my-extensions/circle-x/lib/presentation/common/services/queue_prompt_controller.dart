@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:circle_x/domain/entities/queued_submission.dart';
-import 'package:circle_x/domain/services/queue_prompt_strategy.dart';
+import 'package:circle_x/domain/delivery/entities/queued_submission.dart';
+import 'package:circle_x/domain/delivery/services/queue_prompt_strategy.dart';
 
 class QueuePromptController implements QueuePromptStrategy {
   static final QueuePromptController instance = QueuePromptController.create();

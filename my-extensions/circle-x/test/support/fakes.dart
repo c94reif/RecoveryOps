@@ -1,6 +1,6 @@
-import 'package:circle_x/domain/entities/mileage_reading.dart';
-import 'package:circle_x/domain/entities/bumper_number.dart';
-import 'package:circle_x/domain/entities/uic.dart';
+import 'package:circle_x/domain/vehicle/entities/mileage_reading.dart';
+import 'package:circle_x/domain/vehicle/entities/bumper_number.dart';
+import 'package:circle_x/domain/profile/entities/uic.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -8,34 +8,34 @@ import 'package:circle_x/presentation/common/services/fault_suggestion_controlle
 import 'package:latlong2/latlong.dart';
 
 import 'package:cac_ocr/cac_ocr.dart';
-import 'package:circle_x/domain/entities/maintainer_review.dart';
-import 'package:circle_x/domain/entities/check_result.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
-import 'package:circle_x/domain/entities/pmcs_fault.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/domain/services/transaction_runner.dart';
+import 'package:circle_x/domain/reporting/entities/maintainer_review.dart';
+import 'package:circle_x/domain/inspection/entities/check_result.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_fault.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/shared/services/transaction_runner.dart';
 
 // PmcsReport comes via the reports_view_model export below.
-import 'package:circle_x/domain/entities/pmcs_session.dart';
-import 'package:circle_x/domain/entities/pmcs_signature.dart';
-import 'package:circle_x/domain/entities/profile.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_session.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_signature.dart';
+import 'package:circle_x/domain/profile/entities/profile.dart';
 // QueuedSubmission comes via the reports_view_model export below.
-import 'package:circle_x/domain/entities/transport_kind.dart';
-import 'package:circle_x/domain/entities/vehicle_type.dart';
-import 'package:circle_x/domain/repositories/faults_repo.dart';
-import 'package:circle_x/domain/repositories/location_repo.dart';
-import 'package:circle_x/domain/repositories/profile_repo.dart';
-import 'package:circle_x/domain/repositories/queued_submissions_repo.dart';
-import 'package:circle_x/domain/repositories/reports_repo.dart';
-import 'package:circle_x/domain/repositories/results_repo.dart';
-import 'package:circle_x/domain/repositories/sessions_repo.dart';
-import 'package:circle_x/domain/services/fault_classifier_strategy.dart';
-import 'package:circle_x/domain/services/id_generator.dart';
-import 'package:circle_x/domain/services/mesh_broadcaster_port.dart';
-import 'package:circle_x/domain/services/pmcs_entity_port.dart';
-import 'package:circle_x/domain/services/queue_worker_strategy.dart';
-import 'package:circle_x/domain/services/remote_report_source.dart';
-import 'package:circle_x/domain/services/report_codec.dart';
+import 'package:circle_x/domain/delivery/entities/transport_kind.dart';
+import 'package:circle_x/domain/catalog/entities/vehicle_type.dart';
+import 'package:circle_x/domain/inspection/repositories/faults_repo.dart';
+import 'package:circle_x/domain/shared/repositories/location_repo.dart';
+import 'package:circle_x/domain/profile/repositories/profile_repo.dart';
+import 'package:circle_x/domain/delivery/repositories/queued_submissions_repo.dart';
+import 'package:circle_x/domain/reporting/repositories/reports_repo.dart';
+import 'package:circle_x/domain/inspection/repositories/results_repo.dart';
+import 'package:circle_x/domain/inspection/repositories/sessions_repo.dart';
+import 'package:circle_x/domain/inspection/services/fault_classifier_strategy.dart';
+import 'package:circle_x/domain/shared/services/id_generator.dart';
+import 'package:circle_x/domain/delivery/services/mesh_broadcaster_port.dart';
+import 'package:circle_x/domain/delivery/services/pmcs_entity_port.dart';
+import 'package:circle_x/domain/delivery/services/queue_worker_strategy.dart';
+import 'package:circle_x/domain/delivery/services/remote_report_source.dart';
+import 'package:circle_x/domain/reporting/services/report_codec.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
 
 export 'package:cac_ocr/testing.dart' show FakeCacScanner, HangingCacScanner;

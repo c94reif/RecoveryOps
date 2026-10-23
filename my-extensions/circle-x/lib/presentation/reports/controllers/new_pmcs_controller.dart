@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:circle_x/domain/entities/pmcs_report.dart';
-import 'package:circle_x/domain/entities/pmcs_session.dart';
+import 'package:circle_x/domain/reporting/entities/pmcs_report.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_session.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
 
 class NewPmcsController extends ChangeNotifier {

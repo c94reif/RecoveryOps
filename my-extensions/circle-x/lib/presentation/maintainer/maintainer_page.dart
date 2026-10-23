@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/di/service_locator.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/maintainer_review.dart';
+import 'package:circle_x/domain/reporting/entities/maintainer_review.dart';
 import 'package:circle_x/presentation/maintainer/maintainer_review_page.dart';
 import 'package:circle_x/presentation/maintainer/maintainer_review_prompt.dart';
 import 'package:circle_x/presentation/common/widgets/pmcs_report_card.dart';

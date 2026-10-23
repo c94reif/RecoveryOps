@@ -1,9 +1,9 @@
 import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:circle_x/data/services/queue_protocol.dart';
-import 'package:circle_x/data/services/queue_worker_entrypoint.dart';
-import 'package:circle_x/domain/entities/transport_kind.dart';
+import 'package:circle_x/data/services/delivery/queue_protocol.dart';
+import 'package:circle_x/data/services/delivery/queue_worker_entrypoint.dart';
+import 'package:circle_x/domain/delivery/entities/transport_kind.dart';
 
 import '../support/fakes.dart';
 

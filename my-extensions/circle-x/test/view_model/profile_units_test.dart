@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:circle_x/domain/entities/profile.dart';
+import 'package:circle_x/domain/profile/entities/profile.dart';
 import 'package:circle_x/presentation/profile/profile_view_model.dart';
 
 import '../support/fakes.dart';

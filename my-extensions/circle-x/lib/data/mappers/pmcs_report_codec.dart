@@ -1,15 +1,15 @@
 import 'dart:convert';
-import 'package:circle_x/domain/entities/mileage_reading.dart';
+import 'package:circle_x/domain/vehicle/entities/mileage_reading.dart';
 
 import 'package:circle_x/core/constants/app_constants.dart';
-import 'package:circle_x/domain/entities/pmcs_fault.dart';
-import 'package:circle_x/domain/entities/maintainer_review.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/domain/entities/pmcs_report.dart';
-import 'package:circle_x/domain/entities/pmcs_signature.dart';
-import 'package:circle_x/domain/entities/uic.dart';
-import 'package:circle_x/domain/entities/vehicle_type.dart';
-import 'package:circle_x/domain/services/report_codec.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_fault.dart';
+import 'package:circle_x/domain/reporting/entities/maintainer_review.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/reporting/entities/pmcs_report.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_signature.dart';
+import 'package:circle_x/domain/profile/entities/uic.dart';
+import 'package:circle_x/domain/catalog/entities/vehicle_type.dart';
+import 'package:circle_x/domain/reporting/services/report_codec.dart';
 
 class PmcsReportCodec implements ReportCodec {
   const PmcsReportCodec();

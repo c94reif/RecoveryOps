@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:circle_x/data/datasources/local/database.dart';
 import 'package:circle_x/data/datasources/local/tables/pmcs_reports_table.dart';
-import 'package:circle_x/domain/repositories/reports_repo.dart';
+import 'package:circle_x/domain/reporting/repositories/reports_repo.dart';
 
 part 'pmcs_reports_dao.g.dart';
 

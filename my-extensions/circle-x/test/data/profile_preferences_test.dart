@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/data/dao/profile/profile_dao.dart';
 import 'package:circle_x/data/datasources/local/database.dart';
 import 'package:circle_x/data/repositories/profile_repo_impl.dart';
-import 'package:circle_x/domain/entities/profile.dart';
+import 'package:circle_x/domain/profile/entities/profile.dart';
 
 void main() {
   group('local report units', () {

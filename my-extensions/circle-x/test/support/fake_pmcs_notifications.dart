@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:circle_x/domain/services/pmcs_notification_port.dart';
+import 'package:circle_x/domain/notifications/services/pmcs_notification_port.dart';
 
 typedef PostedPmcsAlert = ({String reportId, String title, String body});
 

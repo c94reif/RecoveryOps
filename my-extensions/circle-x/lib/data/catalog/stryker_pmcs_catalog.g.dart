@@ -3,11 +3,11 @@
 // Stryker: TM 9-2355-311-10.
 // Regenerate with tool/generate_catalog.sh after editing the TM source data.
 
-import 'package:circle_x/domain/entities/pmcs_catalog.dart';
-import 'package:circle_x/domain/entities/pmcs_category.dart';
-import 'package:circle_x/domain/entities/pmcs_check_item.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/domain/entities/vehicle_type.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_catalog.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_category.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_check_item.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/catalog/entities/vehicle_type.dart';
 
 /// 78 PMCS checks for Stryker / Family PMCS.
 const PmcsCatalog strykerPmcsCatalog = PmcsCatalog(

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/core/di/service_locator.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
-import 'package:circle_x/domain/entities/followed_unit.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
+import 'package:circle_x/domain/profile/entities/followed_unit.dart';
 import 'package:circle_x/presentation/reports/reports_page.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
 

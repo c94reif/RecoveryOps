@@ -71,7 +71,7 @@ manuals can be added when their checklist content is available.
    `category` name and `items`; each item has a stable `id`, `item` label, `check`
    instruction, and `faults` answer list. The first answer is serviceable;
    subsequent answers describe faults in increasing severity. The current
-   [classifier](lib/domain/services/tm_fault_classifier.dart) uses `CRIT` in new
+   [classifier](lib/domain/inspection/services/tm_fault_classifier.dart) uses `CRIT` in new
    critical-system IDs and answer order to assign severity, so check both
    against the source manual when transcribing.
 2. Import that source in the manifest and add one entry per selectable variant:

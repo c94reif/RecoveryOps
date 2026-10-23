@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cac_ocr/cac_ocr.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
 
 final Color masterChiefGreen = const Color(0xFF4A7820);
 final Color gunMetalGrey = const Color(0xFF0A0B0D);

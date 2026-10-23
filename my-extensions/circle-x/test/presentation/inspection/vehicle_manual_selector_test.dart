@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/vehicle_type.dart';
-import 'package:circle_x/presentation/inspection/vehicle_manual_selector.dart';
+import 'package:circle_x/domain/catalog/entities/vehicle_type.dart';
+import 'package:circle_x/presentation/inspection/setup/vehicle_manual_selector.dart';
 
 void main() {
   final choices = <VehicleType>[];

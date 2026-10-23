@@ -6,8 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/core/di/injection.dart';
 import 'package:cac_ocr/cac_ocr.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/presentation/inspection/summary_page.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
+import 'package:circle_x/presentation/inspection/summary/summary_page.dart';
 
 import '../../support/fakes.dart';
 import '../../support/inspection_harness.dart';

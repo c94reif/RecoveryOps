@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/di/service_locator.dart';
-import 'package:circle_x/domain/entities/profile.dart';
-import 'package:circle_x/domain/repositories/profile_repo.dart';
+import 'package:circle_x/domain/profile/entities/profile.dart';
+import 'package:circle_x/domain/profile/repositories/profile_repo.dart';
 import 'package:circle_x/presentation/onboarding/onboarding_page.dart';
 
 class OnboardingGate extends StatefulWidget {

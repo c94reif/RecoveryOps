@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'package:circle_x/domain/entities/mileage_reading.dart';
-import 'package:circle_x/domain/entities/pmcs_fault.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/domain/entities/pmcs_signature.dart';
+import 'package:circle_x/domain/vehicle/entities/mileage_reading.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_fault.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_signature.dart';
 
 abstract final class PmcsStorageCodec {
   static String? encodeMileage(MileageReading? mileage) =>

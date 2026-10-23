@@ -5,13 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/core/di/service_locator.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
 import 'package:cac_ocr/testing.dart';
-import 'package:circle_x/domain/entities/mileage_reading.dart';
-import 'package:circle_x/domain/entities/pmcs_session.dart';
-import 'package:circle_x/domain/services/bumper_scanner_strategy.dart';
+import 'package:circle_x/domain/vehicle/entities/mileage_reading.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_session.dart';
+import 'package:circle_x/domain/vehicle/services/bumper_scanner_strategy.dart';
 import 'package:circle_x/presentation/common/widgets/custom_button.dart';
 import 'package:circle_x/presentation/common/widgets/custom_text_field.dart';
-import 'package:circle_x/presentation/inspection/summary_page.dart';
-import 'package:circle_x/presentation/inspection/mileage_scan_dialog.dart';
+import 'package:circle_x/presentation/inspection/summary/summary_page.dart';
+import 'package:circle_x/presentation/inspection/summary/mileage_scan_dialog.dart';
 
 import '../../support/inspection_harness.dart';
 import '../../support/fakes.dart';

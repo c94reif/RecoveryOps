@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:circle_x/core/platform/ocr_camera_preview.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/services/bumper_scanner_strategy.dart';
+import 'package:circle_x/domain/vehicle/services/bumper_scanner_strategy.dart';
 
 Widget? buildBumperViewfinder(BumperScannerStrategy scanner) {
   if (scanner is! OcrCameraPreview) return null;

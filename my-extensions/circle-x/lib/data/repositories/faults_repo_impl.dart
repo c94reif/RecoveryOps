@@ -1,10 +1,10 @@
 import 'package:drift/drift.dart';
 import 'package:circle_x/data/dao/faults/pmcs_faults_dao.dart';
 import 'package:circle_x/data/datasources/local/database.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
-import 'package:circle_x/domain/entities/pmcs_fault.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/domain/repositories/faults_repo.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_fault.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/inspection/repositories/faults_repo.dart';
 
 class FaultsRepoImpl implements FaultsRepository {
   final PmcsFaultsDao dao;

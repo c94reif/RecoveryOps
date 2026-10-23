@@ -100,8 +100,8 @@ export function emitVehicleTypes(catalogs) {
 
 export function emitRegistry(catalogs) {
   return generatedHeader +
-    "import 'package:circle_x/domain/entities/pmcs_catalog.dart';\n" +
-    "import 'package:circle_x/domain/entities/vehicle_type.dart';\n" +
+    "import 'package:circle_x/domain/catalog/entities/pmcs_catalog.dart';\n" +
+    "import 'package:circle_x/domain/catalog/entities/vehicle_type.dart';\n" +
     catalogs.map((catalog) => `import '${catalogFileName(catalog)}';`).join('\n') +
     '\n\nconst Map<VehicleType, PmcsCatalog> registeredPmcsCatalogs = {\n' +
     catalogs.map(({ id }) => `  VehicleType.${id}: ${id}PmcsCatalog,`).join('\n') +

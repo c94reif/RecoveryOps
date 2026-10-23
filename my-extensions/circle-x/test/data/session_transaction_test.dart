@@ -7,15 +7,15 @@ import 'package:circle_x/data/datasources/local/database.dart';
 import 'package:circle_x/data/repositories/faults_repo_impl.dart';
 import 'package:circle_x/data/repositories/results_repo_impl.dart';
 import 'package:circle_x/data/repositories/sessions_repo_impl.dart';
-import 'package:circle_x/data/services/drift_transaction_runner.dart';
-import 'package:circle_x/domain/entities/check_result.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
-import 'package:circle_x/domain/entities/pmcs_catalog.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/domain/entities/pmcs_session.dart';
-import 'package:circle_x/domain/entities/vehicle_type.dart';
-import 'package:circle_x/domain/usecases/session/abandon_session.dart';
-import 'package:circle_x/domain/usecases/session/complete_phase.dart';
+import 'package:circle_x/data/services/shared/drift_transaction_runner.dart';
+import 'package:circle_x/domain/inspection/entities/check_result.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_catalog.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_session.dart';
+import 'package:circle_x/domain/catalog/entities/vehicle_type.dart';
+import 'package:circle_x/domain/inspection/usecases/abandon_session.dart';
+import 'package:circle_x/domain/inspection/usecases/complete_phase.dart';
 
 import '../support/fakes.dart';
 

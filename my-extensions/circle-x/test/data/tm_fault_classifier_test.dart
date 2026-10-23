@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/data/catalog/jltv_pmcs_catalog.g.dart';
 import 'package:circle_x/data/catalog/stryker_pmcs_catalog.g.dart';
-import 'package:circle_x/data/services/tm_fault_classifier.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
+import 'package:circle_x/data/services/inspection/tm_fault_classifier.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
 
 void main() {
   const classifier = TmFaultClassifier();

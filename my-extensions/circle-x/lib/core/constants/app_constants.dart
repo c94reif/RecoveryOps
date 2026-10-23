@@ -1,4 +1,4 @@
-import 'package:circle_x/domain/entities/report_message_type.dart';
+import 'package:circle_x/domain/delivery/entities/report_message_type.dart';
 
 class AppConstants {
   const AppConstants._();

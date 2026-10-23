@@ -26,7 +26,7 @@ test('one manifest registers new families and sibling variants end to end', (t) 
     ...vehicleCatalogs, fixture('testCargo', 'Test trucks'), fixture('testAmbulance', 'Test trucks'),
   ])};`);
   execFileSync(process.execPath, [generator, root, manifest]);
-  const types = readFileSync(join(root, 'domain/entities/vehicle_type.g.dart'), 'utf8');
+  const types = readFileSync(join(root, 'domain/catalog/entities/vehicle_type.g.dart'), 'utf8');
   const registry = readFileSync(join(root, 'data/catalog/pmcs_catalog_registry.g.dart'), 'utf8');
   assert.match(types, /wireName: 'STRYKER'/);
   assert.match(types, /wireName: 'JLTV'/);
@@ -54,8 +54,8 @@ test('invalid manifests do not overwrite generated files', (t) => {
   const root = mkdtempSync(join(tmpdir(), 'circle-x-catalog-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const manifest = join(root, 'manifest.mjs');
-  const existing = join(root, 'domain/entities/vehicle_type.g.dart');
-  mkdirSync(join(root, 'domain/entities'), { recursive: true });
+  const existing = join(root, 'domain/catalog/entities/vehicle_type.g.dart');
+  mkdirSync(join(root, 'domain/catalog/entities'), { recursive: true });
   writeFileSync(existing, 'previous generated version');
   writeFileSync(manifest, `export const vehicleCatalogs = ${JSON.stringify([
     fixture('valid', 'Test'), { ...fixture('invalid', 'Test'), source: {} },

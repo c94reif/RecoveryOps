@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/bumper_number.dart';
+import 'package:circle_x/domain/vehicle/entities/bumper_number.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
 import 'package:circle_x/presentation/common/formatters/report_time.dart';
 import 'package:circle_x/presentation/common/widgets/fault_tally_bar.dart';

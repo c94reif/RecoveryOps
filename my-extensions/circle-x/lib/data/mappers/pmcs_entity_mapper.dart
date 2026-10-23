@@ -4,7 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
 import 'package:circle_x/core/constants/app_constants.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
-import 'package:circle_x/domain/entities/pmcs_report.dart';
+import 'package:circle_x/domain/reporting/entities/pmcs_report.dart';
 
 class PmcsEntityMapper {
   final PmcsReportCodec codec;

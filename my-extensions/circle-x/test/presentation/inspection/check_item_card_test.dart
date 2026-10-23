@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/check_result.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
+import 'package:circle_x/domain/inspection/entities/check_result.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
 import 'package:circle_x/presentation/common/widgets/severity_badge.dart';
-import 'package:circle_x/presentation/inspection/check_item_card.dart';
+import 'package:circle_x/presentation/inspection/checklist/check_item_card.dart';
 
 import '../../support/fakes.dart';
 import '../../support/inspection_harness.dart';

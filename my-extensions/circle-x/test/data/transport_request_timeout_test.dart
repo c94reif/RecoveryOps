@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
-import 'package:circle_x/data/services/entity_report_store_strategy.dart';
-import 'package:circle_x/data/services/main_thread_queue_worker.dart';
-import 'package:circle_x/data/services/mesh_item_report_store_strategy.dart';
-import 'package:circle_x/data/services/sdk_mesh_broadcaster.dart';
-import 'package:circle_x/domain/entities/transport_kind.dart';
-import 'package:circle_x/domain/services/delivery_coordinator.dart';
+import 'package:circle_x/data/services/delivery/entity_report_store_strategy.dart';
+import 'package:circle_x/data/services/delivery/main_thread_queue_worker.dart';
+import 'package:circle_x/data/services/delivery/mesh_item_report_store_strategy.dart';
+import 'package:circle_x/data/services/delivery/sdk_mesh_broadcaster.dart';
+import 'package:circle_x/domain/delivery/entities/transport_kind.dart';
+import 'package:circle_x/domain/delivery/services/delivery_coordinator.dart';
 
 import '../support/fake_mesh_items.dart';
 import '../support/fakes.dart';

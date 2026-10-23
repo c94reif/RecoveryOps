@@ -1,21 +1,21 @@
-import 'package:circle_x/data/services/sdk_report_map_adapter.dart';
-import 'package:circle_x/data/services/sdk_report_message_source.dart';
+import 'package:circle_x/data/services/map/sdk_report_map_adapter.dart';
+import 'package:circle_x/data/services/delivery/sdk_report_message_source.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:circle_x/data/services/isolate_queue_worker.dart';
-import 'package:circle_x/data/services/main_thread_queue_worker.dart';
-import 'package:circle_x/domain/entities/transport_kind.dart';
-import 'package:circle_x/domain/services/clock.dart';
-import 'package:circle_x/domain/services/delivery_coordinator.dart';
-import 'package:circle_x/domain/usecases/map/show_report_on_map.dart';
-import 'package:circle_x/domain/usecases/publishing/publish_pmcs_deletion.dart';
-import 'package:circle_x/domain/usecases/publishing/publish_pmcs_report.dart';
-import 'package:circle_x/domain/usecases/reporting/parse_incoming_deletion.dart';
-import 'package:circle_x/domain/usecases/reporting/parse_incoming_report.dart';
-import 'package:circle_x/domain/usecases/reporting/sync_local_reports_to_lattice.dart';
-import 'package:circle_x/domain/usecases/reporting/sync_remote_reports.dart';
+import 'package:circle_x/data/services/delivery/isolate_queue_worker.dart';
+import 'package:circle_x/data/services/delivery/main_thread_queue_worker.dart';
+import 'package:circle_x/domain/delivery/entities/transport_kind.dart';
+import 'package:circle_x/domain/shared/services/clock.dart';
+import 'package:circle_x/domain/delivery/services/delivery_coordinator.dart';
+import 'package:circle_x/domain/map/usecases/show_report_on_map.dart';
+import 'package:circle_x/domain/delivery/usecases/publish_pmcs_deletion.dart';
+import 'package:circle_x/domain/delivery/usecases/publish_pmcs_report.dart';
+import 'package:circle_x/domain/delivery/usecases/parse_incoming_deletion.dart';
+import 'package:circle_x/domain/delivery/usecases/parse_incoming_report.dart';
+import 'package:circle_x/domain/delivery/usecases/sync_local_reports_to_lattice.dart';
+import 'package:circle_x/domain/delivery/usecases/sync_remote_reports.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
 
 import '../support/fakes.dart';

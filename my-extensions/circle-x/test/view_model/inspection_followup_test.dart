@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/data/mappers/pmcs_entity_mapper.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
 
 import '../support/fakes.dart';

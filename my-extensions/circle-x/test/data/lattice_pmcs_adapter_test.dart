@@ -5,8 +5,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
 import 'package:circle_x/core/constants/app_constants.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
-import 'package:circle_x/data/services/lattice_pmcs_adapter.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
+import 'package:circle_x/data/services/delivery/lattice_pmcs_adapter.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
 
 import '../support/fakes.dart';
 

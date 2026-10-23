@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:circle_x/domain/entities/uic.dart';
+import 'package:circle_x/domain/profile/entities/uic.dart';
 import 'package:circle_x/presentation/common/widgets/custom_text_field.dart';
 
 class UicTextField extends StatefulWidget {

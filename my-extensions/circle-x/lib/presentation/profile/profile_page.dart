@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/di/service_locator.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/uic.dart';
-import 'package:circle_x/domain/services/pmcs_notification_port.dart';
+import 'package:circle_x/domain/profile/entities/uic.dart';
+import 'package:circle_x/domain/notifications/services/pmcs_notification_port.dart';
 import 'package:circle_x/presentation/profile/pmcs_notification_settings_card.dart';
 import 'package:circle_x/presentation/common/widgets/custom_button.dart';
 import 'package:circle_x/presentation/common/widgets/custom_text_field.dart';

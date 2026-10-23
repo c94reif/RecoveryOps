@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
-import 'package:circle_x/data/services/mesh_item_report_store_strategy.dart';
+import 'package:circle_x/data/services/delivery/mesh_item_report_store_strategy.dart';
 import 'package:cac_ocr/cac_ocr.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
-import 'package:circle_x/domain/entities/maintainer_review.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/domain/entities/pmcs_signature.dart';
-import 'package:circle_x/domain/entities/vehicle_type.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
+import 'package:circle_x/domain/reporting/entities/maintainer_review.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_signature.dart';
+import 'package:circle_x/domain/catalog/entities/vehicle_type.dart';
 
 import '../support/fake_mesh_items.dart';
 import '../support/fakes.dart';

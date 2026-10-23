@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/di/service_locator.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/uic.dart';
+import 'package:circle_x/domain/profile/entities/uic.dart';
 import 'package:circle_x/presentation/common/widgets/custom_button.dart';
 import 'package:circle_x/presentation/common/widgets/uic_text_field.dart';
 import 'package:circle_x/presentation/common/widgets/section_label.dart';

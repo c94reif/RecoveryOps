@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/services/pmcs_notification_port.dart';
+import 'package:circle_x/domain/notifications/services/pmcs_notification_port.dart';
 
 class PmcsNotificationSettingsCard extends StatefulWidget {
   final PmcsNotificationPort notifications;

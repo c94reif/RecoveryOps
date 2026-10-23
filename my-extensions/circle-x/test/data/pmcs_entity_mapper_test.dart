@@ -6,11 +6,11 @@ import 'package:le_sdk/le_sdk.dart' as sdk;
 import 'package:circle_x/core/constants/app_constants.dart';
 import 'package:circle_x/data/mappers/pmcs_entity_mapper.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
 import 'package:cac_ocr/cac_ocr.dart';
-import 'package:circle_x/domain/entities/pmcs_signature.dart';
-import 'package:circle_x/domain/entities/vehicle_type.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_signature.dart';
+import 'package:circle_x/domain/catalog/entities/vehicle_type.dart';
 
 import '../support/fakes.dart';
 

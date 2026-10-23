@@ -1,4 +1,4 @@
-import 'package:circle_x/data/services/main_thread_queue_worker.dart';
+import 'package:circle_x/data/services/delivery/main_thread_queue_worker.dart';
 
 import '../../data/main_thread_queue_worker_test.dart'
     show FakeQueuePromptStrategy;
@@ -8,11 +8,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/core/di/injection.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/repositories/profile_repo.dart';
+import 'package:circle_x/domain/profile/repositories/profile_repo.dart';
 import 'package:circle_x/presentation/home/home_page.dart';
 import 'package:circle_x/presentation/home/home_view_model.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
-import 'package:circle_x/presentation/inspection/phase_select_page.dart';
+import 'package:circle_x/presentation/inspection/setup/phase_select_page.dart';
 import 'package:circle_x/presentation/profile/profile_view_model.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
 

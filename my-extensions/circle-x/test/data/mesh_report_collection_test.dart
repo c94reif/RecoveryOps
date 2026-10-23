@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
-import 'package:circle_x/data/services/mesh_report_collection.dart';
+import 'package:circle_x/data/services/delivery/mesh_report_collection.dart';
 import '../support/fake_mesh_items.dart';
 
 const type = sdk.MeshDataTypePath(

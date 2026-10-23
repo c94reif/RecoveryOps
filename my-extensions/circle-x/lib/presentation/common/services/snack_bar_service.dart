@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:circle_x/domain/services/user_notification_sink.dart';
+import 'package:circle_x/domain/shared/services/user_notification_sink.dart';
 
 class SnackBarData {
   final String message;

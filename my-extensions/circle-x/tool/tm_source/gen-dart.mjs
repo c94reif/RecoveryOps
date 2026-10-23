@@ -13,7 +13,7 @@ const manifest = process.argv[3]
 const { vehicleCatalogs } = await import(manifest);
 validateCatalogs(vehicleCatalogs);
 const OUT = join(LIB, 'data/catalog');
-const ENTITIES = join(LIB, 'domain/entities');
+const ENTITIES = join(LIB, 'domain/catalog/entities');
 mkdirSync(OUT, { recursive: true });
 mkdirSync(ENTITIES, { recursive: true });
 
@@ -47,11 +47,11 @@ function emitItem(item, indent) {
 function emitCatalog({ varName, vehicleEnum, source, desc, docs }) {
   const lines = [];
   lines.push(header(desc));
-  lines.push("import 'package:circle_x/domain/entities/pmcs_catalog.dart';");
-  lines.push("import 'package:circle_x/domain/entities/pmcs_category.dart';");
-  lines.push("import 'package:circle_x/domain/entities/pmcs_check_item.dart';");
-  lines.push("import 'package:circle_x/domain/entities/pmcs_phase.dart';");
-  lines.push("import 'package:circle_x/domain/entities/vehicle_type.dart';");
+  lines.push("import 'package:circle_x/domain/catalog/entities/pmcs_catalog.dart';");
+  lines.push("import 'package:circle_x/domain/catalog/entities/pmcs_category.dart';");
+  lines.push("import 'package:circle_x/domain/catalog/entities/pmcs_check_item.dart';");
+  lines.push("import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';");
+  lines.push("import 'package:circle_x/domain/catalog/entities/vehicle_type.dart';");
   lines.push('');
   for (const line of docs) lines.push(`/// ${line}`);
   lines.push(`const PmcsCatalog ${varName} = PmcsCatalog(`);
@@ -93,10 +93,10 @@ writeFileSync(join(OUT, 'pmcs_catalog_registry.g.dart'), emitRegistry(vehicleCat
 // ── Reference data ────────────────────────────────────────────────────────
 const r = [];
 r.push(header('Unit, parts, and dispatch reference data used by the PMCS flow.'));
-r.push("import 'package:circle_x/domain/entities/fault_severity.dart';");
-r.push("import 'package:circle_x/domain/entities/reference/common_part.dart';");
-r.push("import 'package:circle_x/domain/entities/reference/mission.dart';");
-r.push("import 'package:circle_x/domain/entities/reference/priority_designator.dart';");
+r.push("import 'package:circle_x/domain/catalog/entities/fault_severity.dart';");
+r.push("import 'package:circle_x/domain/catalog/entities/reference/common_part.dart';");
+r.push("import 'package:circle_x/domain/catalog/entities/reference/mission.dart';");
+r.push("import 'package:circle_x/domain/catalog/entities/reference/priority_designator.dart';");
 r.push('');
 r.push('/// Actions a maintainer can record against a corrected fault.');
 r.push('const List<String> correctiveActions = [');

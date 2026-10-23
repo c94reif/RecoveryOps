@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:circle_x/data/services/main_thread_queue_worker.dart';
-import 'package:circle_x/domain/entities/queued_submission.dart';
-import 'package:circle_x/domain/entities/transport_kind.dart';
-import 'package:circle_x/domain/services/queue_prompt_strategy.dart';
+import 'package:circle_x/data/services/delivery/main_thread_queue_worker.dart';
+import 'package:circle_x/domain/delivery/entities/queued_submission.dart';
+import 'package:circle_x/domain/delivery/entities/transport_kind.dart';
+import 'package:circle_x/domain/delivery/services/queue_prompt_strategy.dart';
 import 'package:circle_x/presentation/common/widgets/custom_snack_bar.dart';
 
 import '../support/fakes.dart';

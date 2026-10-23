@@ -1,5 +1,5 @@
-import 'package:circle_x/data/services/android_pmcs_notifications.dart';
-import 'package:circle_x/domain/services/pmcs_notification_port.dart';
+import 'package:circle_x/data/services/notifications/android_pmcs_notifications.dart';
+import 'package:circle_x/domain/notifications/services/pmcs_notification_port.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

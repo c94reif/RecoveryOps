@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:circle_x/data/datasources/local/database.dart';
 import 'package:circle_x/data/datasources/local/tables/pmcs_sessions_table.dart';
-import 'package:circle_x/domain/entities/pmcs_session.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_session.dart';
 
 part 'sessions_dao.g.dart';
 

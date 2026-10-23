@@ -1,9 +1,9 @@
 import 'dart:convert';
 
 import 'package:circle_x/data/dao/profile/profile_dao.dart';
-import 'package:circle_x/domain/entities/profile.dart';
-import 'package:circle_x/domain/entities/uic.dart';
-import 'package:circle_x/domain/repositories/profile_repo.dart';
+import 'package:circle_x/domain/profile/entities/profile.dart';
+import 'package:circle_x/domain/profile/entities/uic.dart';
+import 'package:circle_x/domain/profile/repositories/profile_repo.dart';
 
 class ProfileRepoImpl implements ProfileRepository {
   final ProfileDao dao;

@@ -1,16 +1,16 @@
 import 'dart:convert';
 
 import 'package:circle_x/data/mappers/pmcs_storage_codec.dart';
-import 'package:circle_x/domain/entities/maintainer_review.dart';
-import 'package:circle_x/domain/entities/pmcs_fault.dart';
+import 'package:circle_x/domain/reporting/entities/maintainer_review.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_fault.dart';
 
 import 'package:flutter/foundation.dart';
 
 import 'package:circle_x/data/dao/reports/pmcs_reports_dao.dart';
 import 'package:circle_x/data/datasources/local/database.dart';
-import 'package:circle_x/domain/entities/pmcs_report.dart';
-import 'package:circle_x/domain/entities/vehicle_type.dart';
-import 'package:circle_x/domain/repositories/reports_repo.dart';
+import 'package:circle_x/domain/reporting/entities/pmcs_report.dart';
+import 'package:circle_x/domain/catalog/entities/vehicle_type.dart';
+import 'package:circle_x/domain/reporting/repositories/reports_repo.dart';
 
 class ReportsRepoImpl implements ReportsRepository {
   final PmcsReportsDao dao;

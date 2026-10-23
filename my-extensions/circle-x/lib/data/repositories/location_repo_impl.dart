@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:circle_x/core/constants/app_constants.dart';
-import 'package:circle_x/domain/repositories/location_repo.dart';
+import 'package:circle_x/domain/shared/repositories/location_repo.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'package:le_sdk/le_sdk.dart' as sdk;
 

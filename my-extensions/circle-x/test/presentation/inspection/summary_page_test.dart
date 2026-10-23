@@ -4,13 +4,13 @@ import 'package:circle_x/core/di/injection.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
 import 'package:cac_ocr/cac_ocr.dart';
 import 'package:cac_ocr/testing.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
-import 'package:circle_x/domain/entities/pmcs_fault.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_fault.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
 import 'package:circle_x/presentation/common/widgets/fault_tally_bar.dart';
 import 'package:circle_x/presentation/common/widgets/severity_badge.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
-import 'package:circle_x/presentation/inspection/summary_page.dart';
+import 'package:circle_x/presentation/inspection/summary/summary_page.dart';
 
 import '../../support/fakes.dart';
 import '../../support/inspection_harness.dart';

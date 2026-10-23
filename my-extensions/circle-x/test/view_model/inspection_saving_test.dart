@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:circle_x/domain/entities/check_result.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/inspection/entities/check_result.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
 import 'package:circle_x/presentation/common/widgets/custom_snack_bar.dart';
 import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
 

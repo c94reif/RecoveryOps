@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:circle_x/data/dao/queue/queued_submissions_dao.dart';
 import 'package:circle_x/data/datasources/local/database.dart';
-import 'package:circle_x/domain/entities/queued_submission.dart';
-import 'package:circle_x/domain/entities/transport_kind.dart';
-import 'package:circle_x/domain/repositories/queued_submissions_repo.dart';
+import 'package:circle_x/domain/delivery/entities/queued_submission.dart';
+import 'package:circle_x/domain/delivery/entities/transport_kind.dart';
+import 'package:circle_x/domain/delivery/repositories/queued_submissions_repo.dart';
 
 class QueuedSubmissionsRepoImpl implements QueuedSubmissionsRepository {
   final QueuedSubmissionsDao dao;

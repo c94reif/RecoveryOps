@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
 import 'package:cac_ocr/cac_ocr.dart';
-import 'package:circle_x/domain/entities/pmcs_fault.dart';
-import 'package:circle_x/domain/entities/pmcs_signature.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_fault.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_signature.dart';
 
 import '../support/fakes.dart';
 

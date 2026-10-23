@@ -5,7 +5,7 @@ import 'package:le_sdk/le_sdk.dart';
 import 'package:circle_x/core/constants/app_constants.dart';
 import 'package:circle_x/core/di/injection.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/services/queue_worker_strategy.dart';
+import 'package:circle_x/domain/delivery/services/queue_worker_strategy.dart';
 import 'package:circle_x/presentation/common/display_mode.dart';
 import 'package:circle_x/presentation/common/fullscreen.dart';
 import 'package:circle_x/presentation/home/home_page.dart';

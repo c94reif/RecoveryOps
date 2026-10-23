@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:circle_x/domain/entities/profile.dart';
-import 'package:circle_x/domain/entities/uic.dart';
-import 'package:circle_x/domain/repositories/profile_repo.dart';
+import 'package:circle_x/domain/profile/entities/profile.dart';
+import 'package:circle_x/domain/profile/entities/uic.dart';
+import 'package:circle_x/domain/profile/repositories/profile_repo.dart';
 
 class ProfileViewModel extends ChangeNotifier {
   final ProfileRepository repository;

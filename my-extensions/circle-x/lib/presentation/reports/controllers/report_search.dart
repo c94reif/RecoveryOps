@@ -1,5 +1,5 @@
-import 'package:circle_x/domain/entities/bumper_number.dart';
-import 'package:circle_x/domain/entities/uic.dart';
+import 'package:circle_x/domain/vehicle/entities/bumper_number.dart';
+import 'package:circle_x/domain/profile/entities/uic.dart';
 
 class ReportSearch {
   final String _query;

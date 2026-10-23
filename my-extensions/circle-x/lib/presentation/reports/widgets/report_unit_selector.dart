@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/followed_unit.dart';
+import 'package:circle_x/domain/profile/entities/followed_unit.dart';
 
 class ReportUnitSelector extends StatelessWidget {
   static const all = '';

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/entities/pmcs_fault.dart';
-import 'package:circle_x/domain/entities/pmcs_history.dart';
-import 'package:circle_x/domain/entities/pmcs_report.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_fault.dart';
+import 'package:circle_x/domain/reporting/entities/pmcs_history.dart';
+import 'package:circle_x/domain/reporting/entities/pmcs_report.dart';
 import 'package:circle_x/presentation/common/formatters/report_time.dart';
 import 'package:circle_x/presentation/common/widgets/fault_history_widgets.dart';
 import 'package:circle_x/presentation/common/widgets/fault_summary_line.dart';

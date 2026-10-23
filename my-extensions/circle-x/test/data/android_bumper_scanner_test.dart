@@ -4,8 +4,8 @@ import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:circle_x/data/services/android_bumper_scanner.dart';
-import 'package:circle_x/domain/services/bumper_scanner_strategy.dart';
+import 'package:circle_x/data/services/vehicle/android_bumper_scanner.dart';
+import 'package:circle_x/domain/vehicle/services/bumper_scanner_strategy.dart';
 
 // Exercise the real adapter using synthetic platform frames on the test host.
 class _Scanner extends AndroidBumperScanner {

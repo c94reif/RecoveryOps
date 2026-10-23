@@ -3,9 +3,9 @@ import 'package:circle_x/data/mappers/pmcs_storage_codec.dart';
 import 'package:flutter/foundation.dart';
 import 'package:circle_x/data/dao/sessions/sessions_dao.dart';
 import 'package:circle_x/data/datasources/local/database.dart';
-import 'package:circle_x/domain/entities/pmcs_session.dart';
-import 'package:circle_x/domain/entities/vehicle_type.dart';
-import 'package:circle_x/domain/repositories/sessions_repo.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_session.dart';
+import 'package:circle_x/domain/catalog/entities/vehicle_type.dart';
+import 'package:circle_x/domain/inspection/repositories/sessions_repo.dart';
 
 class SessionsRepoImpl implements SessionsRepository {
   final SessionsDao dao;

@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cac_ocr/cac_ocr.dart';
-import 'package:circle_x/domain/services/speech_recognition_strategy.dart';
-import 'package:circle_x/domain/services/user_notification_sink.dart';
+import 'package:circle_x/domain/shared/services/speech_recognition_strategy.dart';
+import 'package:circle_x/domain/shared/services/user_notification_sink.dart';
 import 'package:circle_x/presentation/inspection/controllers/fault_dictation_controller.dart';
 
 class PendingCacScanner implements CacScannerStrategy {

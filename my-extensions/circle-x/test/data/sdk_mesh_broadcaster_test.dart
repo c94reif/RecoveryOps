@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
 import 'package:circle_x/core/constants/app_constants.dart';
-import 'package:circle_x/data/services/sdk_mesh_broadcaster.dart';
+import 'package:circle_x/data/services/delivery/sdk_mesh_broadcaster.dart';
 
 import '../support/fakes.dart';
 

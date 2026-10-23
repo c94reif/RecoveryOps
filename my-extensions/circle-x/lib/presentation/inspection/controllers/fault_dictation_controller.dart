@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:circle_x/domain/services/speech_recognition_strategy.dart';
-import 'package:circle_x/domain/services/user_notification_sink.dart';
+import 'package:circle_x/domain/shared/services/speech_recognition_strategy.dart';
+import 'package:circle_x/domain/shared/services/user_notification_sink.dart';
 
 class FaultDictationController extends ChangeNotifier {
   final SpeechRecognitionStrategy speech;

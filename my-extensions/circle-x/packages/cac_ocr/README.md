@@ -202,7 +202,7 @@ CacOcrText(
 `CacRejection` and `AttestedIdentityError` carry their English the same way,
 in `message`. Only the scan log's developer wording is fixed (see
 [Tuning on a phone](#tuning-on-a-phone)). circle-x's PMCS wording is in
-`lib/presentation/inspection/pmcs_sign_off_text.dart`.
+`lib/presentation/inspection/summary/pmcs_sign_off_text.dart`.
 
 **What is offered.** Leave out `onSubmitUnverified` or `onSubmitTyped` where
 only a scanned card may sign. `showAimGuide: false` drops the card diagram, and

@@ -4,9 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
 import 'package:circle_x/core/constants/app_constants.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
-import 'package:circle_x/data/services/lattice_report_source.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
-import 'package:circle_x/domain/entities/pmcs_fault.dart';
+import 'package:circle_x/data/services/delivery/lattice_report_source.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_fault.dart';
 
 import '../support/fakes.dart';
 

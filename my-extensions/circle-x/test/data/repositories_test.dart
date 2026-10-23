@@ -13,15 +13,15 @@ import 'package:circle_x/data/repositories/queued_submissions_repo_impl.dart';
 import 'package:circle_x/data/repositories/reports_repo_impl.dart';
 import 'package:circle_x/data/repositories/results_repo_impl.dart';
 import 'package:circle_x/data/repositories/sessions_repo_impl.dart';
-import 'package:circle_x/domain/entities/check_result.dart';
+import 'package:circle_x/domain/inspection/entities/check_result.dart';
 import 'package:cac_ocr/cac_ocr.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
-import 'package:circle_x/domain/entities/pmcs_phase.dart';
-import 'package:circle_x/domain/entities/pmcs_session.dart';
-import 'package:circle_x/domain/entities/profile.dart';
-import 'package:circle_x/domain/entities/queued_submission.dart';
-import 'package:circle_x/domain/entities/transport_kind.dart';
-import 'package:circle_x/domain/entities/vehicle_type.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
+import 'package:circle_x/domain/catalog/entities/pmcs_phase.dart';
+import 'package:circle_x/domain/inspection/entities/pmcs_session.dart';
+import 'package:circle_x/domain/profile/entities/profile.dart';
+import 'package:circle_x/domain/delivery/entities/queued_submission.dart';
+import 'package:circle_x/domain/delivery/entities/transport_kind.dart';
+import 'package:circle_x/domain/catalog/entities/vehicle_type.dart';
 
 import '../support/fakes.dart';
 

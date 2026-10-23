@@ -1,5 +1,5 @@
-import 'package:circle_x/domain/entities/pmcs_history.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
+import 'package:circle_x/domain/reporting/entities/pmcs_history.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
 import 'package:circle_x/presentation/reports/controllers/report_search.dart';
 

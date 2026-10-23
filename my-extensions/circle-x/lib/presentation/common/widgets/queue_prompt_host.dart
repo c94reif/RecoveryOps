@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
-import 'package:circle_x/domain/services/queue_prompt_strategy.dart';
+import 'package:circle_x/domain/delivery/services/queue_prompt_strategy.dart';
 
 class QueuePromptHost extends StatefulWidget {
   final QueuePromptStrategy promptStrategy;

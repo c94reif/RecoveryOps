@@ -1,10 +1,10 @@
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
-import 'package:circle_x/domain/entities/pmcs_report.dart';
+import 'package:circle_x/domain/reporting/entities/pmcs_report.dart';
 import 'package:cac_ocr/cac_ocr.dart';
-import 'package:circle_x/domain/services/clock.dart';
-import 'package:circle_x/domain/services/speech_recognition_strategy.dart';
-import 'package:circle_x/domain/usecases/publishing/publish_pmcs_report.dart';
-import 'package:circle_x/domain/usecases/reporting/submit_maintainer_review.dart';
+import 'package:circle_x/domain/shared/services/clock.dart';
+import 'package:circle_x/domain/shared/services/speech_recognition_strategy.dart';
+import 'package:circle_x/domain/delivery/usecases/publish_pmcs_report.dart';
+import 'package:circle_x/domain/reporting/usecases/submit_maintainer_review.dart';
 import 'package:circle_x/presentation/maintainer/maintainer_review_view_model.dart';
 
 import 'fakes.dart';

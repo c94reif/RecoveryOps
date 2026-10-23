@@ -3,10 +3,10 @@
 // Unit, parts, and dispatch reference data used by the PMCS flow.
 // Regenerate with tool/generate_catalog.sh after editing the TM source data.
 
-import 'package:circle_x/domain/entities/fault_severity.dart';
-import 'package:circle_x/domain/entities/reference/common_part.dart';
-import 'package:circle_x/domain/entities/reference/mission.dart';
-import 'package:circle_x/domain/entities/reference/priority_designator.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
+import 'package:circle_x/domain/catalog/entities/reference/common_part.dart';
+import 'package:circle_x/domain/catalog/entities/reference/mission.dart';
+import 'package:circle_x/domain/catalog/entities/reference/priority_designator.dart';
 
 /// Actions a maintainer can record against a corrected fault.
 const List<String> correctiveActions = [

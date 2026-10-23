@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:circle_x/core/theme/app_theme.dart';
 import 'package:flutter/foundation.dart';
-import 'package:circle_x/domain/entities/queued_submission.dart';
+import 'package:circle_x/domain/delivery/entities/queued_submission.dart';
 import 'package:circle_x/presentation/common/formatters/report_time.dart';
 import 'package:circle_x/presentation/common/widgets/section_label.dart';
 

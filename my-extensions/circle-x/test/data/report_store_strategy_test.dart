@@ -3,11 +3,11 @@ import 'package:latlong2/latlong.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
 import 'package:circle_x/core/config/report_store_config.dart';
 import 'package:circle_x/data/mappers/pmcs_report_codec.dart';
-import 'package:circle_x/data/services/entity_report_store_strategy.dart';
-import 'package:circle_x/data/services/mesh_item_report_store_strategy.dart';
-import 'package:circle_x/data/services/report_store_factory.dart';
-import 'package:circle_x/domain/services/report_store_backend.dart';
-import 'package:circle_x/domain/entities/fault_severity.dart';
+import 'package:circle_x/data/services/delivery/entity_report_store_strategy.dart';
+import 'package:circle_x/data/services/delivery/mesh_item_report_store_strategy.dart';
+import 'package:circle_x/data/services/delivery/report_store_factory.dart';
+import 'package:circle_x/domain/delivery/services/report_store_backend.dart';
+import 'package:circle_x/domain/catalog/entities/fault_severity.dart';
 import '../support/fake_mesh_items.dart';
 import '../support/fakes.dart';
 

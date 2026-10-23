@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cac_ocr/cac_ocr.dart';
-import 'package:circle_x/presentation/inspection/pmcs_sign_off_text.dart';
+import 'package:circle_x/presentation/inspection/summary/pmcs_sign_off_text.dart';
 
 void main() {
   group('the PMCS refusal copy', () {
