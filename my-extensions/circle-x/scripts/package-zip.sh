@@ -45,7 +45,6 @@ OUTPUT="${1:-$PARENT_DIR/circle-x-source.zip}"
 OUTPUT_DIR="$(cd -- "$(dirname -- "$OUTPUT")" && pwd)"
 OUTPUT="$OUTPUT_DIR/$(basename -- "$OUTPUT")"
 
-# Always create a fresh archive so files removed since the last run cannot linger.
 STAGING_DIR="$(mktemp -d "$OUTPUT_DIR/.circle-x-package.XXXXXX")"
 trap 'rm -rf -- "$STAGING_DIR"' EXIT
 

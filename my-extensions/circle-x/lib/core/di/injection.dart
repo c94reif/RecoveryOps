@@ -16,7 +16,6 @@ import 'package:circle_x/presentation/common/services/snack_bar_service.dart';
 import 'package:circle_x/core/di/service_locator.dart';
 export 'package:circle_x/core/di/service_locator.dart';
 import 'package:le_sdk/le_sdk.dart' as sdk;
-
 import 'package:circle_x/data/catalog/pmcs_reference_data.g.dart';
 import 'package:circle_x/data/dao/faults/pmcs_faults_dao.dart';
 import 'package:circle_x/data/dao/profile/profile_dao.dart';
@@ -88,6 +87,8 @@ import 'package:circle_x/presentation/inspection/inspection_view_model.dart';
 import 'package:circle_x/presentation/profile/profile_view_model.dart';
 import 'package:circle_x/presentation/reports/reports_view_model.dart';
 
+/*I know this has become god class, but haven't gotten aroudn to refactoring it yet. All
+* dependency injection occurs here. */
 void configureDependencies(
   sdk.ExtensionContext extensionContext, {
   ReportStoreBackend? reportStoreBackend,

@@ -1,24 +1,4 @@
 #!/usr/bin/env bash
-# ─────────────────────────────────────────────────────────────────────
-# build-extension.sh
-#
-# Runs `flutter build web` and composes a self-contained
-# lattice_edge_build/ folder ready to push to a device/emulator.
-#
-# Output structure:
-#   <extension>/lattice_edge_build/
-#   ├── pubspec.yaml
-#   ├── web/          (compiled Flutter web app)
-#   ├── assets/       (logo.png if present)
-#   └── fonts/        (custom fonts if present)
-#
-# Usage:
-#   ./scripts/build-extension.sh [options] [extension_dir]
-#
-# Options:
-#   --no-build   Skip flutter build web (reuse existing build output)
-#   --clean      Run flutter clean before building
-# ─────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; BLUE='\033[0;34m'; NC='\033[0m'
@@ -58,7 +38,6 @@ info "Extension: $EXT_NAME"
 info "Source:    $EXT_DIR"
 info "Output:    $BUILD_DIR"
 
-# ── Build ────────────────────────────────────────────────────────────
 
 if [ "$NO_BUILD" = false ]; then
   if [ ! -d "$EXT_DIR/web" ]; then
@@ -81,7 +60,6 @@ fi
 
 [ -f "$EXT_DIR/build/web/index.html" ] || die "build/web/index.html not found. Run without --no-build first."
 
-# ── Compose lattice_edge_build ───────────────────────────────────────
 
 info "Composing lattice_edge_build/..."
 
@@ -103,7 +81,6 @@ fi
 
 ok "lattice_edge_build/ ready"
 
-# ── Push to connected devices/emulators ──────────────────────────────
 
 DEVICE_PATH="/sdcard/Documents/$EXT_NAME"
 

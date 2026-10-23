@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Regenerate the Dart PMCS catalogs from the TM source data in tool/tm_source.
-#
-# The .mjs files under tool/tm_source are the TM transcriptions with TypeScript
-# annotations stripped. Register vehicles and variants in catalog-manifest.mjs,
-# then run this script — never hand-edit generated Dart files.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
